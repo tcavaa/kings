@@ -12,7 +12,7 @@ database.
   read King Online games straight from it; King Online's old public API
   (`/api/public/*`) is gone.
 
-Live: https://kings-indol-eight.vercel.app (Vercel project `kings`, team
+Live: https://kingge.vercel.app (Vercel project `kings`, team
 "Tsava") · game server https://kings-game-server.onrender.com (Render
 service `kings-game-server`).
 
