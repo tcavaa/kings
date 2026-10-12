@@ -8,7 +8,7 @@ database.
   leaderboard, spectating, chat/voice/sound reactions, `/admin` sound manager.
 - `/score` — King Score: score sheet, history, seasons, stats, achievements.
   Opened from King Online's **ჩაწერა** button (main nav + the lobby tile).
-- One Supabase database (KING-APP) for both. The score app's history/stats
+- One Supabase database (project `KINGS`, Frankfurt) for both. The score app's history/stats
   read King Online games straight from it; King Online's old public API
   (`/api/public/*`) is gone.
 
@@ -19,7 +19,7 @@ service `kings-game-server`).
 ## Architecture
 
 ```
- browser ──► Vercel (Next.js 16)          ──► Supabase Postgres (KING-APP)
+ browser ──► Vercel (Next.js 16)          ──► Supabase Postgres (KINGS)
              ├ /            King Online UI      ├ profiles, finished_games,
              ├ /score       King Score UI       │ live_games, sounds   (King Online)
              └ /api/*       REST API ───────────┤
@@ -35,9 +35,9 @@ Vercel. All three run on free plans.
 
 | Piece | Host | Notes |
 |---|---|---|
-| Next.js app + REST API | Vercel (Hobby) | functions in `bom1` (Mumbai), next to the database |
+| Next.js app + REST API | Vercel (Hobby) | functions in `fra1` (Frankfurt), next to the database |
 | Game server (`server/`) | Render (Free) | Frankfurt. Sleeps after 15 min with nobody connected; the first visitor after that waits ~1 min for it to wake. Live games are snapshotted to `live_games` and restored on wake. |
-| Database | Supabase (Free) | `ap-south-1` |
+| Database | Supabase (Free) | project `KINGS`, `eu-central-1` (Frankfurt), next to the game server |
 
 ## Repo layout
 

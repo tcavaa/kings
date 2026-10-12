@@ -24,3 +24,6 @@ server/.env
 .vscode/
 *.log
 npm-debug.log*
+
+# local database backups (contain PIN hashes)
+backups/
