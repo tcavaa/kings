@@ -13,6 +13,10 @@ const hexToInt = (hex) => parseInt(hex.slice(1), 16);
 
 const W = 1100;
 const H = 700;
+// Nothing is drawn above the felt's top border except empty parchment, so
+// the camera starts this far down: the visible scene is shorter and the
+// table + cards fill more of the screen (the top bar overlays this band).
+const VIEW_TOP = 55;
 
 // ── Table geometry ────────────────────────────────────────────────────────────
 const TABLE_CX = W / 2;
@@ -136,6 +140,16 @@ export class GameScene extends Phaser.Scene {
     this._drawTable();
     this._drawWatermark();
 
+    this.cameras.main.setScroll(0, VIEW_TOP);
+
+    // The hand's card size depends on how big the canvas is on screen, so
+    // repaint when the canvas is re-fitted (rotation, browser chrome).
+    this._onResize = () => {
+      if (!this.sys || !this.sys.isActive()) return;
+      if (this.gameState && !this._animatingTrick) this._renderAll(this.gameState);
+    };
+    this.scale.on("resize", this._onResize);
+
     // Bind handlers so we can detach the exact same references on shutdown
     this._onStateUpdate = (state) => {
       // ALWAYS cache the freshest snapshot, even if we can't draw it right
@@ -218,6 +232,8 @@ export class GameScene extends Phaser.Scene {
 
   _cleanupBus() {
     this._avatarCache?.dispose();
+    if (this._onResize) this.scale?.off("resize", this._onResize);
+    this._onResize = null;
     if (this._onStateUpdate) EventBus.off("state-update", this._onStateUpdate);
     if (this._onAnimateTrickWinner)
       EventBus.off("animate-trick-winner", this._onAnimateTrickWinner);
@@ -627,8 +643,13 @@ export class GameScene extends Phaser.Scene {
       Math.min(maxSpacing, (W - 200) / Math.max(1, total)),
     );
     const startX = W / 2 - ((total - 1) * spacing) / 2;
-    // Lifted so the fan clears the own avatar + sound button underneath.
-    const baseY = H - 192;
+    // On a phone the whole scene is scaled down, so the hand is drawn larger
+    // to keep cards readable: aim for ~50 px wide on screen, at most 1.3×.
+    const shown = (this.scale.displaySize?.width || W) / W;
+    const k = Phaser.Math.Clamp(50 / (CARD_W * shown), 1, 1.3);
+    // Lifted so the fan clears the own avatar + sound button underneath
+    // (bigger cards are lifted by their extra half-height).
+    const baseY = H - 192 - ((k - 1) * CARD_H) / 2;
     const isMyTurn = gamePhase === "playing" && currentTurn === mySeat;
     const midIdx = (total - 1) / 2;
 
@@ -658,6 +679,7 @@ export class GameScene extends Phaser.Scene {
       const isTrump = state.trumpSuit && card.suit === state.trumpSuit;
 
       const container = createFaceUpCard(this, x, y, card, inter);
+      container.setScale(k);
       container.setAngle(fanAngle);
       container.setDepth(20 + i);
       container.origY = y;
@@ -695,15 +717,15 @@ export class GameScene extends Phaser.Scene {
         const fromY = TABLE_CY - 10;
         container.setPosition(fromX, fromY);
         container.setAngle(0);
-        container.setScale(0.55);
+        container.setScale(0.55 * k);
         container.setAlpha(0);
         this.tweens.add({
           targets: container,
           x,
           y,
           angle: fanAngle,
-          scaleX: 1,
-          scaleY: 1,
+          scaleX: k,
+          scaleY: k,
           alpha: 1,
           duration: 380,
           delay: i * 55,
@@ -730,8 +752,8 @@ export class GameScene extends Phaser.Scene {
             targets: container,
             y: y - 24,
             angle: 0,
-            scaleX: 1.06,
-            scaleY: 1.06,
+            scaleX: 1.06 * k,
+            scaleY: 1.06 * k,
             duration: 160,
             ease: "Quad.easeOut",
           });
@@ -742,8 +764,8 @@ export class GameScene extends Phaser.Scene {
             targets: container,
             y,
             angle: fanAngle,
-            scaleX: 1,
-            scaleY: 1,
+            scaleX: k,
+            scaleY: k,
             duration: 160,
             ease: "Quad.easeIn",
           });
@@ -968,4 +990,4 @@ export class GameScene extends Phaser.Scene {
 
 // Re-export for PhaserGame to know the canvas size
 export const SCENE_W = W;
-export const SCENE_H = H;
+export const SCENE_H = H - VIEW_TOP;

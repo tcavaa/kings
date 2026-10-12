@@ -10,14 +10,17 @@ import {
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
 import GameTimer from "./GameTimer";
+// Shown in the contract chip before a contract exists — neutral wording,
+// since it's usually someone else who's choosing.
 const PHASES = {
-  type_selection: "აირჩიე თამაში",
-  trump_selection: "აირჩიე კოზირი",
-  discard: "გადადე კარტები",
+  type_selection: "თამაში ირჩევა",
+  trump_selection: "კოზირი ირჩევა",
+  discard: "კარტები იდება",
   playing: "თამაში მიმდინარეობს",
   round_end: "რაუნდი დასრულდა",
 };
 const SUITS = { H: "♥ გული", D: "♦ აგური", S: "♠ ყვავი", C: "♣ ჯვარი" };
+const SUIT_SYMBOL = { H: "♥", D: "♦", S: "♠", C: "♣" };
 function TopBar({
   onToggleMenu,
   onToggleScores,
@@ -84,19 +87,30 @@ function TopBar({
           <strong>{String(round).padStart(2, "0")}</strong>
           <small>/ 27</small>
           <i />
-          <b>
-            {type?.name || PHASES[gamePhase] || "კინგი"}
-            {trumpSuit && (
-              <em className={`k-trump-label suit-${trumpSuit}`}>
-                კოზირი: {SUITS[trumpSuit]}
+          {/* What's being played is always on screen, at every width: the
+              contract, and for the plus games the trump suit (or none). */}
+          <div
+            className="k-contract"
+            title={
+              trumpSuit
+                ? `${type?.name} · კოზირი: ${SUITS[trumpSuit]}`
+                : type?.name || PHASES[gamePhase]
+            }
+          >
+            {type?.Icon && <type.Icon size={14} aria-hidden="true" />}
+            <span>{type?.name || PHASES[gamePhase] || "კინგი"}</span>
+            {trumpSuit ? (
+              <em className={`k-trump-chip suit-${trumpSuit}`}>
+                {SUIT_SYMBOL[trumpSuit]}
+                <small>{SUITS[trumpSuit].slice(2)}</small>
               </em>
-            )}
-            {!trumpSuit &&
-              chosenGameType?.startsWith("P") &&
-              ["playing", "discard", "round_end"].includes(gamePhase) && (
-                <em className="k-trump-label">უკოზირო</em>
-              )}
-          </b>
+            ) : chosenGameType?.startsWith("P") &&
+              ["playing", "discard", "round_end"].includes(gamePhase) ? (
+              <em className="k-trump-chip is-none">უკოზირო</em>
+            ) : chosenGameType?.startsWith("P") && gamePhase === "trump_selection" ? (
+              <em className="k-trump-chip is-none">კოზირი…</em>
+            ) : null}
+          </div>
         </div>
       </div>
       <div className="k-round-progress" aria-label={`რაუნდი ${round} / 27`}>

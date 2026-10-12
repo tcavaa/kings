@@ -16,9 +16,32 @@ body.king-light-game .k-game-header {
   border-color: #c5d6ca;
   box-shadow: 0 3px 18px #174b3510;
 }
-body.king-light-game .k-game-brand small,
-body.king-light-game .k-game-copy {
-  color: #577666;
+/* Room code: the one thing friends need to join — a dark badge that stands
+   out on the cream bar. */
+body.king-light-game .k-room-code {
+  background: #173e32;
+  border-color: #173e32;
+  color: #c9d8c4;
+  border-radius: 5px;
+}
+body.king-light-game .k-room-code small {
+  color: #a9c2b0;
+}
+body.king-light-game .k-room-code b {
+  color: #d7fa52;
+}
+body.king-light-game .k-room-code:hover {
+  background: #0f2c23;
+}
+body.king-light-game .k-game-timer {
+  background: #f1f6f2;
+  border-color: #c5d6ca;
+  border-radius: 5px;
+  color: #173e32;
+  font-weight: 700;
+}
+body.king-light-game .k-game-timer svg {
+  color: #087b59;
 }
 body.king-light-game .k-game-icon {
   background: #e5f1e9;
@@ -470,4 +493,191 @@ body.king-light-game .k-sound-library button.is-playing {
   background: var(--sound-color);
   border-color: var(--sound-color);
   color: white;
+}
+
+
+/* ── Top bar: always show the contract + trump; compact on phones ───────── */
+body.king-light-game .k-contract {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border: 1px solid #c5d6ca;
+  border-radius: 5px;
+  background: #f1f6f2;
+  color: #173e32;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+body.king-light-game .k-contract svg {
+  color: #087b59;
+  flex: none;
+}
+body.king-light-game .k-trump-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: 2px;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.3;
+  background: #fffdf6;
+  border: 1px solid #c5d6ca;
+  color: #173e32;
+}
+body.king-light-game .k-trump-chip small {
+  font-size: 11px;
+  font-weight: 650;
+}
+body.king-light-game .k-trump-chip.suit-H,
+body.king-light-game .k-trump-chip.suit-D {
+  color: #d11f37;
+}
+body.king-light-game .k-trump-chip.is-none {
+  font-size: 11px;
+  color: #755015;
+  background: #ffedc9;
+  border-color: #e1c58f;
+}
+/* "Waiting for X to choose" floats under the bar instead of squeezing into it. */
+body.king-light-game .k-game-header .k-turn-status {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 24px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: #173e32;
+  color: #fffdf6;
+  box-shadow: 0 4px 14px #174b3530;
+  white-space: nowrap;
+  z-index: 21;
+}
+body.king-light-game .k-game-header .k-turn-status .k-live-dot {
+  display: inline-block;
+}
+body.king-light-game .k-game-header .k-turn-status > span:last-child {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+body.king-light-game .k-game-header .k-turn-status b {
+  color: #d7fa52;
+  font-weight: 700;
+  font-size: 12px;
+}
+body.king-light-game .k-game-header .k-turn-status small {
+  color: #e6eee6;
+  font-size: 11px;
+  margin: 0;
+}
+@media (max-width: 800px), (max-height: 540px) {
+  body.king-light-game .k-game-brand > span {
+    display: none;
+  }
+  body.king-light-game .k-game-round strong {
+    font-size: 20px;
+    padding: 2px 7px;
+  }
+  body.king-light-game .k-game-round > small {
+    font-size: 10px;
+  }
+  body.king-light-game .k-contract {
+    font-size: 12px;
+    padding: 4px 7px;
+    gap: 4px;
+  }
+  body.king-light-game .k-trump-chip small {
+    display: none;
+  }
+  body.king-light-game .k-room-code {
+    padding: 5px 8px;
+  }
+  body.king-light-game .k-room-code b {
+    font-size: 15px;
+    letter-spacing: 1px;
+  }
+  body.king-light-game .k-game-timer {
+    padding: 4px 6px;
+    font-size: 12px;
+  }
+  body.king-light-game .k-game-icon {
+    width: 30px;
+    height: 30px;
+  }
+  body.king-light-game .k-rounds-trigger {
+    padding: 6px;
+  }
+}
+/* Narrow phones: two rows — menu, room code and tools on top; round,
+   contract and trump centred underneath — so nothing overlaps. */
+@media (max-width: 600px) {
+  body.king-light-game .k-game-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 58px;
+    padding: 7px 10px 9px;
+    row-gap: 7px;
+    column-gap: 8px;
+  }
+  body.king-light-game .k-game-brand {
+    flex: none;
+  }
+  body.king-light-game .k-round-group {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+  body.king-light-game .k-game-round {
+    gap: 6px;
+  }
+  body.king-light-game .k-game-round > i {
+    display: block;
+  }
+}
+
+/* Phones: the standings and the replay button shrink so the table has room. */
+@media (max-width: 800px), (max-height: 540px) {
+  body.king-light-game .k-live-scores {
+    width: 124px;
+    left: 8px;
+    bottom: 8px;
+    padding: 6px 9px;
+  }
+  body.king-light-game .k-live-scores-title {
+    display: none;
+  }
+  body.king-light-game .k-live-score {
+    padding: 2px 0;
+    gap: 6px;
+    font-size: 10px;
+  }
+  body.king-light-game .k-live-score > small {
+    display: none;
+  }
+  body.king-light-game .k-live-score > b {
+    font-size: 12px;
+  }
+  body.king-light-game .k-last-trick {
+    right: 8px;
+    bottom: 8px;
+    padding: 5px;
+    gap: 0;
+  }
+  body.king-light-game .k-last-trick > span:not(:first-child),
+  body.king-light-game .k-last-trick > svg {
+    display: none;
+  }
+  body.king-light-game .k-last-trick > span:first-child {
+    width: 34px;
+    height: 34px;
+  }
 }

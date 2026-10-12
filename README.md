@@ -128,7 +128,7 @@ King Score's old tables (`players`, `game_results`, `game_details`) were
 imported with `npm run db:merge-score-app` (safe to re-run; it verifies every
 game reads back exactly). Players without an online name were not carried
 over — their old games keep their name, but they aren't listed or ranked.
-`-- --retire-legacy` moves the old tables into a `legacy` schema.
+Backups of the old tables are in `backups/` (gitignored); the tables themselves can be dropped once nobody needs them.
 
 `supabase/migrations/20261012120000_king_online.sql` creates King Online's
 tables — same tables, columns and keys as the MySQL schema (DATETIME →
