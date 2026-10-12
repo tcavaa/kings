@@ -1,0 +1,25 @@
+# Render Blueprint for the live game server (Socket.IO). In Render:
+# New → Blueprint → pick this repo. Then set the two secrets it asks for.
+services:
+  - type: web
+    name: kings-game-server
+    runtime: node
+    plan: free
+    # Frankfurt: closest Render region to the players in Georgia.
+    region: frankfurt
+    rootDir: server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: APP_TIMEZONE
+        value: Asia/Tbilisi
+      # Supabase → Connect → "Transaction pooler" URI (same value as on Vercel).
+      - key: DATABASE_URL
+        sync: false
+      # The Vercel app's URL(s), comma-separated — or * to allow any origin.
+      - key: CORS_ORIGIN
+        sync: false

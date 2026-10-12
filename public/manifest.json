@@ -1,0 +1,14 @@
+{
+  "name": "King Card Game",
+  "short_name": "King",
+  "description": "KING — a modern card club.",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0c1716",
+  "theme_color": "#0c1716",
+  "icons": [
+    { "src": "/art/app-icon.png",        "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/art/app-icon.png", "sizes": "192x192", "type": "image/png", "purpose": "any" }
+  ]
+}

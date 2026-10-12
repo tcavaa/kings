@@ -1,0 +1,473 @@
+/* The in-game palette is scoped to its lifecycle, including portal dialogs. */
+body.king-light-game {
+  --game-ink: #173e32;
+  --game-muted: #587266;
+  --game-paper: #fffdf6;
+  --game-green: #087b59;
+  --game-line: #cedbd1;
+}
+body.king-light-game .k-game-screen {
+  background: #dceae1 !important;
+  color: var(--game-ink);
+}
+body.king-light-game .k-game-header {
+  background: #fffdf6;
+  color: var(--game-ink);
+  border-color: #c5d6ca;
+  box-shadow: 0 3px 18px #174b3510;
+}
+body.king-light-game .k-game-brand small,
+body.king-light-game .k-game-copy {
+  color: #577666;
+}
+body.king-light-game .k-game-icon {
+  background: #e5f1e9;
+  border-color: #bdd4c5;
+  color: #126646;
+}
+body.king-light-game .k-game-tools .k-game-icon:last-child {
+  color: #315cc0;
+  background: #e9efff;
+  border-color: #c6d5f5;
+}
+body.king-light-game .k-game-round {
+  gap: 8px;
+}
+body.king-light-game .k-game-round > span {
+  color: #315a49;
+  font-size: 10px;
+}
+body.king-light-game .k-game-round strong {
+  background: #087b59;
+  color: #fffdf6;
+  font-size: 30px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 5px;
+}
+body.king-light-game .k-game-round > small {
+  color: #486753;
+}
+body.king-light-game .k-game-round > i {
+  background: #c5d6ca;
+  margin: 0 4px;
+}
+body.king-light-game .k-game-round > b {
+  color: #173e32;
+  font-weight: 700;
+  font-size: 13px;
+}
+body.king-light-game .k-game-round .k-trump-label {
+  display: block;
+  width: fit-content;
+  color: #6d4810;
+  background: #ffebba;
+  border: 1px solid #e8c774;
+  padding: 3px 8px;
+  margin-top: 4px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+}
+body.king-light-game .k-trump-label.suit-H,
+body.king-light-game .k-trump-label.suit-D {
+  color: #ae3044;
+  background: #ffe5df;
+  border-color: #ecb6a7;
+}
+.k-round-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -5px;
+  height: 5px;
+  display: flex;
+  gap: 3px;
+  background: #fffdf6;
+}
+.k-round-progress > span {
+  flex: 1;
+  background: #cdded2;
+}
+.k-round-progress .is-done {
+  background: #15976b;
+}
+.k-round-progress .is-active {
+  background: #ecaa2d;
+  box-shadow: 0 0 0 1px #be8021;
+}
+body.king-light-game .k-turn-status {
+  background: #e3f1e8;
+  color: #245b43;
+  border-color: #bcd4c5;
+}
+body.king-light-game .k-turn-status b,
+body.king-light-game .k-turn-status small {
+  color: #245b43;
+}
+body.king-light-game .k-live-dot,
+body.king-light-game .k-game-connection i.on {
+  background: #079b67;
+}
+body.king-light-game .k-table-quote {
+  color: #416451 !important;
+}
+body.king-light-game .k-game-quote > p:last-child {
+  color: #58705e !important;
+}
+body.king-light-game .k-live-scores {
+  background: #fffdf2ed;
+  border: 1px solid #b7cfbc;
+  border-radius: 6px;
+  padding: 12px;
+  color: #234735;
+}
+body.king-light-game .k-live-scores-title,
+body.king-light-game .k-live-score {
+  color: #456653;
+}
+body.king-light-game .k-live-score.own,
+body.king-light-game .k-live-score b {
+  color: #087b59;
+}
+body.king-light-game .k-desktop-sounds > header {
+  color: #385e49;
+}
+body.king-light-game .k-sheet {
+  background: #fffdf6;
+  color: #173e32;
+  border-color: #c5d6ca;
+}
+body.king-light-game .k-sheet > header .k-eyebrow {
+  color: #498269;
+}
+body.king-light-game .k-sheet > h2 {
+  border-color: #d5dfd5;
+}
+body.king-light-game .k-sheet .k-icon-button {
+  color: #296649;
+  border-color: #cadaca;
+  background: #eaf3e9;
+}
+body.king-light-game .k-data-table,
+body.king-light-game .k-data-table tbody th {
+  color: #254f3a;
+}
+body.king-light-game .k-data-table th,
+body.king-light-game .k-data-table td {
+  border-color: #dce4d9;
+}
+body.king-light-game .k-data-table thead th {
+  background: #e8f1e9;
+  color: #476957;
+}
+body.king-light-game .k-data-table small,
+body.king-light-game .k-data-caption,
+body.king-light-game .k-data-empty {
+  color: #5a7464;
+}
+body.king-light-game .k-type-code {
+  background: var(--contract-color, #d8ebde);
+  color: #173e32;
+  border: 0;
+  font-weight: 700;
+}
+body.king-light-game .k-type-matrix .is-current {
+  background: #fff0cd;
+  box-shadow: inset 3px 0 #dcaa3c;
+}
+body.king-light-game .k-type-matrix .is-played {
+  color: #00864c;
+  background: #d7f7df;
+}
+body.king-light-game .k-type-matrix .is-played svg {
+  width: 21px;
+  height: 21px;
+  padding: 3px;
+  background: #00a65a;
+  color: white;
+  border-radius: 4px;
+}
+body.king-light-game .k-score-totals > div {
+  background: #e6f2e9;
+  border-top: 3px solid #209e74;
+}
+body.king-light-game .k-score-totals > div:nth-child(2) {
+  background: #fff0d8;
+  border-color: #dba441;
+}
+body.king-light-game .k-score-totals > div:nth-child(3) {
+  background: #e9edfc;
+  border-color: #7489d7;
+}
+body.king-light-game .k-score-totals strong {
+  color: #176344;
+}
+body.king-light-game .k-score-totals small,
+body.king-light-game .k-replay > p,
+body.king-light-game .k-replay-cards small {
+  color: #55705e;
+}
+body.king-light-game .k-table-menu button {
+  color: #254e3a;
+  border-color: #dae4d9;
+}
+body.king-light-game .k-table-menu button svg {
+  color: #1b9466;
+}
+body.king-light-game .k-table-menu button:nth-child(2) svg {
+  color: #b98127;
+}
+body.king-light-game .k-table-menu button:nth-child(3) svg {
+  color: #6476c3;
+}
+body.king-light-game .k-chat-empty,
+body.king-light-game .k-chat-empty h4,
+body.king-light-game .k-chat-message > div > span {
+  color: #587366;
+}
+body.king-light-game .k-chat-empty svg {
+  color: #438f73;
+}
+body.king-light-game .k-message-body {
+  background: #edf0fb;
+  color: #304c70;
+}
+body.king-light-game .is-mine .k-message-body {
+  background: #d8f0e1;
+  color: #174f37;
+}
+body.king-light-game .k-chat-compose {
+  border-color: #cbdccd;
+}
+body.king-light-game .k-chat-compose input {
+  background: #edf3eb;
+  border-color: #cadaca;
+  color: #214934;
+}
+body.king-light-game .k-chat-compose > button {
+  background: #e4eee2;
+  color: #287149;
+  border-color: #bed2bd;
+}
+body.king-light-game .k-chat-compose .k-chat-send {
+  background: #087b59;
+  color: #fff;
+}
+body.king-light-game .k-message-reactions button {
+  color: #467451;
+  border-color: #c2d6c2;
+}
+body.king-light-game .k-contract-modal {
+  background: #fffdf6;
+  color: #173e32;
+  border-color: #c2d4c4;
+}
+body.king-light-game .k-contract-heading,
+body.king-light-game .k-contract-footer {
+  border-color: #cfddce;
+}
+body.king-light-game .k-contract-heading .k-eyebrow {
+  color: #16845c;
+}
+body.king-light-game .k-contract-heading > span small,
+body.king-light-game .k-contract-layout aside p,
+body.king-light-game .k-contract-footer > span {
+  color: #587364;
+}
+body.king-light-game .k-contract-layout > aside {
+  background: #e9f2e9;
+}
+body.king-light-game .k-contract-layout > aside > .k-eyebrow {
+  color: #397052;
+}
+body.king-light-game .k-contract-options > button {
+  border-color: #d4dfd2;
+  border-left: 4px solid var(--contract-color);
+  background: #fffdf6;
+  color: #244c37;
+  padding-left: 14px;
+}
+body.king-light-game .k-contract-icon {
+  background: var(--contract-color);
+  color: #233d31;
+  border: 0;
+  border-radius: 8px;
+}
+body.king-light-game .k-contract-options small {
+  color: #5e7665;
+}
+body.king-light-game .k-contract-options b {
+  color: #b44941;
+}
+body.king-light-game .k-contract-options .is-positive b {
+  color: #07865a;
+}
+body.king-light-game .k-contract-options > button[aria-pressed="true"] {
+  background: #def3e5;
+  box-shadow: inset 0 0 0 2px #159463;
+}
+body.king-light-game .k-contract-options > button[aria-pressed="true"] strong,
+body.king-light-game .k-contract-options > button[aria-pressed="true"] b {
+  color: #076c49;
+}
+body.king-light-game .k-contract-options > button:hover {
+  background: #edf6e9;
+}
+body.king-light-game .k-radio {
+  border-color: #a6bfab;
+}
+body.king-light-game
+  .k-contract-options
+  > button[aria-pressed="true"]
+  .k-radio {
+  background: #07855a;
+  color: white;
+  border-color: #07855a;
+}
+body.king-light-game .k-contract-footer .k-button {
+  background: #087b59;
+  color: white;
+}
+body.king-light-game .k-used-types span {
+  background: #dce6da;
+  color: #687c6b;
+}
+body.king-light-game .k-used-types small,
+body.king-light-game .k-trump-body p,
+body.king-light-game .k-link {
+  color: #426d54;
+}
+body.king-light-game .k-suit-choices button {
+  background: #edf3e9;
+  color: #244e38;
+  border-color: #c6d8c3;
+}
+body.king-light-game .k-suit-choices button:nth-child(2),
+body.king-light-game .k-suit-choices button:nth-child(3) {
+  color: #b7404c;
+  background: #fff0e9;
+}
+body.king-light-game .k-suit-choices button[aria-pressed="true"] {
+  border-color: #168c5e;
+  box-shadow: inset 0 0 0 2px #168c5e;
+  background: #d9eedb;
+}
+@media (max-width: 700px) {
+  body.king-light-game .k-game-round > b {
+    font-size: 11px;
+  }
+  body.king-light-game .k-game-round .k-trump-label {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  body.king-light-game .k-game-round strong {
+    font-size: 23px;
+    padding: 2px 6px;
+  }
+}
+body.king-light-game .k-live-score.own > b {
+  color: #087b59;
+}
+body.king-light-game .k-last-trick {
+  background: #fffdf4ee;
+  color: #285d43;
+  border: 1px solid #bfd4be;
+  border-radius: 5px;
+}
+body.king-light-game .k-last-trick small,
+body.king-light-game .k-last-trick > svg {
+  color: #488061;
+}
+
+body.king-light-game .k-contract-modal {
+  background: #fffdf6 !important;
+  border-color: #c2d4c4 !important;
+}
+body.king-light-game .k-strategy-modal .k-contract-layout > aside {
+  background: #e9f2e9;
+}
+body.king-light-game .k-contract-options strong {
+  color: #244c37;
+}
+body.king-light-game .k-contract-options > button {
+  padding-left: 12px;
+  padding-right: 10px;
+}
+body.king-light-game .k-rounds-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  color: #755015;
+  background: #ffedc9;
+  border: 1px solid #e1c58f;
+  border-radius: 4px;
+  font-size: 10px;
+}
+body.king-light-game .k-rounds-trigger b {
+  margin-left: 5px;
+}
+@media (max-width: 700px) {
+  body.king-light-game .k-rounds-trigger span {
+    display: none;
+  }
+}
+body.king-light-game .k-voice-trigger,
+body.king-light-game .k-sound-library button {
+  background: #edf5e9;
+  color: #245b3d;
+  border-color: #bdd1b7;
+}
+body.king-light-game .k-sound-library .is-playing {
+  background: #0c8059;
+  color: white;
+}
+body.king-light-game .k-probability p,
+body.king-light-game .k-table-menu-secondary span {
+  color: #587364;
+}
+@media (max-width: 520px) {
+  body.king-light-game .k-game-header {
+    padding: 0 8px;
+    gap: 5px;
+  }
+  body.king-light-game .k-game-tools {
+    gap: 4px;
+  }
+  body.king-light-game .k-game-round > b {
+    max-width: 105px;
+  }
+}
+
+body.king-light-game .k-live-score > b[data-score-sign="positive"] {
+  color: #009f4d;
+  font-weight: 750;
+}
+body.king-light-game .k-live-score > b[data-score-sign="negative"] {
+  color: #ee233b;
+  font-weight: 750;
+}
+body.king-light-game .k-live-score > b[data-score-sign="zero"] {
+  color: #64746b;
+}
+body.king-light-game .k-direct-sounds button,
+body.king-light-game .k-sound-library button {
+  background: var(--sound-bg);
+  color: var(--sound-color);
+  border: 1px solid var(--sound-border);
+  border-left: 4px solid var(--sound-color);
+  font-weight: 650;
+}
+body.king-light-game .k-direct-sounds button svg,
+body.king-light-game .k-sound-library button small {
+  color: inherit;
+}
+body.king-light-game .k-direct-sounds button:hover,
+body.king-light-game .k-direct-sounds button.is-playing,
+body.king-light-game .k-sound-library button:hover,
+body.king-light-game .k-sound-library button.is-playing {
+  background: var(--sound-color);
+  border-color: var(--sound-color);
+  color: white;
+}

@@ -1,0 +1,26 @@
+{
+  "name": "kings-game-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "King Online live game server (Socket.IO). Deployed on Render; shares the Supabase database with the Next.js app.",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "node tournament/bracket.test.js",
+    "smoke": "node socket/lobby.smoke.js && node socket/chat.smoke.js && node socket/spectator-evict.smoke.js && node tournament/socket.smoke.js && node tournament/nine.smoke.js && node tournament/spectate.smoke.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "dotenv": "16.6.1",
+    "express": "4.22.1",
+    "postgres": "3.4.9",
+    "socket.io": "4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "socket.io-client": "4.8.3"
+  }
+}
