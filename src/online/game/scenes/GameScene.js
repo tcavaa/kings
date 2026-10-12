@@ -21,13 +21,14 @@ const hexToInt = (hex) => parseInt(hex.slice(1), 16);
 //             overlays it), so the table fills more of the screen.
 export function layoutFor(portrait) {
   if (!portrait) {
-    const W = 1100, H = 700, TABLE_CX = W / 2, TABLE_CY = H / 2 - 30;
+    const W = 1100, H = 700, TABLE_CX = W / 2, TABLE_CY = H / 2 - 20;
     return {
       portrait: false, W, H, VIEW_TOP: 55, TABLE_CX, TABLE_CY,
-      felt: { left: 55, right: W - 55, top: H * 0.23, bottom: H * 0.81, cut: 92 },
-      // relative seat: 0 = self (bottom, under the cards), 1 = left, 2 = right
+      felt: { left: 55, right: W - 55, top: H * 0.23, bottom: H * 0.845, cut: 92 },
+      // relative seat: 0 = self (bottom, under the cards — its name and score
+      // sit to the right of the photo, so it can sit low), 1 = left, 2 = right
       AVATAR_POS: [
-        { x: TABLE_CX, y: H - 88 },
+        { x: TABLE_CX, y: H - 60 },
         { x: 100, y: H / 2 - 40 },
         { x: W - 100, y: H / 2 - 40 },
       ],
@@ -597,17 +598,21 @@ export class GameScene extends Phaser.Scene {
         );
       }
 
-      // Name + score chip (mimics 'Frank / 1,860' style)
-      const nameOffY = isOwn ? radius + 16 : radius + 18;
+      // Name + score chip (mimics 'Frank / 1,860' style). The bottom seat
+      // keeps them beside the photo — on its left, right-aligned, clear of the
+      // voice button on its right — so nothing hangs below it.
+      const beside = rel === 0;
+      const textX = beside ? -(radius + 14) : 0;
+      const nameOffY = beside ? -16 : isOwn ? radius + 16 : radius + 18;
       const nameLabel = isOwn ? "შენ" : player.name;
       const nameTxt = this.add
-        .text(0, nameOffY, nameLabel, {
+        .text(textX, nameOffY, nameLabel, {
           fontSize: "14px",
           color: isOwn ? "#163d31" : "#ffffff",
           fontFamily: "Noto Sans Georgian, Inter, system-ui, Arial, sans-serif",
           fontStyle: "bold",
         })
-        .setOrigin(0.5);
+        .setOrigin(beside ? 1 : 0.5, 0.5);
       container.add(nameTxt);
 
       const scoreOffY = nameOffY + 18;
@@ -621,35 +626,37 @@ export class GameScene extends Phaser.Scene {
           : score < 0
             ? "#ae3447"
             : "#4f6c5d";
-      // small coin icon
-      const coin = this.add.graphics();
-      coin.fillStyle(0xd7fa52, 1);
-      coin.fillCircle(-22, scoreOffY, 5);
-      coin.fillStyle(0xfde68a, 1);
-      coin.fillCircle(-22, scoreOffY, 3);
-      container.add(coin);
       const scoreTxt = this.add
-        .text(-12, scoreOffY, scoreStr, {
+        .text(beside ? textX : -12, scoreOffY, scoreStr, {
           fontSize: "13px",
           color: scoreCol,
           fontFamily: "Inter, system-ui, Arial, sans-serif",
           fontStyle: "bold",
         })
-        .setOrigin(0, 0.5);
+        .setOrigin(beside ? 1 : 0, 0.5);
+      // small coin icon, just before the score
+      const coinX = beside ? textX - scoreTxt.width - 10 : -22;
+      const coin = this.add.graphics();
+      coin.fillStyle(0xd7fa52, 1);
+      coin.fillCircle(coinX, scoreOffY, 5);
+      coin.fillStyle(0xfde68a, 1);
+      coin.fillCircle(coinX, scoreOffY, 3);
+      container.add(coin);
       container.add(scoreTxt);
 
       // Leader / "Dealer" pill
       if (isLeader) {
         const pillY = scoreOffY + 18;
+        const pillX = beside ? textX - 32 : 0;
         const pillBg = this.add.graphics();
         pillBg.fillStyle(0x303b28, 1); // Kakhetian wine
-        pillBg.fillRoundedRect(-32, pillY - 9, 64, 18, 2);
+        pillBg.fillRoundedRect(pillX - 32, pillY - 9, 64, 18, 2);
         pillBg.lineStyle(1, 0xc7e88b, 0.75);
-        pillBg.strokeRoundedRect(-32, pillY - 9, 64, 18, 2);
+        pillBg.strokeRoundedRect(pillX - 32, pillY - 9, 64, 18, 2);
         container.add(pillBg);
         container.add(
           this.add
-            .text(0, pillY, "წამყვანი", {
+            .text(pillX, pillY, "წამყვანი", {
               fontSize: "10px",
               color: "#f5f2e9",
               fontFamily: "Noto Sans Georgian, Arial, sans-serif",
@@ -716,7 +723,7 @@ export class GameScene extends Phaser.Scene {
       const startX = W / 2 - ((total - 1) * spacing) / 2;
       // Lifted so the fan clears the own avatar + sound button underneath
       // (bigger cards are lifted by their extra half-height).
-      const baseY = H - 192 - ((k - 1) * CARD_H) / 2;
+      const baseY = H - 167 - ((k - 1) * CARD_H) / 2;
       const midIdx = (total - 1) / 2;
       for (let i = 0; i < total; i++) {
         // slight curve: ends drop a bit
