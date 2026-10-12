@@ -3246,6 +3246,16 @@ input {
   overflow-wrap: anywhere;
   line-height: 1.2;
 }
+.k-winner-feature h2 > span {
+  display: block;
+}
+.k-winner-feature h2 > span + span::before {
+  content: "& ";
+  opacity: 0.45;
+}
+.k-winner-feature.is-tie h2 {
+  font-size: 22px;
+}
 .k-winner-value {
   font-size: 39px;
   display: block;
@@ -3517,6 +3527,18 @@ input {
   }
   .k-winner-feature p {
     display: none;
+  }
+  /* A shared win: avatars in a row, then one name per line, full width. */
+  .k-winner-feature.is-tie {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .k-winner-feature.is-tie .k-winner-avatars {
+    grid-row: auto;
+    gap: 6px;
+  }
+  .k-winner-feature.is-tie h2,
+  .k-winner-feature.is-tie .k-winner-value {
+    grid-column: 1;
   }
   .k-results-star {
     font-size: 105px;

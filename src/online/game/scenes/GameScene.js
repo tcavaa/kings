@@ -11,41 +11,68 @@ import {
 // CSS hex string ("#daa520") → Phaser color int (0xdaa520).
 const hexToInt = (hex) => parseInt(hex.slice(1), 16);
 
-const W = 1100;
-const H = 700;
-// Nothing is drawn above the felt's top border except empty parchment, so
-// the camera starts this far down: the visible scene is shorter and the
-// table + cards fill more of the screen (the top bar overlays this band).
-const VIEW_TOP = 55;
+// ── Table layouts ─────────────────────────────────────────────────────────────
+// The scene is drawn in its own coordinates and FIT-scaled into the screen.
+// A wide screen gets the classic table: opponents left and right, own hand in
+// one fanned row. A tall (portrait) screen gets a tall table — opponents at the
+// top, own hand in two rows of big cards — so a phone held upright isn't
+// limited to a sliver of the width. The scene switches when the screen turns.
+//   VIEW_TOP  the camera skips this empty band above the felt (the top bar
+//             overlays it), so the table fills more of the screen.
+export function layoutFor(portrait) {
+  if (!portrait) {
+    const W = 1100, H = 700, TABLE_CX = W / 2, TABLE_CY = H / 2 - 30;
+    return {
+      portrait: false, W, H, VIEW_TOP: 55, TABLE_CX, TABLE_CY,
+      felt: { left: 55, right: W - 55, top: H * 0.23, bottom: H * 0.81, cut: 92 },
+      // relative seat: 0 = self (bottom, under the cards), 1 = left, 2 = right
+      AVATAR_POS: [
+        { x: TABLE_CX, y: H - 88 },
+        { x: 100, y: H / 2 - 40 },
+        { x: W - 100, y: H / 2 - 40 },
+      ],
+      OPP_FAN_POS: [
+        null,
+        { baseX: 230, y: H / 2 - 40, dir: 1 },
+        { baseX: W - 230, y: H / 2 - 40, dir: -1 },
+      ],
+      // Centre trick drop zones (3 cards in a slight overlap stack)
+      TRICK_POS: [
+        { x: TABLE_CX, y: TABLE_CY + 50, angle: -4 },
+        { x: TABLE_CX - 60, y: TABLE_CY, angle: -10 },
+        { x: TABLE_CX + 60, y: TABLE_CY, angle: 10 },
+      ],
+    };
+  }
+  const W = 720, H = 1240, TABLE_CX = W / 2, TABLE_CY = 545;
+  return {
+    portrait: true, W, H, VIEW_TOP: 0, TABLE_CX, TABLE_CY,
+    felt: { left: 26, right: W - 26, top: 280, bottom: 810, cut: 70 },
+    // Opponents sit above the table (clear of the top bar and the
+    // "waiting for…" pill); own avatar at the very bottom under the hand.
+    AVATAR_POS: [
+      { x: TABLE_CX, y: H - 70 },
+      { x: 135, y: 170 },
+      { x: W - 135, y: 170 },
+    ],
+    OPP_FAN_POS: [
+      null,
+      { baseX: 190, y: 372, dir: 1 },
+      { baseX: W - 190, y: 372, dir: -1 },
+    ],
+    TRICK_POS: [
+      { x: TABLE_CX, y: TABLE_CY + 70, angle: -4 },
+      { x: TABLE_CX - 72, y: TABLE_CY - 5, angle: -10 },
+      { x: TABLE_CX + 72, y: TABLE_CY - 5, angle: 10 },
+    ],
+  };
+}
 
-// ── Table geometry ────────────────────────────────────────────────────────────
-const TABLE_CX = W / 2;
-const TABLE_CY = H / 2 - 30;
-const TABLE_RX = 470;
-const TABLE_RY = 240;
+/** A box taller than wide gets the tall table. */
+export const isPortraitBox = (w, h) => h > w * 1.1;
 
-// ── Player slot positions, by relative seat (0 = self at bottom) ──────────────
-// We place own avatar at the very bottom of the canvas (under the cards),
-// and the two opponents on the left/right sides where their card-fans sit.
-const AVATAR_POS = [
-  { x: TABLE_CX, y: H - 88 }, // self (bottom)
-  { x: 100, y: H / 2 - 40 }, // left opponent
-  { x: W - 100, y: H / 2 - 40 }, // right opponent
-];
-
-// Position of the opponent card fans
-const OPP_FAN_POS = [
-  null,
-  { baseX: 230, y: H / 2 - 40, dir: 1 }, // left
-  { baseX: W - 230, y: H / 2 - 40, dir: -1 }, // right
-];
-
-// Centre trick drop zones (3 cards in a slight overlap stack)
-const TRICK_POS = [
-  { x: TABLE_CX, y: TABLE_CY + 50, angle: -4 }, // self
-  { x: TABLE_CX - 60, y: TABLE_CY, angle: -10 }, // left
-  { x: TABLE_CX + 60, y: TABLE_CY, angle: 10 }, // right
-];
+/** The scene size for a layout (what the Phaser game is created with). */
+export const sceneSize = (L) => ({ width: L.W, height: L.H - L.VIEW_TOP });
 
 // Avatar accent colours
 const AVATAR_COLOR = [0xd7fa52, 0x91a578, 0x91a578]; // self gold, opps green
@@ -136,16 +163,32 @@ export class GameScene extends Phaser.Scene {
     this._avatarCache = new AvatarTextureCache(this.textures, () => {
       if (this.sys?.isActive() && this.gameState) this._renderAll(this.gameState);
     });
+    const size = this.scale.gameSize;
+    this.L = layoutFor(size.height > size.width);
+    this.staticObjs = [];
     this._drawBackground();
     this._drawTable();
     this._drawWatermark();
 
-    this.cameras.main.setScroll(0, VIEW_TOP);
+    this.cameras.main.setScroll(0, this.L.VIEW_TOP);
 
-    // The hand's card size depends on how big the canvas is on screen, so
-    // repaint when the canvas is re-fitted (rotation, browser chrome).
+    // When the screen turns, switch layouts; either way the hand's card size
+    // depends on how big the canvas is on screen, so repaint.
     this._onResize = () => {
       if (!this.sys || !this.sys.isActive()) return;
+      const parent = this.scale.parentSize;
+      const portrait = isPortraitBox(parent.width, parent.height);
+      if (parent.width > 0 && portrait !== this.L.portrait) {
+        this.L = layoutFor(portrait);
+        const { width, height } = sceneSize(this.L);
+        this.cameras.main.setScroll(0, this.L.VIEW_TOP);
+        this.staticObjs.forEach((o) => o.destroy());
+        this.staticObjs = [];
+        this._drawBackground();
+        this._drawWatermark();
+        this.scale.setGameSize(width, height); // fires resize again → repaint below
+        return;
+      }
       if (this.gameState && !this._animatingTrick) this._renderAll(this.gameState);
     };
     this.scale.on("resize", this._onResize);
@@ -253,14 +296,12 @@ export class GameScene extends Phaser.Scene {
 
   // ── Saloon-felt background (PNG) with a procedural fallback ──────────────
   _drawBackground() {
+    const { W, H, felt } = this.L;
     const g = this.add.graphics();
+    this.staticObjs.push(g);
     g.fillStyle(0xdceae1, 1);
     g.fillRect(0, 0, W, H);
-    const left = 55,
-      right = W - 55,
-      top = H * 0.23,
-      bottom = H * 0.81,
-      cut = 92;
+    const { left, right, top, bottom, cut } = felt;
     const points = [
       { x: left + cut, y: top },
       { x: right - cut, y: top },
@@ -276,7 +317,7 @@ export class GameScene extends Phaser.Scene {
     g.lineStyle(5, 0xd7bb75, 1);
     g.strokePoints(points, true);
     g.lineStyle(2, 0x89b69d, 0.7);
-    g.strokeRoundedRect(35, top - 20, W - 70, bottom - top + 40, 12);
+    g.strokeRoundedRect(left - 20, top - 20, right - left + 40, bottom - top + 40, 12);
     g.lineStyle(1, 0x889875, 0.1);
     g.lineBetween(W * 0.5, top + 22, W * 0.5, top + 45);
     g.lineBetween(W * 0.5, bottom - 22, W * 0.5, bottom - 45);
@@ -285,7 +326,8 @@ export class GameScene extends Phaser.Scene {
   _drawTable() {}
 
   _drawWatermark() {
-    this.add
+    const { TABLE_CX, TABLE_CY } = this.L;
+    const logo = this.add
       .text(TABLE_CX, TABLE_CY - 22, "kıng", {
         fontSize: "40px",
         color: "#b5e6ce",
@@ -294,7 +336,7 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(0.42);
-    this.add
+    const motto = this.add
       .text(TABLE_CX, TABLE_CY + 14, "P L A Y   W I T H   I N T E N T", {
         fontSize: "8px",
         color: "#82946d",
@@ -302,6 +344,7 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setAlpha(0.4);
+    this.staticObjs.push(logo, motto);
   }
 
   _renderAll(state) {
@@ -344,7 +387,7 @@ export class GameScene extends Phaser.Scene {
     if (!state) return;
     const mySeat = state.mySeat ?? 0;
     const rel = (seat - mySeat + 3) % 3;
-    const pos = AVATAR_POS[rel];
+    const pos = this.L.AVATAR_POS[rel];
     if (!pos) return;
     const ring = this.add.graphics();
     ring.lineStyle(4, colour, 1);
@@ -365,6 +408,7 @@ export class GameScene extends Phaser.Scene {
     if (!this.cameras?.main) return;
     this.cameras.main.shake(220, 0.014);
     // Brief red vignette — overlay rectangle that fades out
+    const { W, H } = this.L;
     const flash = this.add.rectangle(W / 2, H / 2, W, H, 0xc92020, 0);
     flash.setDepth(999);
     this.tweens.add({
@@ -404,8 +448,8 @@ export class GameScene extends Phaser.Scene {
     const round1Hidden = round === 1 && gamePhase === "type_selection";
 
     const specs = [
-      { rel: 1, seat: (mySeat + 1) % 3, ...OPP_FAN_POS[1] },
-      { rel: 2, seat: (mySeat + 2) % 3, ...OPP_FAN_POS[2] },
+      { rel: 1, seat: (mySeat + 1) % 3, ...this.L.OPP_FAN_POS[1] },
+      { rel: 2, seat: (mySeat + 2) % 3, ...this.L.OPP_FAN_POS[2] },
     ];
 
     specs.forEach(({ rel, seat, baseX, y, dir }) => {
@@ -450,7 +494,7 @@ export class GameScene extends Phaser.Scene {
       const player = players.find((p) => p.seat === seat);
       if (!player) return;
 
-      const pos = AVATAR_POS[rel];
+      const pos = this.L.AVATAR_POS[rel];
       const accentHex = AVATAR_COLOR_HEX[rel];
       const accentInt = AVATAR_COLOR[rel];
       // A watcher occupies no seat: rel 0 is simply the player the table is
@@ -466,6 +510,8 @@ export class GameScene extends Phaser.Scene {
 
       const radius = isOwn ? 38 : 36;
       const container = this.add.container(pos.x, pos.y);
+      // The tall table is shown smaller per scene unit; keep names readable.
+      if (this.L.portrait) container.setScale(1.4);
 
       // Crisp player plate. A solid edge marks the turn without a perpetual glow tween.
       const ringCol = isActive ? 0xf3ba45 : 0x71baa3;
@@ -631,27 +677,53 @@ export class GameScene extends Phaser.Scene {
     const { hand = [], mySeat, gamePhase, currentTurn } = state;
     if (!hand.length) return;
 
-    // On narrow viewports the canvas is FIT-scaled down and individual cards
-    // become finger-unfriendly — push spacing up a touch so adjacent cards
-    // don't overlap into a single tap-target.
-    const isNarrow = typeof window !== "undefined" && window.innerWidth < 720;
+    const { W, H, TABLE_CX, TABLE_CY, portrait, felt } = this.L;
     const total = hand.length;
-    const maxSpacing = isNarrow ? 78 : 64;
-    const minSpacing = isNarrow ? 46 : 36;
-    const spacing = Math.max(
-      minSpacing,
-      Math.min(maxSpacing, (W - 200) / Math.max(1, total)),
-    );
-    const startX = W / 2 - ((total - 1) * spacing) / 2;
     // On a phone the whole scene is scaled down, so the hand is drawn larger
-    // to keep cards readable: aim for ~50 px wide on screen, at most 1.3×.
+    // to keep cards readable: in one row aim for ~50 px wide on screen (at
+    // most 1.3×); the tall table's two rows have room for ~62 px (at most 1.5×).
     const shown = (this.scale.displaySize?.width || W) / W;
-    const k = Phaser.Math.Clamp(50 / (CARD_W * shown), 1, 1.3);
-    // Lifted so the fan clears the own avatar + sound button underneath
-    // (bigger cards are lifted by their extra half-height).
-    const baseY = H - 192 - ((k - 1) * CARD_H) / 2;
+    const k = portrait
+      ? Phaser.Math.Clamp(62 / (CARD_W * shown), 1, 1.5)
+      : Phaser.Math.Clamp(50 / (CARD_W * shown), 1, 1.3);
+    const slots = [];
+    if (portrait) {
+      // Two rows under the table: the first half on top, the rest below.
+      const cw = CARD_W * k;
+      const ch = CARD_H * k;
+      const rows = total > 5 ? [Math.ceil(total / 2), Math.floor(total / 2)] : [total];
+      let i = 0;
+      rows.forEach((count, r) => {
+        const spacing = count > 1 ? Math.min(cw + 10, (W - 40 - cw) / (count - 1)) : 0;
+        const startX = W / 2 - ((count - 1) * spacing) / 2;
+        const rowY = felt.bottom + 20 + r * ch * 0.78;
+        const mid = (count - 1) / 2;
+        for (let j = 0; j < count; j++, i++) {
+          slots.push({ x: startX + j * spacing, y: rowY + Math.abs(j - mid) * 2, angle: (j - mid) * 1.2 });
+        }
+      });
+    } else {
+      // On narrow viewports the canvas is FIT-scaled down and individual
+      // cards become finger-unfriendly — push spacing up a touch so adjacent
+      // cards don't overlap into a single tap-target.
+      const isNarrow = typeof window !== "undefined" && window.innerWidth < 720;
+      const maxSpacing = isNarrow ? 78 : 64;
+      const minSpacing = isNarrow ? 46 : 36;
+      const spacing = Math.max(
+        minSpacing,
+        Math.min(maxSpacing, (W - 200) / Math.max(1, total)),
+      );
+      const startX = W / 2 - ((total - 1) * spacing) / 2;
+      // Lifted so the fan clears the own avatar + sound button underneath
+      // (bigger cards are lifted by their extra half-height).
+      const baseY = H - 192 - ((k - 1) * CARD_H) / 2;
+      const midIdx = (total - 1) / 2;
+      for (let i = 0; i < total; i++) {
+        // slight curve: ends drop a bit
+        slots.push({ x: startX + i * spacing, y: baseY + Math.abs(i - midIdx) * 1.2, angle: (i - midIdx) * 1.6 });
+      }
+    }
     const isMyTurn = gamePhase === "playing" && currentTurn === mySeat;
-    const midIdx = (total - 1) / 2;
 
     // Detect a fresh deal: round changed AND we now have a full(ish) hand.
     const isFreshDeal = state.round !== this._lastDealRound && hand.length >= 9;
@@ -669,11 +741,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     hand.forEach((card, i) => {
-      const x = startX + i * spacing;
-      const fanAngle = (i - midIdx) * 1.6;
-      // slight curve: ends drop a bit
-      const yCurve = Math.abs(i - midIdx) * 1.2;
-      const y = baseY + yCurve;
+      const { x, y, angle: fanAngle } = slots[i];
       const playable = isPlayableCard(card, state);
       const inter = isMyTurn && playable;
       const isTrump = state.trumpSuit && card.suit === state.trumpSuit;
@@ -793,7 +861,7 @@ export class GameScene extends Phaser.Scene {
 
     currentTrick.forEach(({ seat, card }, i) => {
       const rel = (seat - mySeat + 3) % 3;
-      const pos = TRICK_POS[rel];
+      const pos = this.L.TRICK_POS[rel];
       const container = createFaceUpCard(this, pos.x, pos.y, card, false);
       container.setAngle(pos.angle);
       container.setDepth(50 + rel);
@@ -807,7 +875,7 @@ export class GameScene extends Phaser.Scene {
       if (!wasNew) return;
       const isNewest = i === currentTrick.length - 1;
       if (!isNewest) return;
-      const from = AVATAR_POS[rel] || pos;
+      const from = this.L.AVATAR_POS[rel] || pos;
       container.setPosition(from.x, from.y);
       container.setAngle(0);
       container.setScale(0.7);
@@ -831,7 +899,7 @@ export class GameScene extends Phaser.Scene {
     if (!state || !this.trickCards.length) return;
     const mySeat = state.mySeat ?? 0;
     const rel = (winnerSeat - mySeat + 3) % 3;
-    const target = AVATAR_POS[rel];
+    const target = this.L.AVATAR_POS[rel];
 
     this._animatingTrick = true;
 
@@ -890,9 +958,13 @@ export class GameScene extends Phaser.Scene {
     if (mySeat === leaderSeat) return;
     if (!centerCards?.length) return;
 
+    const { TABLE_CX, TABLE_CY, portrait } = this.L;
+    // The tall table has room to show the prikup a size up.
+    const pk = portrait ? 1.25 : 1;
     centerCards.forEach((card, i) => {
-      const x = TABLE_CX - 50 + i * 100;
+      const x = TABLE_CX + (i - 0.5) * 100 * pk;
       const container = createFaceUpCard(this, x, TABLE_CY + 10, card, false);
+      container.setScale(pk);
 
       const border = this.add.graphics();
       border.lineStyle(3, 0xc7e88b, 1);
@@ -909,7 +981,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     const lbl = this.add
-      .text(TABLE_CX, TABLE_CY + CARD_H / 2 + 28, "❖  პრიკუპი  ❖", {
+      .text(TABLE_CX, TABLE_CY + (CARD_H * pk) / 2 + 28, "❖  პრიკუპი  ❖", {
         fontSize: "11px",
         color: "#d5b982",
         fontFamily: "Noto Sans Georgian, Inter, Arial",
@@ -930,7 +1002,7 @@ export class GameScene extends Phaser.Scene {
       const seat = Number(seatStr);
       if (!players.find((p) => p.seat === seat)) return;
       const rel = (seat - mySeat + 3) % 3;
-      const pos = AVATAR_POS[rel];
+      const pos = this.L.AVATAR_POS[rel];
 
       // Anchor the bubble above the avatar (own at bottom: place above; opps at top: also place above)
       const bubbleY = pos.y - 78;
@@ -989,5 +1061,4 @@ export class GameScene extends Phaser.Scene {
 }
 
 // Re-export for PhaserGame to know the canvas size
-export const SCENE_W = W;
-export const SCENE_H = H - VIEW_TOP;
+

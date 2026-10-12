@@ -168,7 +168,7 @@ function ResultsContent({ onOpenLeaderboard, game }) {
         </span>
       </section>
       <div className="k-results-layout">
-        <aside className="k-winner-feature">
+        <aside className={`k-winner-feature${isTie ? " is-tie" : ""}`}>
           <span className="k-eyebrow">
             {isTie ? "THE WINNERS" : "THE WINNER"}
           </span>
@@ -186,7 +186,12 @@ function ResultsContent({ onOpenLeaderboard, game }) {
               />
             ))}
           </div>
-          <h2>{winners.map((w) => w.name).join(" & ")}</h2>
+          {/* One name per line, so a shared win never squeezes names apart. */}
+          <h2>
+            {winners.map((w) => (
+              <span key={w.seat}>{w.name}</span>
+            ))}
+          </h2>
           <span className="k-winner-value">
             {resultOf(winners[0]?.seat).toLocaleString()}
             <small>ქულა</small>

@@ -2,7 +2,7 @@ import { memo, useEffect, useRef } from "react";
 import Phaser from "phaser";
 import { useChat } from "../context/GameContext";
 import { PreloadScene } from "./scenes/PreloadScene";
-import { GameScene, SCENE_W, SCENE_H } from "./scenes/GameScene";
+import { GameScene, layoutFor, isPortraitBox, sceneSize } from "./scenes/GameScene";
 import { EventBus } from "./EventBus";
 
 function PhaserGame({ gameState, onCardPlay }) {
@@ -18,11 +18,17 @@ function PhaserGame({ gameState, onCardPlay }) {
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
 
+    // Start with the table that suits the screen (tall table on an upright
+    // phone); the scene switches by itself when the screen turns.
+    const box = containerRef.current.getBoundingClientRect();
+    const { width, height } = sceneSize(
+      layoutFor(isPortraitBox(box.width || window.innerWidth, box.height || window.innerHeight)),
+    );
     const config = {
       type: Phaser.AUTO,
       parent: containerRef.current,
-      width: SCENE_W,
-      height: SCENE_H,
+      width,
+      height,
       // Parchment, matching the table art — shows only for the frame or two
       // before the felt image paints, so it must not flash dark.
       backgroundColor: "#dceae1",

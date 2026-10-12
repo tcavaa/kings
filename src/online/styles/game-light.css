@@ -681,3 +681,11 @@ body.king-light-game .k-game-header .k-turn-status small {
     height: 34px;
   }
 }
+
+/* Upright phones use the tall table, whose opponents sit where the quote was. */
+@media (orientation: portrait) and (max-width: 700px) {
+  .k-game-quote,
+  .k-table-quote {
+    display: none !important;
+  }
+}
