@@ -16,7 +16,7 @@
 // back and turned into ჩაწერა's old rows again, which must equal the
 // originals (names switched to online names, player ids to profile ids).
 //
-// Needs DATABASE_URL (the postgres role).
+// Needs DATABASE_URL (the postgres role; a :6543 pooler URL is switched to :5432).
 
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -26,8 +26,11 @@ const { fromLegacyRows } = require('../server/games/scoreSheet.js');
 const { liveGameToLegacy } = await import('../src/score/lib/gameShapes.js');
 
 const args = new Set(process.argv.slice(2));
-const url = process.env.DATABASE_URL;
+let url = process.env.DATABASE_URL;
 if (!url) { console.error('DATABASE_URL is not set'); process.exit(1); }
+// One long transaction: hangs on Supabase's transaction pooler (:6543), so use
+// the session pooler (:5432) on the same host.
+url = url.replace(/(\.pooler\.supabase\.com):6543\//, '$1:5432/');
 const isLocal = /@(localhost|127\.0\.0\.1)[:/]/.test(url) || !url.includes('@');
 const sql = postgres(url, { prepare: false, ssl: isLocal ? false : 'require', max: 1, onnotice: () => {} });
 
