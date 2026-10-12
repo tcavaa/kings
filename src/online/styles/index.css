@@ -306,7 +306,8 @@ input {
 .k-rail {
   background: #171919;
   color: #f2f2ed;
-  padding: 34px 22px;
+  padding: calc(34px + env(safe-area-inset-top, 0px)) 22px 34px
+    max(22px, env(safe-area-inset-left, 0px));
   display: flex;
   flex-direction: column;
   position: sticky;
@@ -1673,10 +1674,13 @@ input {
   }
   .k-rail {
     position: relative;
-    height: 72px;
+    /* The page runs under the iPhone status bar / Dynamic Island
+       (viewport-fit=cover, translucent status bar): push the bar below it. */
+    height: calc(72px + env(safe-area-inset-top, 0px));
     flex-direction: row;
     align-items: center;
-    padding: 0 20px;
+    padding: env(safe-area-inset-top, 0px) max(20px, env(safe-area-inset-right, 0px)) 0
+      max(20px, env(safe-area-inset-left, 0px));
     justify-content: space-between;
   }
   .k-rail .k-wordmark {
