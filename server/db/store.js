@@ -21,6 +21,22 @@ function isValidPin(pin) {
   return typeof pin === 'string' && /^\d{4}$/.test(pin);
 }
 
+// Constant-time comparison so a wrong guess doesn't leak the right prefix.
+function pinMatches(pinHash, pin, profileId) {
+  if (!pinHash || !isValidPin(pin)) return false;
+  const a = Buffer.from(pinHash, 'hex');
+  const b = Buffer.from(hashPin(pin, profileId), 'hex');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// A profile with a PIN can only be changed or removed by someone who knows it.
+function assertPinOwner(pinHash, currentPin, profileId) {
+  if (!pinHash || pinMatches(pinHash, currentPin, profileId)) return;
+  const err = new Error('Wrong PIN');
+  err.status = 403;
+  throw err;
+}
+
 function db() {
   const s = getSql();
   if (!s) {
@@ -107,7 +123,7 @@ async function getProfile(id) {
   return row ? rowToProfile(row) : null;
 }
 
-async function upsertProfile({ id, name, avatar, deviceKey, pin }) {
+async function upsertProfile({ id, name, avatar, deviceKey, pin, currentPin }) {
   if (!id) throw new Error('profile.id is required');
   if (!name || !name.trim()) throw new Error('profile.name is required');
   const trimmed = name.trim().slice(0, 64);
@@ -118,13 +134,14 @@ async function upsertProfile({ id, name, avatar, deviceKey, pin }) {
   } else if (pin === null || pin === '') {
     nextPinHash = null;
   } else {
-    if (!isValidPin(pin)) throw new Error('PIN must be exactly 4 digits.');
+    if (!isValidPin(pin)) throw badRequest('PIN must be exactly 4 digits.');
     nextPinHash = hashPin(pin, id);
   }
 
   await db().begin(async (tx) => {
     const existing = await tx`
       SELECT device_key, pin_hash FROM profiles WHERE id = ${id} FOR UPDATE`;
+    if (existing.length) assertPinOwner(existing[0].pin_hash, currentPin, id);
 
     if (existing.length === 0) {
       await tx`
@@ -155,21 +172,15 @@ async function verifyProfilePin(id, pin) {
   const profile = await getProfile(id);
   if (!profile) return { ok: false, reason: 'not_found' };
   if (!profile.pin_hash) return { ok: true, hadPin: false };
-  if (!isValidPin(pin)) return { ok: false, reason: 'bad_pin', hadPin: true };
-  const expected = profile.pin_hash;
-  const actual = hashPin(pin, id);
-  // Constant-time comparison to avoid leaking the right prefix via timing.
-  const a = Buffer.from(expected, 'hex');
-  const b = Buffer.from(actual,   'hex');
-  if (a.length !== b.length) return { ok: false, reason: 'bad_pin', hadPin: true };
-  const match = crypto.timingSafeEqual(a, b);
-  return match ? { ok: true, hadPin: true } : { ok: false, reason: 'bad_pin', hadPin: true };
+  return pinMatches(profile.pin_hash, pin, id)
+    ? { ok: true, hadPin: true }
+    : { ok: false, reason: 'bad_pin', hadPin: true };
 }
 
-async function deleteProfile(id /*, deviceKey */) {
-  const existing = await getProfile(id);
-  if (!existing) return false;
-  // Device-ownership check intentionally removed — see upsertProfile().
+async function deleteProfile(id, currentPin) {
+  const rows = await db()`SELECT pin_hash FROM profiles WHERE id = ${id}`;
+  if (!rows.length) return false;
+  assertPinOwner(rows[0].pin_hash, currentPin, id);
   await db()`DELETE FROM profiles WHERE id = ${id}`;
   return true;
 }

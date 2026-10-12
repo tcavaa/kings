@@ -34,12 +34,15 @@ export function forgetProfileVerification(id) {
 export const listProfiles = ()   => api.listProfiles()
 export const getProfile   = (id) => api.getProfile(id)
 
-export async function saveProfile({ id, name, avatar, pin }) {
+// `currentPin` is the profile's existing PIN — the server refuses to change
+// or delete a PIN-protected profile without it.
+export async function saveProfile({ id, name, avatar, pin, currentPin }) {
   const profileId = id || `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
   const saved = await api.saveProfile(profileId, {
     name,
     avatar: avatar || null,
     ...(pin === undefined ? {} : { pin }),
+    ...(currentPin ? { currentPin } : {}),
   })
 
   if (typeof pin === 'string' && pin.length === 4) markProfileVerified(saved.id)
@@ -48,7 +51,7 @@ export async function saveProfile({ id, name, avatar, pin }) {
   return saved
 }
 
-export const deleteProfile = (id) => api.deleteProfile(id)
+export const deleteProfile = (id, currentPin) => api.deleteProfile(id, currentPin)
 
 // ── PIN verify (server-backed) ──────────────────────────────────────────────
 export async function verifyPin(id, pin) {
@@ -56,6 +59,10 @@ export async function verifyPin(id, pin) {
   if (out.ok) markProfileVerified(id)
   return out
 }
+
+// Checks a PIN without switching this device to that profile (used before
+// editing one).
+export const checkPin = (id, pin) => api.verifyProfilePin(id, pin)
 
 // ── File → downscaled JPEG data URL ─────────────────────────────────────────
 export async function fileToDataURL(file, maxSize = 256) {

@@ -15,6 +15,7 @@ import {
   getActiveProfileId,
   clearActiveProfile,
   markProfileVerified,
+  checkPin,
 } from "../lib/profiles";
 import { api } from "../lib/api";
 import ProfileForm, { ProfilePicker } from "./ProfileForm";
@@ -51,6 +52,10 @@ export default function Lobby({ onOpenLeaderboard }) {
   const [activeId, setActiveId] = useState(() => getActiveProfileId());
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  // A PIN-protected profile waiting for its PIN before the edit form opens,
+  // and the PIN that opened it (the server needs it to save or delete).
+  const [editPending, setEditPending] = useState(null);
+  const [editPin, setEditPin] = useState("");
   // Pre-fill the room code from the last successful join so a quick refresh
   // or an accidental tab close doesn't force the player to retype it.
   const [joinCode, setJoinCode] = useState(() => {
@@ -153,7 +158,18 @@ export default function Lobby({ onOpenLeaderboard }) {
     }
     setShowForm(false);
     setEditing(null);
+    setEditPin("");
     setDialog(null);
+  };
+
+  const editProfile = (profile) => {
+    setEditPin("");
+    if (profile.has_pin) {
+      setEditPending(profile);
+      return;
+    }
+    setEditing(profile);
+    setShowForm(true);
   };
 
   // Picking a *different* profile pops the PIN prompt. Clicking the
@@ -427,12 +443,14 @@ export default function Lobby({ onOpenLeaderboard }) {
               <ProfileForm
                 key={editing?.id || "new"}
                 editing={editing}
+                currentPin={editPin}
                 onDone={onProfileSaved}
                 onCancel={
                   profiles.length
                     ? () => {
                         setShowForm(false);
                         setEditing(null);
+                        setEditPin("");
                       }
                     : null
                 }
@@ -459,10 +477,7 @@ export default function Lobby({ onOpenLeaderboard }) {
                   profiles={profiles}
                   value={activeId}
                   onChange={pickProfile}
-                  onEdit={(p) => {
-                    setEditing(p);
-                    setShowForm(true);
-                  }}
+                  onEdit={editProfile}
                 />
                 <button
                   className="k-button k-button-outline"
@@ -486,6 +501,20 @@ export default function Lobby({ onOpenLeaderboard }) {
                 setDialog(null);
               }}
               onCancel={() => setPinPending(null)}
+            />
+          )}
+          {editPending && (
+            <PinPromptModal
+              profile={editPending}
+              check={checkPin}
+              hint="შეიყვანე კოდი პროფილის შესაცვლელად."
+              onSuccess={({ profile, pin }) => {
+                setEditPin(pin);
+                setEditing(profile);
+                setShowForm(true);
+                setEditPending(null);
+              }}
+              onCancel={() => setEditPending(null)}
             />
           )}
         </Sheet>

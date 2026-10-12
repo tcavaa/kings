@@ -113,6 +113,9 @@ game (bots) and checks it lands in the database.
 **Players** — `profiles` is the one player list. King Online creates
 profiles with a PIN and photo; King Score adds plain ones (`POST /api/players`)
 and can only remove those (a profile with a PIN belongs to King Online).
+Changing or deleting a profile that has a PIN needs that PIN (`currentPin`
+in the request body; 403 otherwise), so the lobby asks for it before the
+edit form opens.
 Games refer to players by name (King Online always has), and King Score's
 games also store the profile id.
 

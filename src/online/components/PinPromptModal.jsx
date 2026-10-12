@@ -9,10 +9,18 @@ import { verifyPin } from "../lib/profiles";
  *
  * Props:
  *   profile  — the profile object being authenticated
- *   onSuccess({ profile }) — called once the server returns ok:true
+ *   onSuccess({ profile, pin }) — called once the server returns ok:true
  *   onCancel()             — user dismissed the modal
+ *   check(id, pin)         — the verify call (default: verify and sign in)
+ *   hint                   — the line under the name
  */
-export default function PinPromptModal({ profile, onSuccess, onCancel }) {
+export default function PinPromptModal({
+  profile,
+  onSuccess,
+  onCancel,
+  check = verifyPin,
+  hint = "შეიყვანე შენი 4-ციფრიანი კოდი შესასვლელად.",
+}) {
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,9 +69,9 @@ export default function PinPromptModal({ profile, onSuccess, onCancel }) {
     if (!profile?.id || pin.length !== 4 || busy) return;
     setBusy(true);
     try {
-      const r = await verifyPin(profile.id, pin);
+      const r = await check(profile.id, pin);
       if (r.ok) {
-        onSuccess?.({ profile });
+        onSuccess?.({ profile, pin });
         return;
       }
       setError("არასწორი კოდი, სცადე ხელახლა.");
@@ -142,7 +150,7 @@ export default function PinPromptModal({ profile, onSuccess, onCancel }) {
               className="text-xs font-typewriter mt-1"
               style={{ color: "rgba(225,233,225,0.6)" }}
             >
-              შეიყვანე შენი 4-ციფრიანი კოდი შესასვლელად.
+              {hint}
             </p>
           </div>
         </div>

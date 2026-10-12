@@ -15,7 +15,7 @@ export async function GET(_request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
-    const { name, avatar, pin } = (await readJson(request)) || {}
+    const { name, avatar, pin, currentPin } = (await readJson(request)) || {}
     if (typeof name !== 'string' || !name.trim()) {
       return json({ error: 'name is required' }, 400)
     }
@@ -28,6 +28,8 @@ export async function PUT(request, { params }) {
       avatar: cleanAvatar,
       deviceKey: deviceKey(request),
       pin,
+      // Required when the profile already has a PIN (403 otherwise).
+      currentPin,
     })
     return json(publicProfile(saved))
   } catch (err) { return sendErr(err) }
@@ -36,8 +38,8 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params
-    await readJson(request)
-    const ok = await store.deleteProfile(id, deviceKey(request))
+    const { currentPin } = (await readJson(request)) || {}
+    const ok = await store.deleteProfile(id, currentPin)
     if (!ok) return json({ error: 'Profile not found' }, 404)
     return json({ ok: true })
   } catch (err) { return sendErr(err) }

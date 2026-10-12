@@ -13,6 +13,8 @@ const PIN_DIGITS = 4;
 /**
  * Inline form for creating or editing a profile (username + avatar + PIN).
  * `editing` is the profile object (or null to create new). Calls onDone(profile|null).
+ * `currentPin` is the PIN the user typed to open a protected profile for
+ * editing; the server needs it to save or delete.
  *
  * PIN behaviour
  *   - On *create*, the PIN is required (4 digits).
@@ -20,7 +22,7 @@ const PIN_DIGITS = 4;
  *     untouched. Typing a new 4-digit PIN replaces it. There is no UI for
  *     "remove PIN" — easier mental model for casual users.
  */
-export default function ProfileForm({ editing, onDone, onCancel }) {
+export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
   const [name, setName] = useState(editing?.name || "");
   const [avatar, setAvatar] = useState(editing?.avatar || null);
   const [pin, setPin] = useState("");
@@ -84,6 +86,7 @@ export default function ProfileForm({ editing, onDone, onCancel }) {
         // Send PIN only when the user actually typed one; otherwise keep
         // the existing hash on the server.
         ...(pin.length === PIN_DIGITS ? { pin } : {}),
+        currentPin,
       });
       setActiveProfileId(saved.id);
       onDone?.(saved);
@@ -99,7 +102,7 @@ export default function ProfileForm({ editing, onDone, onCancel }) {
     setError("");
     setBusy(true);
     try {
-      await deleteProfile(editing.id);
+      await deleteProfile(editing.id, currentPin);
       onDone?.(null);
     } catch (err) {
       setError(`პროფილის წაშლა ვერ მოხერხდა: ${err.message}`);

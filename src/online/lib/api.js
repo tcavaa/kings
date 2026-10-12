@@ -71,8 +71,8 @@ export const api = {
   saveProfile:   (id, body)   => request(`/api/profiles/${encodeURIComponent(id)}`, {
     method: 'PUT', body: JSON.stringify(body),
   }),
-  deleteProfile: (id)         => request(`/api/profiles/${encodeURIComponent(id)}`, {
-    method: 'DELETE',
+  deleteProfile: (id, currentPin) => request(`/api/profiles/${encodeURIComponent(id)}`, {
+    method: 'DELETE', body: JSON.stringify({ currentPin }),
   }),
   // PIN check — returns { ok: true, hadPin } on success.  On a wrong PIN the
   // server replies 401 → request() throws an Error whose .message contains
