@@ -166,7 +166,14 @@ body {
 .app-content { display: flex; flex-direction: column; }
 
 /* ════════════ Header ════════════ */
-.app-header { display: flex; justify-content: center; padding: 10px 0 6px; }
+.app-header { display: flex; justify-content: center; padding: 10px 0 6px; position: relative; }
+.home-link {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none;
+  padding: 8px 4px; min-height: 36px;
+}
+.home-link:hover { color: var(--text); }
 .brand {
   display: inline-flex; align-items: center; gap: 10px;
   background: none; border: none; cursor: pointer; padding: 4px 10px;

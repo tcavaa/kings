@@ -752,7 +752,7 @@ input {
 }
 .k-mode-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border-bottom: 0;
   gap: 1px;
   background: #17191925;
@@ -1774,10 +1774,6 @@ input {
   .k-mode-tabs {
     grid-template-columns: 1fr 1fr;
   }
-  /* Three modes on a two-column grid: the odd one out takes the full row. */
-  .k-mode-tabs > button:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-  }
   .k-mode-tabs > button {
     min-height: 108px;
     padding: 13px 16px;
@@ -1920,6 +1916,60 @@ input {
   font-weight: 200;
   color: #869365;
 }
+/* Leaderboard seasons: one full-width panel per row (the tables need the room) */
+.k-insights-grid.k-seasons {
+  grid-template-columns: minmax(0, 1fr);
+}
+.k-season-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid #ffffff18;
+}
+.k-season-facts > div {
+  padding: 20px 26px;
+  border-right: 1px solid #ffffff18;
+  min-width: 0;
+}
+.k-season-facts > div:last-child {
+  border-right: 0;
+}
+.k-season-facts span {
+  display: block;
+  font-size: 10px;
+  color: #a4b394;
+}
+.k-season-facts strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  font-weight: 450;
+  color: #d7fa52;
+  overflow-wrap: anywhere;
+}
+.k-season-facts small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #a4b394;
+}
+.k-season-race {
+  padding: 20px 12px 14px;
+}
+@media (max-width: 720px) {
+  .k-season-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .k-season-facts > div:nth-child(2) {
+    border-right: 0;
+  }
+  .k-season-facts > div:nth-child(-n + 2) {
+    border-bottom: 1px solid #ffffff18;
+  }
+  .k-season-facts > div {
+    padding: 16px 18px;
+  }
+}
+
 /* Leaderboard game-type filter: ყველა / ონლაინ / ლაივი */
 .k-type-filter {
   display: inline-grid;
@@ -1992,6 +2042,12 @@ input {
   gap: 28px;
   border-bottom: 1px solid #17191930;
   margin: 20px 0 30px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.k-page-tabs > button {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .k-page-tabs button {
   display: flex;

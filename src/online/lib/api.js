@@ -101,6 +101,8 @@ export const api = {
 
   // stats — per-player lifetime counters computed server-side from every
   // stored game's roundDetails JSON.
+  // King Score's seasons, for the leaderboard's seasons tab.
+  listSeasons: () => request('/api/seasons'),
   getLifetimeStats: (name, type = 'all') =>
     request(`/api/stats/${encodeURIComponent(name)}?type=${encodeURIComponent(type)}`),
 

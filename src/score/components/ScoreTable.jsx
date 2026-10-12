@@ -149,7 +149,9 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
                     <span className="edit-actions">
                       {!isEditing && (
                         <>
-                          <button className="link icon-btn" onClick={startEdit} title="Edit last round"><Pencil size={11} /> Edit</button>
+                          {onEditLastRound && (
+                            <button className="link icon-btn" onClick={startEdit} title="Edit last round"><Pencil size={11} /> Edit</button>
+                          )}
                           {onUndoLastRound && (
                             <button className="link icon-btn" onClick={onUndoLastRound} title="Undo last round" style={{ color: 'var(--muted)' }}><Undo2 size={11} /> Undo</button>
                           )}

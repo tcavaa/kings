@@ -82,6 +82,35 @@ export async function saveGame({ players, rounds, durationSeconds }) {
   reloadGameData().catch(() => {})
 }
 
+// ── live sheets: games being scored right now, for others to follow ──
+
+/** Publish this device's sheet (fire and forget — the next change retries). */
+export function publishLiveSheet(id, state) {
+  return fetch(`/api/live-sheets/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(state),
+    keepalive: true,
+  }).catch(() => {})
+}
+
+export function removeLiveSheet(id) {
+  return fetch(`/api/live-sheets/${encodeURIComponent(id)}`, { method: 'DELETE', keepalive: true }).catch(() => {})
+}
+
+/** Sheets being played right now (null until loaded), refreshed every few seconds. */
+export function useLiveSheets(intervalMs = 8000) {
+  const [sheets, setSheets] = useState(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => request('/api/live-sheets').then(s => { if (alive) setSheets(s) }, () => {})
+    load()
+    const t = setInterval(load, intervalMs)
+    return () => { alive = false; clearInterval(t) }
+  }, [intervalMs])
+  return sheets
+}
+
 /** { data, loading, error } — data is null until the first load finishes. */
 export function useGameData() {
   const [state, setState] = useState({ data: null, loading: true, error: null })

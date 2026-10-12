@@ -18,16 +18,21 @@ import SeasonBanner from './components/SeasonBanner.jsx'
 import SeasonEndModal from './components/SeasonEndModal.jsx'
 import GameTimer from './components/GameTimer.jsx'
 import ThemeDecorations from './components/ThemeDecorations.jsx'
-import { saveGame } from './lib/gameData.js'
+import { saveGame, publishLiveSheet, removeLiveSheet } from './lib/gameData.js'
+import LiveSheets from './components/LiveSheets.jsx'
 import { useSeasons } from './hooks/useSeasons'
 import { applyThemeToBody } from './utils/themes'
 import { formatDuration } from './utils/time'
-import { RefreshCw, Trash2, Timer } from 'lucide-react'
+import { RefreshCw, Trash2, Timer, ArrowLeft } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { playRoundEnd, playBigPenalty, playGameWin, playRematch } from './utils/sounds.js'
 import './styles/main.css'
 
 export const PLAYER_COLORS = ['#2563eb', '#059669', '#dc2626', '#d97706']
+
+// Each game in progress is published under its own id so others can follow it.
+const newSheetId = () =>
+  (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '')
 
 function App() {
   const [state, dispatch] = useReducer(
@@ -38,10 +43,11 @@ function App() {
           // Snapshots saved before the game clock existed have no
           // startedAt — start counting from the moment they're restored.
           if (merged.players && !merged.startedAt) merged.startedAt = Date.now()
+          if (merged.players && !merged.sheetId) merged.sheetId = newSheetId()
           return merged
         }
         case 'START':
-          return { players: action.players, activePlayerIndex: 0, rounds: [], startedAt: Date.now(), endedAt: null }
+          return { players: action.players, activePlayerIndex: 0, rounds: [], startedAt: Date.now(), endedAt: null, sheetId: newSheetId() }
         case 'END_ROUND': {
           const rounds = [...s.rounds, action.round]
           const nextLeader = s.players ? (s.activePlayerIndex + 1) % s.players.length : 0
@@ -65,14 +71,14 @@ function App() {
           return { ...s, rounds: s.rounds.slice(0, -1), activePlayerIndex: prevLeader, endedAt: null }
         }
         case 'RESET':
-          return { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null }
+          return { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null, sheetId: null }
         default:
           return s
       }
     },
-    { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null }
+    { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null, sheetId: null }
   )
-  const { players, activePlayerIndex, rounds, startedAt, endedAt } = state
+  const { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId } = state
   const [hydrated, setHydrated] = useState(false)
   const [preselectedTypeCode, setPreselectedTypeCode] = useState(null)
   // 'home' (Score) | 'history' | 'stats' | 'more' | 'players'
@@ -119,6 +125,7 @@ function App() {
               rounds: parsed.rounds,
               startedAt: parsed.startedAt || null,
               endedAt: parsed.endedAt || null,
+              sheetId: parsed.sheetId || null,
             } })
           } else {
             localStorage.removeItem('king-score-state')
@@ -132,11 +139,18 @@ function App() {
   // Persist to localStorage on change
   useEffect(() => {
     if (!hydrated) return
-    const snapshot = { players, activePlayerIndex, rounds, startedAt, endedAt }
+    const snapshot = { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId }
     try {
       localStorage.setItem('king-score-state', JSON.stringify(snapshot))
     } catch (e) {}
-  }, [players, activePlayerIndex, rounds, startedAt, endedAt, hydrated])
+  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
+
+  // Publish the game in progress so others can follow it live.
+  useEffect(() => {
+    if (!hydrated || !players || !sheetId) return
+    const t = setTimeout(() => publishLiveSheet(sheetId, { players, activePlayerIndex, rounds, startedAt, endedAt }), 600)
+    return () => clearTimeout(t)
+  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
 
   const usedTypesByPlayer = useMemo(() => {
     const map = {}
@@ -201,9 +215,10 @@ function App() {
     const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
     if (!saved) return
+    if (sheetId) removeLiveSheet(sheetId)
     localStorage.removeItem('king-score-state')
     dispatch({ type: 'RESET' })
-  }, [players, rounds, saveGameToDB, durationSeconds])
+  }, [players, rounds, saveGameToDB, durationSeconds, sheetId])
 
   const handleRematch = useCallback(async () => {
     if (!players) return
@@ -212,10 +227,11 @@ function App() {
     const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
     if (!saved) return
+    if (sheetId) removeLiveSheet(sheetId)
     localStorage.removeItem('king-score-state')
     if (soundEnabled) playRematch()
     dispatch({ type: 'START', players: rematchers })
-  }, [players, rounds, saveGameToDB, soundEnabled, durationSeconds])
+  }, [players, rounds, saveGameToDB, soundEnabled, durationSeconds, sheetId])
 
   const handleStart = useCallback((playersList) => {
     dispatch({ type: 'START', players: playersList })
@@ -254,10 +270,11 @@ function App() {
   const handleReset = useCallback(() => {
     const ok = window.confirm('Are you sure you want to reset the current game? This will clear all progress.')
     if (!ok) return
+    if (sheetId) removeLiveSheet(sheetId)
     localStorage.removeItem('king-score-state')
     dispatch({ type: 'RESET' })
     setView('home')
-  }, [])
+  }, [sheetId])
 
   async function handleSeasonEdit({ name, theme }) {
     await updateCurrentSeason({ name, theme })
@@ -268,6 +285,8 @@ function App() {
     <div className="app">
       <ThemeDecorations themeId={currentSeasonTheme} />
       <header className="app-header">
+        {/* King Online is the site's home page (its own root layout) */}
+        <a className="home-link" href="/" title="King Online"><ArrowLeft size={16} /> King Online</a>
         <button className="brand" onClick={() => setView('home')} title="Home">
           <img className="logo" src="/12427687.png" alt="" />
           <h1>KING</h1>
@@ -317,7 +336,9 @@ function App() {
         )}
 
         {view === 'home' && !players && (
-          <PlayerInput onStart={handleStart} />
+          <LiveSheets>
+            <PlayerInput onStart={handleStart} />
+          </LiveSheets>
         )}
 
         {view === 'home' && players && !gameFinished && (

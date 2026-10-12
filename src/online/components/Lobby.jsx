@@ -6,7 +6,6 @@ import {
   X,
   Users,
   Swords,
-  Layers,
   LogOut,
   Crown,
 } from "lucide-react-online";
@@ -68,9 +67,6 @@ export default function Lobby({ onOpenLeaderboard }) {
   // into `activeId`.
   const [pinPending, setPinPending] = useState(null);
 
-  // Which kind of game "Create Room" makes: casual ('public') or
-  // 'championship' (counts toward seasons, 2/day per player).
-  const [createMode, setCreateMode] = useState("public");
   // Today's championship quota for the locked-in profile — null while
   // loading/unknown. Refetched whenever the active profile changes.
   const [quota, setQuota] = useState(null);
@@ -145,11 +141,6 @@ export default function Lobby({ onOpenLeaderboard }) {
 
   const quotaSpent = quota != null && quota.remaining <= 0;
 
-  // If the championship option is selected but the quota runs out (or the
-  // profile switches to someone who spent theirs), fall back to casual.
-  useEffect(() => {
-    if (createMode === "championship" && quotaSpent) setCreateMode("public");
-  }, [createMode, quotaSpent]);
 
   const onProfileSaved = async (saved) => {
     await reload();
@@ -189,7 +180,8 @@ export default function Lobby({ onOpenLeaderboard }) {
   // socket call directly.
   const handleCreate = () => {
     if (!active) return;
-    createRoom(active.name, active.avatar, createMode);
+    // Every table is a league table (the casual "classic" mode is gone).
+    createRoom(active.name, active.avatar, "championship");
   };
 
   const handleJoin = () => {
@@ -213,15 +205,8 @@ export default function Lobby({ onOpenLeaderboard }) {
       icon: Crown,
     },
     {
-      id: "public",
-      n: "02",
-      title: "კლასიკური",
-      subtitle: "THE ORIGINAL",
-      icon: Layers,
-    },
-    {
       id: "tournament",
-      n: "03",
+      n: "02",
       title: "ტურნირი",
       subtitle: "TAKE THE STAGE",
       icon: Swords,
@@ -361,7 +346,7 @@ export default function Lobby({ onOpenLeaderboard }) {
           aria-labelledby={`mode-${mode}`}
           className="k-mode-panel"
         >
-          {(mode === "public" || mode === "championship") && (
+          {mode === "championship" && (
             <PublicRoomPanel
               active={active}
               mode={mode}
@@ -514,25 +499,10 @@ export default function Lobby({ onOpenLeaderboard }) {
                 ჯერ აირჩიე პროფილი <ArrowRight size={18} />
               </button>
             )}
-            <span className="k-eyebrow">CREATE A TABLE</span>
-            <div className="k-segment">
-              {[
-                ["championship", "ლიგა"],
-                ["public", "კლასიკური"],
-              ].map(([id, label]) => (
-                <button
-                  key={id}
-                  disabled={id === "championship" && quotaSpent}
-                  aria-pressed={createMode === id}
-                  onClick={() => setCreateMode(id)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <span className="k-eyebrow">CREATE A LEAGUE TABLE</span>
             <button
               className="k-button"
-              disabled={!canPlay}
+              disabled={!canPlay || quotaSpent}
               onClick={handleCreate}
             >
               შექმენი მაგიდა <Plus size={18} />

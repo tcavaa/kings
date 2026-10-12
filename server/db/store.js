@@ -684,6 +684,65 @@ async function getChampionshipQuota(name) {
   };
 }
 
+// ─── seasons (King Score's, read by both apps) ───────────────────────────────
+
+async function listSeasons() {
+  const rows = await db()`
+    SELECT id, name, theme, started_at, ended_at, champion_name FROM seasons ORDER BY started_at DESC`;
+  const iso = (v) => (v instanceof Date ? v.toISOString() : v);
+  return rows.map((r) => ({ ...r, started_at: iso(r.started_at), ended_at: iso(r.ended_at) }));
+}
+
+// ─── live score sheets: ჩაწერა games in progress, for others to follow ──────
+
+const LIVE_SHEET_HOURS = 3;
+const SHEET_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
+
+function sheetState(state) {
+  const players = Array.isArray(state?.players) ? state.players : null;
+  const rounds = Array.isArray(state?.rounds) ? state.rounds : null;
+  if (!players || players.length < 3 || players.length > 4 || !rounds || rounds.length > 36
+      || players.some((p) => !p || typeof p.id !== 'string' || typeof p.name !== 'string' || p.name.length > 64)) {
+    throw badRequest('Invalid score sheet.');
+  }
+  const clean = {
+    players: players.map((p) => ({ id: p.id.slice(0, 64), name: p.name })),
+    rounds,
+    activePlayerIndex: Number.isInteger(state.activePlayerIndex) ? state.activePlayerIndex : 0,
+    startedAt: Number.isFinite(state.startedAt) ? state.startedAt : null,
+    endedAt: Number.isFinite(state.endedAt) ? state.endedAt : null,
+  };
+  const text = JSON.stringify(clean);
+  if (text.length > 100 * 1024) throw badRequest('Score sheet is too large.');
+  return text;
+}
+
+async function saveLiveSheet(id, state) {
+  if (!SHEET_ID_RE.test(String(id))) throw badRequest('Invalid sheet id.');
+  const text = sheetState(state);
+  await db()`
+    INSERT INTO live_sheets (id, state, updated_at) VALUES (${id}, ${text}, now())
+    ON CONFLICT (id) DO UPDATE SET state = EXCLUDED.state, updated_at = now()`;
+}
+
+async function deleteLiveSheet(id) {
+  await db()`DELETE FROM live_sheets WHERE id = ${String(id)}`;
+}
+
+/** Sheets touched in the last few hours, most recently updated first. */
+async function listLiveSheets() {
+  const rows = await db()`
+    SELECT id, state, updated_at FROM live_sheets
+     WHERE updated_at > now() - make_interval(hours => ${LIVE_SHEET_HOURS})
+     ORDER BY updated_at DESC`;
+  const out = [];
+  for (const r of rows) {
+    try { out.push({ id: r.id, updatedAt: r.updated_at.toISOString(), ...JSON.parse(r.state) }); }
+    catch { /* ignore a malformed row */ }
+  }
+  return out;
+}
+
 // ─── sounds ──────────────────────────────────────────────────────────────────
 // The reaction-clip catalogue. Built-in clips are files in the front-end
 // build (`/sounds/<id>.mp3`); admin uploads keep their bytes in the row.
@@ -925,6 +984,8 @@ module.exports = {
   getLifetimeStats, getPublicLeaderboard,
   // championship daily quota
   getChampionshipQuota, CHAMPIONSHIP_DAILY_LIMIT,
+  // seasons, and ჩაწერა score sheets in progress
+  listSeasons, listLiveSheets, saveLiveSheet, deleteLiveSheet,
   // live games (mid-flight rooms persisted for crash/rejoin recovery)
   saveLiveGame, loadLiveGame, deleteLiveGame, listLiveGames, purgeStaleLiveGames,
   // reaction sounds (admin-managed)

@@ -16,6 +16,7 @@ const Insights = lazy(() => import("./LeaderboardPanels/Insights"));
 const PastGamesList = lazy(() => import("./LeaderboardPanels/PastGamesList"));
 const GameDetail = lazy(() => import("./LeaderboardPanels/GameDetail"));
 const PlayerProfile = lazy(() => import("./LeaderboardPanels/PlayerProfile"));
+const SeasonsPanel = lazy(() => import("./LeaderboardPanels/SeasonsPanel"));
 const PAGE_SIZE = 12;
 // Games played in King Online, games recorded at a table in ჩაწერა, or both.
 const GAME_TYPES = [
@@ -163,6 +164,7 @@ export default function Leaderboard({ onBack }) {
           ["rankings", "რეიტინგი"],
           ["insights", "ანალიტიკა"],
           ["history", "თამაშების ისტორია"],
+          ["seasons", "სეზონები"],
         ].map(([id, label], i) => (
           <button
             key={id}
@@ -285,6 +287,8 @@ export default function Leaderboard({ onBack }) {
                 )}
               </section>
             </div>
+          ) : section === "seasons" ? (
+            <SeasonsPanel games={games} />
           ) : section === "insights" ? (
             aggregated.length > 1 ? (
               <Insights games={games} players={aggregated} gameType={gameType} />
@@ -309,6 +313,7 @@ export default function Leaderboard({ onBack }) {
         !loading &&
         !error &&
         section !== "insights" &&
+        section !== "seasons" &&
         pages > 1 && (
           <div className="k-pagination">
             <span>

@@ -7,7 +7,12 @@ database.
 - `/` — King Online: lobby, quick-match tables, private rooms, tournaments,
   leaderboard, spectating, chat/voice/sound reactions, `/admin` sound manager.
 - `/score` — King Score: score sheet, history, seasons, stats, achievements.
-  Opened from King Online's **ჩაწერა** button (main nav + the lobby tile).
+  Opened from King Online's **ჩაწერა** button (main nav + the lobby tile); its
+  header links back to King Online. Games being scored right now show under
+  **Live now** on its home screen (anyone can follow one; `/score?live=<id>`).
+- King Online's leaderboard has a **სეზონები** tab: the running season (facts,
+  wins race, table) and every finished season's champion and table. Every
+  King Online table is a league table (the casual კლასიკური mode is gone).
 - One Supabase database (project `KINGS`, Frankfurt) for both, with **one
   player list** (`profiles`) and **one games table** (`finished_games`, each
   game `type` = `online` or `live` — played in King Online, or at a table and
@@ -26,7 +31,7 @@ service `kings-game-server`).
              ├ /            King Online UI      ├ profiles, finished_games,
              ├ /score       King Score UI       │ live_games, sounds  (both apps, via /api)
              └ /api/*       REST API ───────────┤
-                                                └ seasons (King Score)
+                                                └ seasons, live_sheets (King Score)
  browser ──► Supabase (anon key) ──────────────────┘
  browser ──► Render (Node, Socket.IO) ── game server ──► same Postgres
 ```
