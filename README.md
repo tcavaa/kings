@@ -8,9 +8,12 @@ database.
   leaderboard, spectating, chat/voice/sound reactions, `/admin` sound manager.
 - `/score` — King Score: score sheet, history, seasons, stats, achievements.
   Opened from King Online's **ჩაწერა** button (main nav + the lobby tile).
-- One Supabase database (project `KINGS`, Frankfurt) for both. The score app's history/stats
-  read King Online games straight from it; King Online's old public API
-  (`/api/public/*`) is gone.
+- One Supabase database (project `KINGS`, Frankfurt) for both, with **one
+  player list** (`profiles`) and **one games table** (`finished_games`, each
+  game `type` = `online` or `live` — played in King Online, or at a table and
+  recorded in King Score). A player added in either app shows up in both, and
+  both apps' leaderboards/stats count every game, with an
+  All / Online / Live filter. King Online's old public API (`/api/public/*`) is gone.
 
 Live: https://kingge.vercel.app (Vercel project `kings`, team
 "Tsava") · game server https://kings-game-server.onrender.com (Render
@@ -21,10 +24,10 @@ service `kings-game-server`).
 ```
  browser ──► Vercel (Next.js 16)          ──► Supabase Postgres (KINGS)
              ├ /            King Online UI      ├ profiles, finished_games,
-             ├ /score       King Score UI       │ live_games, sounds   (King Online)
+             ├ /score       King Score UI       │ live_games, sounds  (both apps, via /api)
              └ /api/*       REST API ───────────┤
-                                                └ players, game_results,
- browser ──► Supabase (anon key) ──────────────────game_details, seasons (King Score)
+                                                └ seasons (King Score)
+ browser ──► Supabase (anon key) ──────────────────┘
  browser ──► Render (Node, Socket.IO) ── game server ──► same Postgres
 ```
 
@@ -102,6 +105,26 @@ game (bots) and checks it lands in the database.
 
 ## Database
 
+**Players** — `profiles` is the one player list. King Online creates
+profiles with a PIN and photo; King Score adds plain ones (`POST /api/players`)
+and can only remove those (a profile with a PIN belongs to King Online).
+Games refer to players by name (King Online always has), and King Score's
+games also store the profile id.
+
+**Games** — `finished_games` holds both apps' games in King Online's payload
+shape; `type` tells them apart. A score-sheet game is converted by
+`server/games/scoreSheet.js` (round scores per seat, the round's own card
+counts as King Online's `*Taken` fields, plus the sheet's entry as typed),
+and `src/score/lib/gameShapes.js` turns any game back into King Score's old
+rows, so its screens work unchanged. The daily league limit counts online
+games only.
+
+King Score's old tables (`players`, `game_results`, `game_details`) were
+imported with `npm run db:merge-score-app` (safe to re-run; it verifies every
+game reads back exactly). Players without an online name were not carried
+over — their old games keep their name, but they aren't listed or ranked.
+`-- --retire-legacy` moves the old tables into a `legacy` schema.
+
 `supabase/migrations/20261012120000_king_online.sql` creates King Online's
 tables — same tables, columns and keys as the MySQL schema (DATETIME →
 timestamptz, MEDIUMTEXT → text). RLS is on with no policies and the client
@@ -153,3 +176,6 @@ always identical to a fresh query.
   games only, avatars stripped) instead of `king.rretrocar.ge/api/public`.
 - Big game lists are streamed (Vercel's 4.5 MB limit only applies to buffered
   responses).
+- Players and games are shared between the apps (see **Database**); King
+  Score reads and writes them through `/api/players` and `/api/games` instead
+  of Supabase directly (seasons still go straight to Supabase).

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import AvatarImg from "./AvatarImg";
 import { Swords } from "lucide-react-online";
 import { scoreColorClass } from "../../utils/scoreColor";
-import { isWinnerName } from "../../lib/leaderboard";
+import { isWinnerName, isRemovedPlayer } from "../../lib/leaderboard";
 
 /**
  * "You vs Ramaz" panel: select a player from the dropdown and see your record
@@ -13,7 +13,7 @@ function buildH2H(games) {
   //                                     aBest, bBest, gamesShared }
   const map = new Map();
   for (const g of games) {
-    const players = g.players || [];
+    const players = (g.players || []).filter((p) => !isRemovedPlayer(p));
     if (players.length < 2) continue;
     for (let i = 0; i < players.length; i++) {
       for (let j = i + 1; j < players.length; j++) {

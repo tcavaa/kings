@@ -3,9 +3,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ReferenceLine, Cell,
 } from 'recharts'
-import { Swords, Medal, Globe } from 'lucide-react'
+import { Swords, Medal } from 'lucide-react'
 import { computeGlobalStats, getGlobalAwards, TYPE_ROWS, computeKingMatrix, computeTypeEfficiency } from '../utils/analytics'
-import { isOnlineWinner } from '../utils/winners'
 import { CardTypeIcon, AwardIcon } from '../utils/gameIcons'
 import ComparePlayersPage from './ComparePlayersPage'
 
@@ -16,57 +15,36 @@ function getCssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-// onlineGames: season-filtered array from WinnersPage (already sliced to current season)
-export default function GlobalAnalyticsPage({ details, results, supabasePlayers = [], onlineGames = [], onBack }) {
+// details/results: the season's games of the type picked in `filter` — King
+// Online's and the ones recorded here are counted the same way, per player.
+export default function GlobalAnalyticsPage({ details, results, filter = null, onBack }) {
   const [view, setView] = useState('main') // 'main' | 'compare'
-  const playerMap = useMemo(() => computeGlobalStats(details, results), [details, results])
-
-  // Compute per-player online stats from the (season-filtered) game list
-  const onlineMap = useMemo(() => {
-    const m = {}
-    onlineGames.forEach(g => {
-      const ps = g.players || []
-      ps.forEach(p => {
-        if (!m[p.name]) m[p.name] = { gamesPlayed: 0, wins: 0, seconds: 0, totalScore: 0 }
-        m[p.name].gamesPlayed++
-        m[p.name].totalScore += p.score ?? 0
-        if (isOnlineWinner(g, p.name)) m[p.name].wins++
-      })
-      // Second place = 2nd-highest score in the game
-      const ranking = [...ps].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      if (ranking.length >= 2 && m[ranking[1].name]) m[ranking[1].name].seconds++
-    })
-    return m
-  }, [onlineGames])
-
-  // UUID → online_name from the players table (set manually in Supabase dashboard)
-  const uuidToOnlineName = useMemo(() => {
-    const m = {}
-    supabasePlayers.forEach(p => { if (p.online_name) m[p.id] = p.online_name })
-    return m
-  }, [supabasePlayers])
+  // Players taken off the player list (no King Online name) keep their old
+  // games, under `guest:` ids, but aren't listed or ranked any more.
+  const playerMap = useMemo(() => Object.fromEntries(
+    Object.entries(computeGlobalStats(details, results)).filter(([id]) => !id.startsWith('guest:'))
+  ), [details, results])
+  const guestNames = useMemo(() => new Set(details.flatMap(d =>
+    (d.players || []).filter(p => String(p.id).startsWith('guest:')).map(p => p.name))
+  ), [details])
   const awards = useMemo(() => getGlobalAwards(playerMap), [playerMap])
   const players = useMemo(
     () => Object.entries(playerMap)
       .map(([id, data]) => ({ id, ...data }))
-      .sort((a, b) => {
-        const aWins = a.wins + (onlineMap[uuidToOnlineName[a.id]]?.wins ?? 0)
-        const bWins = b.wins + (onlineMap[uuidToOnlineName[b.id]]?.wins ?? 0)
-        return bWins - aWins
-      }),
-    [playerMap, onlineMap, uuidToOnlineName]
+      .sort((a, b) => b.wins - a.wins),
+    [playerMap]
   )
   const kingMatrix = useMemo(() => computeKingMatrix(details), [details])
   const typeEfficiency = useMemo(() => computeTypeEfficiency(details), [details])
 
-  const kingLeaders = useMemo(() => Object.keys(kingMatrix).sort(), [kingMatrix])
+  const kingLeaders = useMemo(() => Object.keys(kingMatrix).filter(n => !guestNames.has(n)).sort(), [kingMatrix, guestNames])
   const kingTargets = useMemo(() => {
     const targets = new Set()
     Object.values(kingMatrix).forEach(row => Object.keys(row).forEach(t => targets.add(t)))
-    return [...targets].sort()
-  }, [kingMatrix])
+    return [...targets].filter(n => !guestNames.has(n)).sort()
+  }, [kingMatrix, guestNames])
 
-  const effPlayers = useMemo(() => Object.keys(typeEfficiency).sort(), [typeEfficiency])
+  const effPlayers = useMemo(() => Object.keys(typeEfficiency).filter(n => !guestNames.has(n)).sort(), [typeEfficiency, guestNames])
 
   // Bar chart: total units collected per card type per player
   const unitBarData = useMemo(() => {
@@ -92,6 +70,7 @@ export default function GlobalAnalyticsPage({ details, results, supabasePlayers 
           <h2 style={{ margin: 0 }}>Global Analytics</h2>
           <button className="link" onClick={onBack}>← Back</button>
         </div>
+        {filter}
         <p style={{ color: 'var(--muted)', marginTop: 12 }}>
           No detailed game data yet. Play a game to start seeing analytics.
         </p>
@@ -108,8 +87,6 @@ export default function GlobalAnalyticsPage({ details, results, supabasePlayers 
         players={players}
         details={details}
         results={results}
-        onlineGames={onlineGames}
-        uuidToOnlineName={uuidToOnlineName}
         onBack={() => setView('main')}
       />
     )
@@ -126,6 +103,7 @@ export default function GlobalAnalyticsPage({ details, results, supabasePlayers 
         <p style={{ color: 'var(--muted)', margin: '8px 0 0', fontSize: 13 }}>
           {details.length} recorded game{details.length !== 1 ? 's' : ''} · {players.length} player{players.length !== 1 ? 's' : ''}
         </p>
+        {filter}
       </div>
 
       {/* Compare entry point */}
@@ -146,16 +124,10 @@ export default function GlobalAnalyticsPage({ details, results, supabasePlayers 
           <div className="thead">
             <div className="tr summary-tr">
               <div className="th">Player</div>
-              <div className="th center online-col">All Wins</div>
-              <div className="th center online-col"><Medal size={11} /> 2nd</div>
               <div className="th center">Games</div>
               <div className="th center">Wins</div>
-              <div className="th center online-col"><Globe size={11} /> Games</div>
-              <div className="th center online-col"><Globe size={11} /> Wins</div>
-              <div className="th center online-col">Total Games</div>
+              <div className="th center"><Medal size={11} /> 2nd</div>
               <div className="th center">Win%</div>
-              <div className="th center online-col"><Globe size={11} /> Win%</div>
-              <div className="th center online-col">Total%</div>
               <div className="th center">Avg Score</div>
               <div className="th center"><CardTypeIcon code="Q" size={11} /> Q</div>
               <div className="th center"><CardTypeIcon code="J" size={11} /> J</div>
@@ -170,26 +142,14 @@ export default function GlobalAnalyticsPage({ details, results, supabasePlayers 
             {players.map(p => {
               const avgScore = p.gamesPlayed > 0 ? (p.totalScore / p.gamesPlayed).toFixed(1) : '0'
               const plusTotal = p.P1 + p.P2 + p.P3
-              const online = onlineMap[uuidToOnlineName[p.id]]
-              const allWins    = p.wins + (online?.wins ?? 0)
-              const allSeconds = (p.seconds ?? 0) + (online?.seconds ?? 0)
-              const totalGames = p.gamesPlayed + (online?.gamesPlayed ?? 0)
-              const winPct        = p.gamesPlayed > 0 ? ((p.wins / p.gamesPlayed) * 100).toFixed(0) : '—'
-              const onlineWinPct  = online?.gamesPlayed > 0 ? ((online.wins / online.gamesPlayed) * 100).toFixed(0) : '—'
-              const totalWinPct   = totalGames > 0 ? ((allWins / totalGames) * 100).toFixed(0) : '—'
+              const winPct = p.gamesPlayed > 0 ? ((p.wins / p.gamesPlayed) * 100).toFixed(0) : '—'
               return (
                 <div key={p.id} className="tr summary-tr">
                   <div className="td bold">{p.name}</div>
-                  <div className="td center online-col bold">{allWins}</div>
-                  <div className="td center online-col">{allSeconds}</div>
                   <div className="td center">{p.gamesPlayed}</div>
-                  <div className="td center">{p.wins}</div>
-                  <div className="td center online-col">{online ? online.gamesPlayed : '—'}</div>
-                  <div className="td center online-col">{online ? online.wins : '—'}</div>
-                  <div className="td center online-col">{totalGames}</div>
+                  <div className="td center bold">{p.wins}</div>
+                  <div className="td center">{p.seconds ?? 0}</div>
                   <div className="td center">{winPct}{winPct !== '—' ? '%' : ''}</div>
-                  <div className="td center online-col">{onlineWinPct}{onlineWinPct !== '—' ? '%' : ''}</div>
-                  <div className="td center online-col bold">{totalWinPct}{totalWinPct !== '—' ? '%' : ''}</div>
                   <div className={`td center ${+avgScore > 0 ? 'pos' : +avgScore < 0 ? 'neg' : ''}`}>{avgScore}</div>
                   <div className="td center">{p.Q}</div>
                   <div className="td center">{p.J}</div>

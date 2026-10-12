@@ -10,7 +10,7 @@ import {
   Legend,
 } from "recharts-online";
 
-const COLOURS = ["#d7fa52", "#b8c5a5", "#789e98"];
+const COLOURS = ["#d7fa52", "#b8c5a5", "#789e98", "#e0a458"];
 
 /**
  * Recharts line chart of the running tally per round. Same data as

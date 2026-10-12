@@ -101,7 +101,8 @@ export const api = {
 
   // stats — per-player lifetime counters computed server-side from every
   // stored game's roundDetails JSON.
-  getLifetimeStats: (name) => request(`/api/stats/${encodeURIComponent(name)}`),
+  getLifetimeStats: (name, type = 'all') =>
+    request(`/api/stats/${encodeURIComponent(name)}?type=${encodeURIComponent(type)}`),
 
   // championship daily quota — { name, limit, playedToday, remaining }.
   getChampionshipQuota: (name) => request(`/api/quota/${encodeURIComponent(name)}`),

@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
-import { useGameResults } from '../hooks/useGameResults'
-import { useAllGameDetails } from '../hooks/useAllGameDetails'
+import { useGameData, gamesOfType } from '../lib/gameData'
 import TrophyIcon from './TrophyIcon'
+import TypeFilter, { useTypeFilter } from './TypeFilter'
 import AchievementBadges from './AchievementBadges'
 import { computeAllLifetimeAchievements } from '../utils/achievements'
 import { isWinnerOf, isChampionName } from '../utils/winners'
 
 export default function PlayersPage({ onBack, currentChampion }) {
+  // One list with King Online: a player added here shows up there (without a
+  // PIN) and the other way round. Players with a King Online PIN are managed there.
   const { players, loading, addPlayer, deletePlayer } = usePlayers()
-  const { results, loading: resultsLoading } = useGameResults()
-  const { details: allDetails } = useAllGameDetails()
+  const { data, loading: resultsLoading } = useGameData()
+  const [type, setType] = useTypeFilter()
+  const { results, details: allDetails } = useMemo(() => gamesOfType(data, type), [data, type])
   const [name, setName] = useState('')
   const [err, setErr] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -60,6 +63,7 @@ export default function PlayersPage({ onBack, currentChampion }) {
         <button className="primary" disabled={saving || !name.trim()}>Add</button>
       </form>
       {err && <div className="validation" style={{ marginTop: 8 }}>{err}</div>}
+      <TypeFilter value={type} onChange={setType} />
 
       {loading || resultsLoading ? (
         <p style={{ color: 'var(--muted)', marginTop: 12 }}>Loading...</p>
@@ -87,7 +91,9 @@ export default function PlayersPage({ onBack, currentChampion }) {
                   )}
                   <AchievementBadges achievements={lifetimeAchievements[p.name] || {}} />
                 </div>
-                <button className="link" style={{ color: '#dc2626', alignSelf: 'flex-start', marginTop: 2 }} onClick={() => setConfirmDelete(p)}>Remove</button>
+                {!p.has_pin && (
+                  <button className="link" style={{ color: '#dc2626', alignSelf: 'flex-start', marginTop: 2 }} onClick={() => setConfirmDelete(p)}>Remove</button>
+                )}
               </li>
             )
           })}
@@ -108,7 +114,12 @@ export default function PlayersPage({ onBack, currentChampion }) {
               <button
                 className="primary"
                 style={{ background: '#dc2626', borderColor: '#dc2626' }}
-                onClick={() => { deletePlayer(confirmDelete.id); setConfirmDelete(null) }}
+                onClick={async () => {
+                  const target = confirmDelete
+                  setConfirmDelete(null)
+                  const error = await deletePlayer(target.id)
+                  if (error) setErr(error)
+                }}
               >
                 Remove
               </button>

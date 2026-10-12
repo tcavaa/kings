@@ -1,40 +1,21 @@
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { useCallback } from 'react'
+import { useGameData, savePlayer, removePlayer } from '../lib/gameData'
 
+const NONE = []
+
+// One player list for ჩაწერა and King Online (King Online's profiles), by name.
 export function usePlayers() {
-  const [players, setPlayers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  const fetchPlayers = useCallback(async () => {
-    setLoading(true)
-    const { data, error } = await supabase
-      .from('players')
-      .select('id, name, online_name, created_at')
-      .order('name')
-    if (error) setError(error.message)
-    else setPlayers(data)
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { fetchPlayers() }, [fetchPlayers])
+  const { data, loading, error } = useGameData()
 
   const addPlayer = useCallback(async (name) => {
-    const { error } = await supabase
-      .from('players')
-      .insert({ name: name.trim() })
-    if (error) return error.message
-    await fetchPlayers()
-    return null
-  }, [fetchPlayers])
+    try { await savePlayer(name.trim()); return null }
+    catch (err) { return err.message }
+  }, [])
 
   const deletePlayer = useCallback(async (id) => {
-    const { error } = await supabase
-      .from('players')
-      .delete()
-      .eq('id', id)
-    if (!error) await fetchPlayers()
-  }, [fetchPlayers])
+    try { await removePlayer(id); return null }
+    catch (err) { return err.message }
+  }, [])
 
-  return { players, loading, error, addPlayer, deletePlayer }
+  return { players: data?.players ?? NONE, loading, error, addPlayer, deletePlayer }
 }

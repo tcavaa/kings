@@ -1,26 +1,27 @@
-import { useGameResults } from '../hooks/useGameResults'
-import { useAllGameDetails } from '../hooks/useAllGameDetails'
-import { usePlayers } from '../hooks/usePlayers'
-import { useOnlineGames } from '../hooks/useOnlineData'
+import { useMemo } from 'react'
+import { useGameData, gamesOfType } from '../lib/gameData'
 import GlobalAnalyticsPage from './GlobalAnalyticsPage'
+import TypeFilter, { useTypeFilter } from './TypeFilter'
 
 /**
- * The "Stats" tab — Global Analytics for the CURRENT season, addressable
- * straight from the bottom nav. Online data arrives championship-only from
- * the public API, so public/casual online games never touch these numbers.
+ * The "Stats" tab — Global Analytics for the CURRENT season, over the games
+ * picked in the filter: all of them, King Online's league games, or the ones
+ * recorded here. Casual online games never touch these numbers.
  */
 export default function StatsPage({ currentSeasonStart, onBack }) {
-  const { results, loading: resultsLoading } = useGameResults()
-  const { details, loading: detailsLoading } = useAllGameDetails()
-  const { players: supabasePlayers } = usePlayers()
-  const { games: onlineGames } = useOnlineGames(500)
+  const { data, loading } = useGameData()
+  const [type, setType] = useTypeFilter()
 
   const seasonStart = currentSeasonStart || new Date(0)
-  const seasonDetails     = details.filter(d => new Date(d.played_at) > seasonStart)
-  const seasonResults     = results.filter(r => new Date(r.played_at) > seasonStart)
-  const seasonOnlineGames = onlineGames.filter(g => new Date(g.playedAt) > seasonStart)
+  const { results, details } = useMemo(() => {
+    const games = gamesOfType(data, type)
+    return {
+      results: games.results.filter(r => new Date(r.played_at) > seasonStart),
+      details: games.details.filter(d => new Date(d.played_at) > seasonStart),
+    }
+  }, [data, type, seasonStart])
 
-  if (resultsLoading || detailsLoading) {
+  if (loading) {
     return (
       <div className="card">
         <h2>Global Analytics</h2>
@@ -31,10 +32,9 @@ export default function StatsPage({ currentSeasonStart, onBack }) {
 
   return (
     <GlobalAnalyticsPage
-      details={seasonDetails}
-      results={seasonResults}
-      onlineGames={seasonOnlineGames}
-      supabasePlayers={supabasePlayers}
+      details={details}
+      results={results}
+      filter={<TypeFilter value={type} onChange={setType} />}
       onBack={onBack}
     />
   )

@@ -58,7 +58,7 @@ export default function GameDetail({ game, onBack }) {
     });
     details.forEach((d) => {
       if (tally[d.leaderSeat]) tally[d.leaderSeat].roundsLed++;
-      for (const seat of [0, 1, 2]) {
+      for (const { seat } of playerList) {
         if (!tally[seat]) continue;
         tally[seat].totalTricks += d.tricksTaken?.[seat] ?? 0;
         if (d.gameType === "Q")
@@ -87,7 +87,7 @@ export default function GameDetail({ game, onBack }) {
         <button className="k-text-action" onClick={onBack}>
           <ArrowLeft size={16} /> ყველა თამაში
         </button>
-        <GameModeTag isChampionship={game.isChampionship} />
+        <GameModeTag isChampionship={game.isChampionship} type={game.type} />
       </div>
       <PodiumView game={game} sortedPlayers={sortedPlayers} />
       <nav className="k-report-tabs" aria-label="თამაშის დეტალები">

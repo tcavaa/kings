@@ -1,5 +1,5 @@
 import { GAME_TYPES } from '../constants/gameTypes'
-import { isWinnerOf, isOnlineWinner } from './winners'
+import { isWinnerOf } from './winners'
 
 // Icons for these rows come from utils/gameIcons.jsx (CardTypeIcon by code);
 // chart labels use the plain `label` text.
@@ -123,10 +123,11 @@ export function computeGlobalStats(allDetails, allResults) {
 }
 
 // Head-to-head comparison restricted to games every selected player took part in.
-// `selected` = [{ id, name, onlineName }] (onlineName may be undefined).
-// Returns per-player wins/games/win% over shared games (local + online) plus a
-// pairwise matrix of who outscored whom.
-export function computeComparison(selected, allDetails, allResults = [], onlineGames = []) {
+// `selected` = [{ id, name }]. allDetails/allResults hold King Online's games
+// and the ones recorded here alike (detail.type says which).
+// Returns per-player wins/games/win% over shared games plus a pairwise matrix
+// of who outscored whom.
+export function computeComparison(selected, allDetails, allResults = []) {
   const ids = selected.map(s => s.id)
 
   const stats = {}
@@ -148,13 +149,13 @@ export function computeComparison(selected, allDetails, allResults = [], onlineG
   let localShared = 0
   let onlineShared = 0
 
-  // ---- Local shared games ----
   allDetails.forEach(detail => {
     const { players, rounds, game_result_id } = detail
     if (!players || !rounds) return
     const inGame = new Set(players.map(p => p.id))
     if (!ids.every(id => inGame.has(id))) return
-    localShared++
+    if (detail.type === 'online') onlineShared++
+    else localShared++
 
     const totals = {}
     players.forEach(p => { totals[p.id] = 0 })
@@ -170,25 +171,6 @@ export function computeComparison(selected, allDetails, allResults = [], onlineG
     addPairwise(totals)
   })
 
-  // ---- Online shared games (only when every selected player has an online name) ----
-  const allHaveOnline = selected.every(s => s.onlineName)
-  if (allHaveOnline) {
-    onlineGames.forEach(g => {
-      const scoreByName = {}
-      ;(g.players || []).forEach(p => { scoreByName[p.name] = p.score ?? 0 })
-      if (!selected.every(s => s.onlineName in scoreByName)) return
-      onlineShared++
-
-      const scoreById = {}
-      selected.forEach(s => {
-        scoreById[s.id] = scoreByName[s.onlineName]
-        stats[s.id].games++
-        if (isOnlineWinner(g, s.onlineName)) stats[s.id].wins++
-      })
-      addPairwise(scoreById)
-    })
-  }
-
   const rows = selected
     .map(s => {
       const st = stats[s.id]
@@ -196,7 +178,7 @@ export function computeComparison(selected, allDetails, allResults = [], onlineG
     })
     .sort((a, b) => b.wins - a.wins)
 
-  return { rows, h2h, localShared, onlineShared, totalShared: localShared + onlineShared, allHaveOnline }
+  return { rows, h2h, localShared, onlineShared, totalShared: localShared + onlineShared }
 }
 
 // Returns { [leaderName]: { [targetName]: count } } — how many times leader sent King to target

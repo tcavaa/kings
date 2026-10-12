@@ -4,8 +4,8 @@ import { computeComparison } from '../utils/analytics'
 
 const MAX_SELECT = 4
 
-// players: [{ id, name }] roster from Global Analytics (id = stable player UUID)
-export default function ComparePlayersPage({ players, details, results, onlineGames = [], uuidToOnlineName = {}, onBack }) {
+// players: [{ id, name }] roster from Global Analytics (id = the player's profile id)
+export default function ComparePlayersPage({ players, details, results, onBack }) {
   const [selectedIds, setSelectedIds] = useState([])
 
   const toggle = id => {
@@ -20,14 +20,14 @@ export default function ComparePlayersPage({ players, details, results, onlineGa
   const selected = useMemo(
     () => selectedIds.map(id => {
       const p = players.find(x => x.id === id)
-      return { id, name: p?.name ?? id, onlineName: uuidToOnlineName[id] }
+      return { id, name: p?.name ?? id }
     }),
-    [selectedIds, players, uuidToOnlineName]
+    [selectedIds, players]
   )
 
   const cmp = useMemo(
-    () => (selected.length >= 2 ? computeComparison(selected, details, results, onlineGames) : null),
-    [selected, details, results, onlineGames]
+    () => (selected.length >= 2 ? computeComparison(selected, details, results) : null),
+    [selected, details, results]
   )
 
   const nameById = useMemo(() => {
@@ -92,8 +92,7 @@ export default function ComparePlayersPage({ players, details, results, onlineGa
             <h2>Head to Head</h2>
             <p style={{ color: 'var(--muted)', margin: '0 0 14px', fontSize: 13 }}>
               {cmp.totalShared} shared game{cmp.totalShared !== 1 ? 's' : ''}
-              {' · '}{cmp.localShared} local · {cmp.onlineShared} online
-              {!cmp.allHaveOnline && ' (online skipped — not all selected players have an online name)'}
+              {' · '}{cmp.localShared} live · {cmp.onlineShared} online
             </p>
 
             {isPair ? (

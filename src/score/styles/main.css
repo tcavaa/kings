@@ -539,7 +539,7 @@ button, input, select { min-height: 44px; }
 .analytics-max { color: var(--text); font-weight: 700; }
 .analytics-zero { color: var(--muted); }
 
-.summary-tr { grid-template-columns: 75px 58px 52px 58px 52px 60px 58px 68px 52px 58px 52px 80px repeat(7, 46px); min-width: 1012px; }
+.summary-tr { grid-template-columns: 75px 58px 52px 52px 52px 80px repeat(7, 46px); min-width: 691px; }
 .summary-tr .th, .summary-tr .td { padding: 8px 6px; font-size: 11px; }
 .online-col { background: color-mix(in srgb, var(--accent-good) 6%, var(--cell-bg)); border-left: 1px solid var(--line); }
 

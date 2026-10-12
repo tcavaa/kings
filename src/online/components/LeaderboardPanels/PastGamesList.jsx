@@ -1,10 +1,14 @@
 import { ArrowUpRight } from "lucide-react-online";
-/** Small ლიგა/კლასიკური pill shown on each game row (and the detail header). */
-export function GameModeTag({ isChampionship, className = "" }) {
+/** Small ლიგა/კლასიკური/ლაივი pill shown on each game row (and the detail header). */
+export function GameModeTag({ isChampionship, type, className = "" }) {
   const championship = isChampionship !== false; // records without the flag are legacy championship games
   return (
     <span className={`k-mode-tag ${className}`}>
-      {championship ? "RANKED / ლიგა" : "CLASSIC / კლასიკური"}
+      {type === "live"
+        ? "LIVE / ლაივი"
+        : championship
+          ? "RANKED / ლიგა"
+          : "CLASSIC / კლასიკური"}
     </span>
   );
 }
@@ -49,7 +53,11 @@ export default function PastGamesList({ loading, games, onSelect }) {
             <span>{g.players?.map((p) => p.name).join(" / ")}</span>
           </span>
           <span className="k-history-mode">
-            {g.isChampionship === false ? "CLASSIC" : "RANKED"}
+            {g.type === "live"
+              ? "LIVE"
+              : g.isChampionship === false
+                ? "CLASSIC"
+                : "RANKED"}
             <small>{g.players?.length} მოთამაშე</small>
           </span>
           <ArrowUpRight size={21} />

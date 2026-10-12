@@ -21,11 +21,19 @@ export function isWinnerName(game, name) {
   return winnersOf(game).some(w => w?.name === name)
 }
 
+/**
+ * Players taken off the shared player list (ჩაწერა players who had no King
+ * Online name). Their old table games keep their name, but they are no longer
+ * ranked or paired with anyone.
+ */
+export const isRemovedPlayer = (p) => p?.profileId === null
+
 /** Aggregate stats per player name across the supplied games array. */
 export function aggregatePlayers(games = []) {
   const tally = new Map()
   for (const g of games) {
     for (const p of g.players || []) {
+      if (isRemovedPlayer(p)) continue
       const k = p.name
       const t = tally.get(k) || {
         name: p.name, avatar: p.avatar || null,

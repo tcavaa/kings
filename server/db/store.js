@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { getSql } = require('./connection');
+const { fromScoreSheet } = require('../games/scoreSheet');
 
 // Every DATETIME the MySQL build wrote was wall-clock time on the cPanel box
 // (Asia/Tbilisi), and the championship "calendar day" was that box's day.
@@ -173,6 +174,53 @@ async function deleteProfile(id /*, deviceKey */) {
   return true;
 }
 
+// ─── players: ჩაწერა's view of the same profiles ─────────────────────────────
+// One player list for both apps. ჩაწერა only needs names (no photos), and can
+// add a player — a profile without a PIN, which King Online shows like any
+// other — or remove one it added. Profiles with a PIN belong to King Online.
+
+async function listPlayers() {
+  const rows = await db()`
+    SELECT id, name, pin_hash IS NOT NULL AS has_pin, created_at FROM profiles ORDER BY name`;
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    has_pin: r.has_pin,
+    created_at: r.created_at instanceof Date ? r.created_at.toISOString() : r.created_at,
+  }));
+}
+
+async function createPlayer(name) {
+  const trimmed = String(name ?? '').trim().slice(0, 64);
+  if (!trimmed) throw badRequest('Player name is required.');
+  const id = `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  // Names identify players in every game, so one name per person.
+  const rows = await db()`
+    INSERT INTO profiles (id, name)
+    SELECT ${id}, ${trimmed}
+     WHERE NOT EXISTS (SELECT 1 FROM profiles WHERE lower(name) = lower(${trimmed}))
+    RETURNING id, name, created_at`;
+  if (!rows.length) {
+    const err = new Error(`A player named "${trimmed}" already exists.`);
+    err.status = 409;
+    throw err;
+  }
+  const r = rows[0];
+  return { id: r.id, name: r.name, has_pin: false, created_at: r.created_at.toISOString() };
+}
+
+async function deletePlayer(id) {
+  const rows = await db()`SELECT pin_hash FROM profiles WHERE id = ${id}`;
+  if (!rows.length) return false;
+  if (rows[0].pin_hash) {
+    const err = new Error('This player has a King Online PIN — remove them in King Online.');
+    err.status = 403;
+    throw err;
+  }
+  await db()`DELETE FROM profiles WHERE id = ${id}`;
+  return true;
+}
+
 function rowToProfile(row) {
   return {
     id: row.id,
@@ -197,6 +245,12 @@ function matchesMode(isChampionship, mode) {
   if (mode === 'championship') return isChampionship === 1;
   if (mode === 'public')       return isChampionship === 0;
   return true;
+}
+
+// finished_games.type: 'online' (played in King Online) or 'live' (played at
+// a table and recorded in ჩაწერა). `type` filters: 'online' | 'live' | 'all'.
+function matchesType(rowType, type) {
+  return type === 'online' || type === 'live' ? rowType === type : true;
 }
 
 // The mirror holds each payload with its avatar data URLs swapped for a
@@ -228,7 +282,7 @@ const gameMirror = createMirror({
   fetchRows: async (ids) => {
     const sql = db();
     const rows = await sql`
-      SELECT id, xmin::text AS v, played_at, winner_name, winner_seat, winner_score,
+      SELECT id, xmin::text AS v, type, played_at, winner_name, winner_seat, winner_score,
              is_championship,
              regexp_replace(payload, ${AVATAR_RE_SQL}, ${AVATAR_SLOT_TEXT}, 'g') AS text,
              ARRAY(
@@ -259,6 +313,7 @@ const gameMirror = createMirror({
   makeEntry: (rows) => rows.map((r) => ({
     id: r.id,
     v: r.v,
+    type: r.type,
     played_at: r.played_at,
     winner_name: r.winner_name,
     winner_seat: r.winner_seat,
@@ -293,11 +348,11 @@ function barePayload(entry) {
   return entry.bareParsed;
 }
 
-/** Mirror entries for a mode, newest first (the ORDER BY played_at DESC). */
-async function gameEntries(mode) {
+/** Mirror entries for a mode and type, newest first (the ORDER BY played_at DESC). */
+async function gameEntries(mode, type = 'all') {
   await gameMirror.sync();
   return [...gameMirror.entries.values()]
-    .filter((e) => matchesMode(e.is_championship, mode))
+    .filter((e) => matchesMode(e.is_championship, mode) && matchesType(e.type, type))
     .sort((a, b) => b.playedAtMs - a.playedAtMs);
 }
 
@@ -313,8 +368,8 @@ function limitGames(entries, limit) {
 }
 
 // The returned objects are shared with the mirror — read them, never mutate.
-async function listGames(limit = 50, mode = 'all') {
-  return limitGames(await gameEntries(mode), limit).map((e) => {
+async function listGames(limit = 50, mode = 'all', type = 'all') {
+  return limitGames(await gameEntries(mode, type), limit).map((e) => {
     if (!e.fullGame) e.fullGame = rowToGame(e, fullPayload(e));
     return e.fullGame;
   });
@@ -324,8 +379,8 @@ async function listGames(limit = 50, mode = 'all') {
  * Same rows, order and limit as listGames, but every player's `avatar` is
  * null. Only for callers that strip or ignore avatars anyway.
  */
-async function listGamesWithoutAvatars(limit = 50, mode = 'all') {
-  return limitGames(await gameEntries(mode), limit).map((e) => {
+async function listGamesWithoutAvatars(limit = 50, mode = 'all', type = 'all') {
+  return limitGames(await gameEntries(mode, type), limit).map((e) => {
     if (!e.bareGame) e.bareGame = rowToGame(e, barePayload(e));
     return e.bareGame;
   });
@@ -333,7 +388,7 @@ async function listGamesWithoutAvatars(limit = 50, mode = 'all') {
 
 async function getGame(id) {
   const rows = await db()`
-    SELECT id, played_at, winner_name, winner_seat, winner_score, is_championship, payload
+    SELECT id, type, played_at, winner_name, winner_seat, winner_score, is_championship, payload
     FROM finished_games WHERE id = ${id} LIMIT 1`;
   return rows.length ? rowToGame(rows[0], parsePayload(rows[0].payload)) : null;
 }
@@ -388,6 +443,38 @@ async function saveFinishedGame(record) {
   return getGame(id);
 }
 
+/** A game ჩაწერა just finished (see server/games/scoreSheet.js). */
+async function saveScoreSheetGame(body) {
+  const ids = (Array.isArray(body?.players) ? body.players : [])
+    .map((p) => p && p.id).filter((id) => typeof id === 'string');
+  const byId = new Map();
+  if (ids.length) {
+    for (const p of await db()`SELECT id, name FROM profiles WHERE id = ANY(${ids})`) byId.set(p.id, p);
+  }
+  const unknown = ids.filter((id) => !byId.has(id));
+  if (unknown.length) {
+    // A game started before the player lists were merged still carries
+    // ჩაწერა's old player ids; those map to profiles through online_name.
+    const [{ schema } = {}] = await db()`
+      SELECT table_schema AS schema FROM information_schema.tables
+       WHERE table_name = 'players' AND table_schema IN ('public', 'legacy') LIMIT 1`;
+    if (schema) {
+      const rows = await db()`
+        SELECT pl.id::text AS old_id, pr.id, pr.name
+          FROM ${db()(`${schema}.players`)} pl JOIN profiles pr ON pr.name = pl.online_name
+         WHERE pl.id::text = ANY(${unknown})`;
+      for (const r of rows) byId.set(r.old_id, { id: r.id, name: r.name });
+    }
+  }
+  const row = fromScoreSheet(body, (id) => byId.get(id) || null);
+  await db()`
+    INSERT INTO finished_games
+      (id, type, played_at, winner_name, winner_seat, winner_score, is_championship, payload)
+    VALUES (${row.id}, 'live', now(), ${String(row.winner.name).slice(0, 64)}, ${row.winner.seat},
+            ${row.winner.score}, ${row.isChampionship}, ${JSON.stringify(row.payload)})`;
+  return getGame(row.id);
+}
+
 function rowToGame(row, parsed) {
   let payload = {};
   if (parsed.ok) payload = parsed.value;
@@ -412,14 +499,19 @@ function rowToGame(row, parsed) {
     winners,
     isTie: winners.length > 1,
     isChampionship: row.is_championship === undefined ? true : !!row.is_championship,
+    type: row.type || 'online',
     players: payload.players || [],
     roundDetails: payload.roundDetails || [],
+    // ჩაწერა games only: how long the sheet was open, and what its old rows
+    // need to be rebuilt exactly (see src/score/lib/gameShapes.js).
+    ...(payload.durationSeconds != null && { durationSeconds: payload.durationSeconds }),
+    ...(payload.legacy && { legacy: payload.legacy }),
   };
 }
 
-async function getLifetimeStats(name, mode = 'all') {
+async function getLifetimeStats(name, mode = 'all', type = 'all') {
   if (!name) throw new Error('name is required');
-  const rows = await gameEntries(mode);
+  const rows = await gameEntries(mode, type);
   const out = {
     name,
     gamesPlayed: 0, wins: 0, totalScore: 0,
@@ -525,15 +617,15 @@ async function listLiveGames() {
 }
 
 /**
- * Aggregate every finished game into a per-player leaderboard. Same shape
+ * Aggregate King Online's finished games into a per-player leaderboard. Same shape
  * the client computes locally for the Hall of Fame view (wins, games
  * played, total cumulative score, best/worst single-game score), exposed
  * server-side so the score app doesn't have to fetch every game.
  *
  * Returned rows are sorted by wins desc, then total score desc.
  */
-async function getPublicLeaderboard(mode = 'all') {
-  const games = await listGamesWithoutAvatars(200, mode);
+async function getPublicLeaderboard(mode = 'all', type = 'online') {
+  const games = await listGamesWithoutAvatars(200, mode, type);
   const tally = new Map();
   for (const g of games) {
     for (const p of g.players || []) {
@@ -561,9 +653,9 @@ async function getPublicLeaderboard(mode = 'all') {
 
 /**
  * Daily championship quota for one player name (server-local calendar day,
- * APP_TIMEZONE). A "played" game is a finished championship game the player
- * participated in — surrendered games count too, so abandoning a match
- * doesn't refund the slot.
+ * APP_TIMEZONE). A "played" game is a finished King Online championship game
+ * the player participated in — surrendered games count too, so abandoning a
+ * match doesn't refund the slot. Games recorded in ჩაწერა never count.
  */
 async function getChampionshipQuota(name) {
   if (!name) throw new Error('name is required');
@@ -572,6 +664,7 @@ async function getChampionshipQuota(name) {
     SELECT regexp_replace(payload, ${AVATAR_RE_SQL}, '"avatar":null', 'g') AS payload
       FROM finished_games
      WHERE is_championship = 1
+       AND type = 'online'
        AND played_at >= (date_trunc('day', now() AT TIME ZONE ${APP_TIMEZONE}) AT TIME ZONE ${APP_TIMEZONE})`;
   const lower = String(name).trim().toLowerCase();
   let playedToday = 0;
@@ -824,8 +917,10 @@ async function deleteSound(id) {
 module.exports = {
   // profiles
   listProfiles, getProfile, upsertProfile, deleteProfile, verifyProfilePin,
-  // finished games
-  listGames, listGamesWithoutAvatars, getGame, saveFinishedGame,
+  // the same profiles as ჩაწერა's player list
+  listPlayers, createPlayer, deletePlayer,
+  // finished games (King Online's and ჩაწერა's)
+  listGames, listGamesWithoutAvatars, getGame, saveFinishedGame, saveScoreSheetGame,
   // stats
   getLifetimeStats, getPublicLeaderboard,
   // championship daily quota

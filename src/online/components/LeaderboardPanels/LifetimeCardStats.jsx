@@ -6,7 +6,7 @@ const FIELDS = [
   ["J", "ვალეტები", "jacks"],
   ["♥", "გულები", "hearts"],
 ];
-export default function LifetimeCardStats({ players }) {
+export default function LifetimeCardStats({ players, gameType = "all" }) {
   const [selected, setSelected] = useState("");
   const name = selected || players[0]?.name;
   const [result, setResult] = useState(null);
@@ -18,7 +18,7 @@ export default function LifetimeCardStats({ players }) {
     setResult(null);
     setError(false);
     api
-      .getLifetimeStats(name)
+      .getLifetimeStats(name, gameType)
       .then((r) => {
         if (alive) setResult(r);
       })
@@ -28,7 +28,7 @@ export default function LifetimeCardStats({ players }) {
     return () => {
       alive = false;
     };
-  }, [name, attempt]);
+  }, [name, gameType, attempt]);
   if (!players.length) return null;
   return (
     <section className="k-analysis-panel">

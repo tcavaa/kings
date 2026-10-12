@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
-import { winnersOf, isWinnerName } from "../../lib/leaderboard";
+import { winnersOf, isWinnerName, isRemovedPlayer } from "../../lib/leaderboard";
 function buildPairData(games) {
   // pair-key (sorted names) -> { label, [nameA]: aWins, [nameB]: bWins }
   const map = new Map();
   for (const g of games) {
-    const players = g.players || [];
+    const players = (g.players || []).filter((p) => !isRemovedPlayer(p));
     if (players.length < 2 || !winnersOf(g).length) continue;
     for (let i = 0; i < players.length; i++) {
       for (let j = i + 1; j < players.length; j++) {

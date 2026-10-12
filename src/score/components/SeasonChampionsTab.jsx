@@ -44,6 +44,7 @@ function SeasonStats({ season, allDetails, allResults, allOnlineGames, supabaseP
   const playerMap = useMemo(() => computeGlobalStats(details, results), [details, results])
   const players = useMemo(
     () => Object.entries(playerMap)
+      .filter(([id]) => !id.startsWith('guest:'))   // players no longer on the list
       .map(([id, d]) => ({ id, ...d }))
       .sort((a, b) => {
         const aW = a.wins + (onlineStatsMap[uuidToOnlineName[a.id]]?.wins ?? 0)

@@ -17,9 +17,16 @@ const PastGamesList = lazy(() => import("./LeaderboardPanels/PastGamesList"));
 const GameDetail = lazy(() => import("./LeaderboardPanels/GameDetail"));
 const PlayerProfile = lazy(() => import("./LeaderboardPanels/PlayerProfile"));
 const PAGE_SIZE = 12;
+// Games played in King Online, games recorded at a table in ჩაწერა, or both.
+const GAME_TYPES = [
+  ["all", "ყველა"],
+  ["online", "ონლაინ"],
+  ["live", "ლაივი"],
+];
 
 export default function Leaderboard({ onBack }) {
-  const [games, setGames] = useState([]);
+  const [allGames, setAllGames] = useState([]);
+  const [gameType, setGameType] = useState("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -29,6 +36,18 @@ export default function Leaderboard({ onBack }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("wins");
   const [page, setPage] = useState(0);
+  const games = useMemo(
+    () =>
+      gameType === "all"
+        ? allGames
+        : allGames.filter((g) => (g.type || "online") === gameType),
+    [allGames, gameType],
+  );
+  const typeCounts = useMemo(() => {
+    const counts = { all: allGames.length, online: 0, live: 0 };
+    for (const g of allGames) counts[g.type || "online"]++;
+    return counts;
+  }, [allGames]);
   const aggregated = useMemo(() => aggregatePlayers(games), [games]);
   const ranked = useMemo(
     () =>
@@ -51,7 +70,7 @@ export default function Leaderboard({ onBack }) {
     Promise.all([listGames("all"), api.listProfiles().catch(() => [])])
       .then(([list, profiles]) => {
         if (!cancelled)
-          setGames(
+          setAllGames(
             withCurrentAvatars(
               Array.isArray(list) ? list : [],
               Array.isArray(profiles) ? profiles : [],
@@ -74,6 +93,12 @@ export default function Leaderboard({ onBack }) {
   const changeSection = (id) => {
     setProfileName(null);
     setSection(id);
+    setPage(0);
+    setSelected(null);
+  };
+  const changeType = (type) => {
+    setProfileName(null);
+    setGameType(type);
     setPage(0);
     setSelected(null);
   };
@@ -119,6 +144,20 @@ export default function Leaderboard({ onBack }) {
           </strong>
         </div>
       </div>
+      {!loading && !error && (
+        <div className="k-type-filter" role="group" aria-label="თამაშის ტიპი">
+          {GAME_TYPES.map(([id, label]) => (
+            <button
+              key={id}
+              aria-pressed={gameType === id}
+              onClick={() => changeType(id)}
+            >
+              {label}
+              <small>{typeCounts[id]}</small>
+            </button>
+          ))}
+        </div>
+      )}
       <nav className="k-page-tabs" aria-label="რეიტინგის სექციები">
         {[
           ["rankings", "რეიტინგი"],
@@ -248,7 +287,7 @@ export default function Leaderboard({ onBack }) {
             </div>
           ) : section === "insights" ? (
             aggregated.length > 1 ? (
-              <Insights games={games} players={aggregated} />
+              <Insights games={games} players={aggregated} gameType={gameType} />
             ) : (
               <p className="k-empty">
                 ანალიტიკისთვის საჭიროა ორი მოთამაშის შედეგები.

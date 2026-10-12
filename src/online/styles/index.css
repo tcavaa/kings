@@ -1920,6 +1920,35 @@ input {
   font-weight: 200;
   color: #869365;
 }
+/* Leaderboard game-type filter: ყველა / ონლაინ / ლაივი */
+.k-type-filter {
+  display: inline-grid;
+  grid-auto-flow: column;
+  gap: 1px;
+  margin: 0 0 30px;
+  background: #17191925;
+  border: 1px solid #17191925;
+}
+.k-type-filter > button {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 12px 18px;
+  background: #e5e7de;
+  color: #515b45;
+  font-size: 13px;
+}
+.k-type-filter > button small {
+  font-size: 10px;
+  color: #7b866e;
+}
+.k-type-filter > button[aria-pressed="true"] {
+  background: #171919;
+  color: #f4f5ec;
+}
+.k-type-filter > button[aria-pressed="true"] small {
+  color: #d7fa52;
+}
 .k-ranking-stats {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -3139,7 +3168,7 @@ input {
   font-size: 12px;
   color: #747c6a;
 }
-.k-finish-list > div > div:not(.rounded-full) {
+.k-finish-list > div > div:not(.rounded-full):not(.k-avatar) {
   flex: 1;
 }
 .k-finish-list strong {

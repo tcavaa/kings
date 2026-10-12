@@ -18,9 +18,8 @@ import SeasonBanner from './components/SeasonBanner.jsx'
 import SeasonEndModal from './components/SeasonEndModal.jsx'
 import GameTimer from './components/GameTimer.jsx'
 import ThemeDecorations from './components/ThemeDecorations.jsx'
-import { supabase } from './lib/supabase.js'
+import { saveGame } from './lib/gameData.js'
 import { useSeasons } from './hooks/useSeasons'
-import { joinWinnerNames } from './utils/winners'
 import { applyThemeToBody } from './utils/themes'
 import { formatDuration } from './utils/time'
 import { RefreshCw, Trash2, Timer } from 'lucide-react'
@@ -179,48 +178,19 @@ function App() {
     ? Math.max(0, Math.round((endedAt - startedAt) / 1000))
     : null
 
+  // The server works out totals and winners from the rounds, the same way the
+  // sheet does. A game that fails to save stays on screen to retry.
   const saveGameToDB = useCallback(async (playersList, roundsList, gameDuration = null) => {
-    const totals = {}
-    playersList.forEach((p) => (totals[p.id] = 0))
-    roundsList.forEach((r) => {
-      if (r.scores) playersList.forEach((p) => {
-        totals[p.id] = (totals[p.id] || 0) + (r.scores[p.id] || 0)
-      })
-    })
-    // Tie-aware: everyone on the top score is a winner. Ties are stored as
-    // a joined winner_name ("A & B") — utils/winners.js splits it back out
-    // everywhere wins are counted.
-    const maxTotal = Math.max(...playersList.map((p) => totals[p.id]))
-    const winners = playersList.filter((p) => totals[p.id] === maxTotal)
-    const winnerName = joinWinnerNames(winners.map((w) => w.name))
-    const participants = playersList.map((p) => ({ name: p.name, score: totals[p.id] }))
-
-    const row = { winner_name: winnerName, participants }
-    if (gameDuration != null) row.duration_seconds = gameDuration
-
-    let { data: resultData, error } = await supabase
-      .from('game_results')
-      .insert(row)
-      .select('id')
-      .single()
-
-    // duration_seconds needs the supabase migration — if the column isn't
-    // there yet, save the game without it rather than losing the result.
-    if (error && gameDuration != null) {
-      const retry = await supabase
-        .from('game_results')
-        .insert({ winner_name: winnerName, participants })
-        .select('id')
-        .single()
-      resultData = retry.data
-    }
-
-    if (resultData?.id) {
-      await supabase.from('game_details').insert({
-        game_result_id: resultData.id,
-        players: playersList,
+    try {
+      await saveGame({
+        players: playersList.map((p) => ({ id: p.id })),
         rounds: roundsList,
+        durationSeconds: gameDuration ?? undefined,
       })
+      return true
+    } catch (err) {
+      window.alert(`The game could not be saved (${err.message}). It is still here — try again.`)
+      return false
     }
   }, [])
 
@@ -228,8 +198,9 @@ function App() {
     if (!players) return
     setSaving(true)
     lastPlayersRef.current = players
-    await saveGameToDB(players, rounds, durationSeconds)
+    const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
+    if (!saved) return
     localStorage.removeItem('king-score-state')
     dispatch({ type: 'RESET' })
   }, [players, rounds, saveGameToDB, durationSeconds])
@@ -238,8 +209,9 @@ function App() {
     if (!players) return
     setSaving(true)
     const rematchers = [...players]
-    await saveGameToDB(players, rounds, durationSeconds)
+    const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
+    if (!saved) return
     localStorage.removeItem('king-score-state')
     if (soundEnabled) playRematch()
     dispatch({ type: 'START', players: rematchers })

@@ -11,9 +11,9 @@ export async function GET(request) {
     const limit = query(request, 'limit')
     const mode = parseMode(query(request, 'mode'), 'championship')
     if (String(query(request, 'include') || '').includes('avatar')) {
-      return jsonArray(await store.listGames(limit, mode))
+      return jsonArray(await store.listGames(limit, mode, 'online'))
     }
-    const games = await store.listGamesWithoutAvatars(limit, mode)
+    const games = await store.listGamesWithoutAvatars(limit, mode, 'online')
     return jsonArray(games.map((game) => ({
       ...game,
       players: (game.players || []).map(({ avatar, ...rest }) => rest),

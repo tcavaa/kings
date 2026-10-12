@@ -76,8 +76,8 @@ function unitCounts(round) {
   if (code === 'L2') {
     const tw = round.trickWinners
     if (!Array.isArray(tw) || tw.length < 2) return null
-    const counts = { 0: 0, 1: 0, 2: 0 }
-    tw.slice(-2).forEach(s => { if (counts[s] !== undefined) counts[s]++ })
+    const counts = {}
+    tw.slice(-2).forEach(s => { counts[s] = (counts[s] ?? 0) + 1 })
     return counts
   }
   return null
