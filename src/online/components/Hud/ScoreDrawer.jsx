@@ -42,7 +42,12 @@ export default function ScoreDrawer({ panel, onClose }) {
             <WinProbability />
           </>
         )}
-        {panel === "matrix" && <GameTypeMatrix />}
+        {panel === "matrix" && (
+          <>
+            <GameTypeMatrix />
+            <WinProbability />
+          </>
+        )}
         {panel === "last" && <LastTrickView />}
         {panel === "chart" && (
           <Suspense fallback={<p className="k-data-empty">იტვირთება…</p>}>

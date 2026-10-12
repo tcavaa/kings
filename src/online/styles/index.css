@@ -2432,14 +2432,6 @@ input {
   font-weight: 750;
   line-height: 1;
 }
-.k-game-brand small {
-  display: block;
-  font-size: 7px;
-  letter-spacing: 1.4px;
-  font-weight: 400;
-  margin-top: 6px;
-  color: #889d77;
-}
 .k-game-icon {
   width: 36px;
   height: 36px;
@@ -2453,9 +2445,47 @@ input {
   background: #d7fa52;
   color: #171919;
 }
-.k-game-copy {
-  color: #9fae8d;
-  padding: 7px;
+.k-room-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border: 1px solid #d7fa5266;
+  background: #d7fa5214;
+  color: #c9d6b8;
+  white-space: nowrap;
+}
+.k-room-code small {
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  color: #a4b394;
+}
+.k-room-code b {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #d7fa52;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.k-room-code:hover {
+  background: #d7fa5226;
+}
+.k-game-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #ffffff26;
+  color: #f4f5ec;
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.k-game-timer svg {
+  color: #d7fa52;
 }
 .k-game-round {
   display: flex;
@@ -2778,7 +2808,6 @@ input {
   .k-game-brand > span {
     font-size: 23px;
   }
-  .k-game-copy,
   .k-game-round > span,
   .k-game-tools > div,
   .k-game-connection {
@@ -2803,8 +2832,26 @@ input {
     width: 32px;
     height: 32px;
   }
-  .k-game-brand small {
-    font-size: 6px;
+  .k-room-code {
+    padding: 6px 9px;
+    gap: 7px;
+  }
+  .k-room-code b {
+    font-size: 16px;
+    letter-spacing: 1.5px;
+  }
+  .k-room-code svg,
+  .k-room-code small {
+    display: none;
+  }
+  .k-game-timer {
+    padding: 5px 7px;
+    font-size: 13px;
+    gap: 4px;
+  }
+  .k-game-timer svg {
+    width: 13px;
+    height: 13px;
   }
   .k-live-scores {
     bottom: 12px;

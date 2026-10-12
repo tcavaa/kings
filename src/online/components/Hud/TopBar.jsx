@@ -55,15 +55,18 @@ function TopBar({
         >
           <Menu size={20} />
         </button>
-        <span>
-          kıng<small>TABLE / {roomCode}</small>
-        </span>
+        <span>kıng</span>
+        {/* The room code is what friends type to join, so it's the most
+            visible thing up here; tapping it copies it. */}
         <button
-          className="k-game-copy"
-          aria-label="კოდის კოპირება"
+          className="k-room-code"
+          aria-label={`ოთახის კოდი ${roomCode} — კოპირება`}
+          title="კოდის კოპირება"
           onClick={copy}
         >
-          {copied ? <Check size={14} /> : <Copy size={14} />}
+          <small>მაგიდა</small>
+          <b>{roomCode}</b>
+          {copied ? <Check size={15} /> : <Copy size={15} />}
         </button>
       </div>
       <div className="k-round-group">

@@ -5,7 +5,7 @@ import { MATRIX_CELL_DECOR } from '../utils/decorations'
 
 export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlayerIndex, onPreselect, playerColors = [], currentChampion }) {
   return (
-    <div className="card matrix">
+    <div className="card matrix" style={{ '--player-count': players.length }}>
       <h2>Game Types Availability</h2>
       <div className="matrix-grid">
         <div className="matrix-header sticky">

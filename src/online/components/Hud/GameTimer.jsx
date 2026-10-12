@@ -1,4 +1,5 @@
 import { memo, useEffect, useState } from 'react'
+import { Timer } from 'lucide-react-online'
 import { useGame } from '../../context/GameContext'
 
 /** ms → M:SS, rolling over to H:MM:SS only once a game actually passes an hour. */
@@ -35,24 +36,12 @@ function GameTimer() {
   if (!gameStartedAt) return null
 
   return (
-    // No absolute positioning: this renders as the second row of the TopBar's
-    // centre column, so flex puts it under the round/type/trump pills and it
-    // cannot overlap them however wide or tall they grow.
-    <div
-      className="pointer-events-none select-none inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full"
-      style={{
-        background: 'rgba(23,39,35,0.82)',
-        border: '1px solid rgba(151,176,162,0.35)',
-        boxShadow: '0 1px 0 rgba(0,0,0,0.15)',
-        backdropFilter: 'blur(2px)',
-      }}
-      title="თამაშის ხანგრძლივობა"
-    >
-      <span className="text-[11px] lg:text-xs font-mono font-bold tabular-nums leading-none"
-            style={{ color: 'rgba(225,233,225,0.85)' }}>
-        {format(now - gameStartedAt)}
-      </span>
-    </div>
+    // Sits in the TopBar's tools row (a span, so the row's `> div` reset
+    // rules don't touch it); styled by .k-game-timer.
+    <span className="k-game-timer" title="თამაშის ხანგრძლივობა">
+      <Timer size={15} aria-hidden="true" />
+      <span>{format(now - gameStartedAt)}</span>
+    </span>
   )
 }
 

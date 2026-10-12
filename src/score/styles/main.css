@@ -386,7 +386,9 @@ button, input, select { min-height: 44px; }
 
 /* ════════════ Tables ════════════ */
 .table { width: 100%; overflow-x: auto; }
-.tr { display: grid; grid-template-columns: 1.2fr repeat(var(--player-count, 4), 1fr); gap: 5px; padding: 3px 0; }
+.tr { display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(var(--player-count, 4), minmax(0, 1fr)); gap: 5px; padding: 3px 0; }
+/* Long player names wrap inside their column instead of widening the table. */
+.tr > .th, .tr > .td { min-width: 0; overflow-wrap: anywhere; }
 .thead .tr { font-weight: 700; }
 .td, .th {
   padding: 9px 10px; background: var(--cell-bg);
@@ -422,7 +424,9 @@ button, input, select { min-height: 44px; }
 
 /* ════════════ Matrix ════════════ */
 .matrix-grid { display: grid; grid-auto-rows: minmax(36px, auto); gap: 5px; }
-.matrix-header, .matrix-row { display: grid; grid-template-columns: 0.8fr repeat(var(--player-count, 4), 1fr); gap: 5px; }
+.matrix-header, .matrix-row { display: grid; grid-template-columns: minmax(0, 0.8fr) repeat(var(--player-count, 4), minmax(0, 1fr)); gap: 5px; }
+.matrix-header .player-col { min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
+.matrix-header .player-col > span { flex-wrap: wrap; justify-content: center; }
 .matrix .cell {
   padding: 8px; background: var(--cell-bg); border: 1px solid var(--line);
   border-radius: 9px; text-align: center; font-size: 14px;
@@ -545,7 +549,7 @@ button, input, select { min-height: 44px; }
 .history-participant-score.neg { color: var(--accent-bad); font-weight: 600; }
 
 /* ════════════ Analytics ════════════ */
-.analytics-tr { grid-template-columns: 1.5fr repeat(var(--ac, 3), 1fr); }
+.analytics-tr { grid-template-columns: minmax(0, 1.5fr) repeat(var(--ac, 3), minmax(0, 1fr)); }
 .analytics-max { color: var(--text); font-weight: 700; }
 .analytics-zero { color: var(--muted); }
 
@@ -1073,6 +1077,7 @@ body.dark.theme-christmas .matrix .cell::after { opacity: 0.9; filter: drop-shad
 
 /* ════════════ Mobile ════════════ */
 @media (max-width: 640px) {
+  .matrix-header .player-col { font-size: 12px; padding: 6px 4px; }
   .app { padding: calc(8px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) calc(84px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left, 0px)); }
   .card { padding: 13px; border-radius: 14px; }
   .season-hero-title { font-size: 24px; }
