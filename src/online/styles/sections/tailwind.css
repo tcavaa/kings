@@ -1,0 +1,8 @@
+/* Tailwind must live in its own partial: @import has to come first in
+   index.css. The hover:/disabled:/lg: variants land here too, before the
+   component sections; none of the elements using them has a competing
+   component rule of equal specificity, so the move is invisible. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@tailwind variants;

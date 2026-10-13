@@ -1,0 +1,613 @@
+/* Play surface — one continuous command strip, compact standings, quiet table. */
+.k-game-header {
+  position: absolute;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
+  height: 76px;
+  background: #141917ed;
+  border-bottom: 1px solid #a6b58a25;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 0 24px;
+  z-index: 20;
+  color: #eef1e6;
+}
+.k-game-brand {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  min-width: 0;
+}
+.k-game-brand > span {
+  font-size: 27px;
+  letter-spacing: -2px;
+  font-weight: 750;
+  line-height: 1;
+}
+.k-game-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #8e9f7230;
+  border-radius: 50%;
+  color: #bac7aa;
+}
+.k-game-icon:hover {
+  background: #d7fa52;
+  color: #171919;
+}
+.k-room-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border: 1px solid #d7fa5266;
+  background: #d7fa5214;
+  color: #c9d6b8;
+  white-space: nowrap;
+}
+.k-room-code small {
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  color: #a4b394;
+}
+.k-room-code b {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #d7fa52;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.k-room-code:hover {
+  background: #d7fa5226;
+}
+.k-game-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid #ffffff26;
+  color: #f4f5ec;
+  font-size: 15px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.k-game-timer svg {
+  color: #d7fa52;
+}
+.k-game-round {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.k-game-round > span {
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: #93a57d;
+}
+.k-game-round strong {
+  font-size: 30px;
+  font-weight: 400;
+  color: #d7fa52;
+  font-variant-numeric: tabular-nums;
+}
+.k-game-round > small {
+  font-size: 10px;
+  color: #8d9f79;
+}
+.k-game-round > i {
+  height: 25px;
+  width: 1px;
+  background: #ffffff20;
+  margin: 0 10px;
+}
+.k-game-round em {
+  font-style: normal;
+  color: #d7fa52;
+  font-size: 17px;
+}
+.k-game-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.k-game-connection i {
+  display: block;
+  width: 5px;
+  height: 5px;
+  background: #d79d68;
+  border-radius: 50%;
+}
+.k-game-connection i.on {
+  background: #d7fa52;
+}
+.k-live-scores {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: 190px;
+  z-index: 20;
+  text-align: left;
+  background: #151b17d9;
+  border-left: 2px solid #d7fa52;
+  padding: 14px 15px;
+  color: #eef0e8;
+}
+.k-live-scores-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  align-items: center;
+  color: #96a980;
+  font-size: 7px;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.k-live-score {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 10px;
+  padding: 6px 0;
+}
+.k-live-score > small {
+  font-size: 8px;
+  color: #81936d;
+}
+.k-live-score > span {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+.k-live-score > b {
+  font-weight: 450;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.k-live-score.own > b {
+  color: #d7fa52;
+}
+.k-last-trick {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  z-index: 20;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 13px 16px;
+  border-top: 1px solid #a8bd8144;
+  background: #151b17d9;
+  color: #e3ead9;
+}
+.k-last-trick > span:first-child {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #9cad8044;
+  border-radius: 50%;
+}
+.k-last-trick small {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #8b9f70;
+  text-align: left;
+}
+.k-last-trick b {
+  font-size: 10px;
+  font-weight: 450;
+  display: block;
+  margin-top: 5px;
+}
+.k-last-trick > svg {
+  color: #d7fa52;
+}
+.k-table-quote {
+  font-size: 11px;
+  color: #91a382 !important;
+  max-width: 400px;
+}
+.k-game-screen .western-panel {
+  border-radius: 0;
+}
+.k-contract-modal {
+  padding: 0 !important;
+  border: 1px solid #82966a33 !important;
+  background: #20271f !important;
+  border-radius: 0 !important;
+}
+.k-contract-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 24px 28px;
+  border-bottom: 1px solid #ffffff15;
+}
+.k-contract-heading .k-eyebrow {
+  font-size: 8px;
+  color: #a4b58b;
+}
+.k-contract-heading h2 {
+  font-size: 25px;
+  font-weight: 450;
+  margin-top: 10px;
+  letter-spacing: -0.7px;
+}
+.k-contract-heading > span {
+  font-size: 13px;
+}
+.k-contract-heading > span small {
+  font-size: 9px;
+  display: block;
+  color: #91a27d;
+  margin-top: 7px;
+}
+.k-contract-layout {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+}
+.k-contract-layout > aside {
+  padding: 25px;
+  background: #181e17;
+}
+.k-contract-layout > aside > .k-eyebrow {
+  font-size: 8px;
+  color: #9aac84;
+}
+.k-contract-hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 18px 0;
+}
+.k-contract-layout aside p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #8ea278;
+}
+.k-used-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 10px;
+}
+.k-used-types small {
+  width: 100%;
+  font-size: 9px;
+  color: #9bae85;
+  margin-bottom: 5px;
+}
+.k-used-types span {
+  font-size: 8px;
+  text-decoration: line-through;
+  color: #6b7d5b;
+}
+.k-contract-options {
+  padding: 12px 22px;
+}
+.k-contract-options > button {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 12px 0;
+  text-align: left;
+  border-bottom: 1px solid #ffffff12;
+  color: #dbe3d0;
+}
+.k-contract-options > button:last-child {
+  border: 0;
+}
+.k-contract-icon {
+  width: 33px;
+  height: 33px;
+  border: 1px solid #9bad7c30;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #a1b787;
+  flex-shrink: 0;
+}
+.k-contract-options > button > span:nth-child(2) {
+  flex: 1;
+}
+.k-contract-options strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.k-contract-options small {
+  display: block;
+  font-size: 8px;
+  color: #8fa07a;
+  margin-top: 4px;
+}
+.k-contract-options b {
+  font-size: 16px;
+  font-weight: 400;
+  min-width: 32px;
+  text-align: right;
+}
+.k-radio {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #74845e;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #171919;
+  flex-shrink: 0;
+}
+.k-contract-options > button[aria-pressed="true"] .k-radio {
+  background: #d7fa52;
+  border-color: #d7fa52;
+}
+.k-contract-options > button[aria-pressed="true"] strong,
+.k-contract-options > button[aria-pressed="true"] b {
+  color: #d7fa52;
+}
+.k-contract-options > button:hover {
+  background: #ffffff03;
+}
+.k-contract-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 28px;
+  border-top: 1px solid #ffffff15;
+}
+.k-contract-footer > span {
+  font-size: 10px;
+  color: #91a67b;
+  max-width: 200px;
+}
+.k-contract-footer .k-button {
+  font-size: 11px;
+  min-height: 48px;
+  padding: 13px 20px;
+}
+@media (max-width: 800px) {
+  .k-game-header {
+    height: 66px;
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .k-game-brand {
+    gap: 8px;
+  }
+  .k-game-brand > span {
+    font-size: 23px;
+  }
+  .k-game-round > span,
+  .k-game-connection {
+    display: none;
+  }
+  .k-game-round strong {
+    font-size: 24px;
+  }
+  .k-game-round {
+    gap: 6px;
+  }
+  .k-game-round > i {
+    margin: 0 3px;
+  }
+  .k-game-tools {
+    gap: 6px;
+  }
+  .k-game-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .k-room-code {
+    padding: 6px 9px;
+    gap: 7px;
+  }
+  .k-room-code b {
+    font-size: 16px;
+    letter-spacing: 1.5px;
+  }
+  .k-room-code svg,
+  .k-room-code small {
+    display: none;
+  }
+  .k-game-timer {
+    padding: 5px 7px;
+    font-size: 13px;
+    gap: 4px;
+  }
+  .k-game-timer svg {
+    width: 13px;
+    height: 13px;
+  }
+  .k-live-scores {
+    bottom: 12px;
+    left: 12px;
+    width: 160px;
+    padding: 10px 12px;
+  }
+  .k-last-trick {
+    bottom: 12px;
+    right: 12px;
+    padding: 10px;
+  }
+  .k-last-trick > span:nth-child(2),
+  .k-last-trick > svg {
+    display: none;
+  }
+  .k-last-trick > span:first-child {
+    width: 28px;
+    height: 28px;
+  }
+  .k-contract-heading {
+    padding: 18px 20px;
+  }
+  .k-contract-heading h2 {
+    font-size: 22px;
+  }
+  .k-contract-options {
+    padding: 8px 16px;
+  }
+  .k-contract-layout {
+    grid-template-columns: 170px 1fr;
+  }
+  .k-contract-layout > aside {
+    padding: 20px 15px;
+  }
+  .k-contract-footer {
+    padding: 16px 20px;
+  }
+}
+@media (max-width: 520px) {
+  .k-game-brand > span {
+    display: none;
+  }
+  .k-game-round strong {
+    font-size: 23px;
+  }
+  .k-game-round > small {
+    font-size: 9px;
+  }
+  .k-game-header {
+    gap: 8px;
+    height: 58px;
+  }
+  .k-table-quote {
+    font-size: 10px;
+  }
+  .k-contract-heading > span {
+    display: none;
+  }
+  .k-contract-layout {
+    grid-template-columns: 1fr;
+  }
+  .k-contract-layout > aside {
+    padding: 12px 18px;
+  }
+  .k-contract-hand {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 10px 0 0;
+    gap: 5px;
+  }
+  .k-contract-hand > div {
+    width: 48px;
+    height: 69px;
+  }
+  .k-contract-layout aside p {
+    display: none;
+  }
+  .k-contract-options {
+    padding: 4px 18px;
+  }
+  .k-contract-options > button {
+    padding: 8px 0;
+    gap: 10px;
+  }
+  .k-contract-options small {
+    font-size: 7px;
+  }
+  .k-contract-options strong {
+    font-size: 11px;
+  }
+  .k-contract-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .k-contract-footer {
+    padding: 13px 18px;
+  }
+  .k-contract-footer > span {
+    display: none;
+  }
+  .k-contract-footer .k-button {
+    width: 100%;
+  }
+  .k-contract-heading h2 {
+    font-size: 22px;
+    margin-top: 5px;
+  }
+  .k-contract-heading {
+    padding: 17px 18px;
+  }
+  .k-live-scores {
+    width: 143px;
+  }
+  .k-live-scores-title {
+    font-size: 6px;
+  }
+}
+@media (max-height: 540px) {
+  .k-game-header {
+    height: 50px;
+  }
+  .k-live-scores {
+    bottom: 8px;
+    left: 8px;
+    padding: 7px 10px;
+  }
+  .k-live-scores-title {
+    display: none;
+  }
+  .k-live-score {
+    padding: 3px 0;
+    font-size: 9px;
+  }
+  .k-live-score > b {
+    font-size: 12px;
+  }
+  .k-last-trick {
+    bottom: 8px;
+  }
+  .k-contract-heading {
+    padding: 10px 18px;
+  }
+  .k-contract-heading h2 {
+    font-size: 19px;
+  }
+  .k-contract-heading .k-eyebrow {
+    display: none;
+  }
+  .k-contract-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+  .k-contract-options > button {
+    padding: 7px 0;
+  }
+  .k-contract-options small {
+    display: none;
+  }
+  .k-contract-options b {
+    font-size: 12px;
+  }
+  .k-contract-footer {
+    padding: 10px 18px;
+  }
+  .k-contract-footer .k-button {
+    min-height: 40px;
+    padding: 10px 16px;
+  }
+  .k-contract-layout {
+    grid-template-columns: 170px 1fr;
+  }
+  .k-contract-layout > aside {
+    padding: 12px;
+  }
+  .k-contract-layout aside p {
+    display: none;
+  }
+}

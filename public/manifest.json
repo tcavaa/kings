@@ -5,12 +5,18 @@
   "start_url": "/",
   "display": "fullscreen",
   "orientation": "any",
-  "background_color": "#0c1716",
-  "theme_color": "#0c1716",
+  "background_color": "#171919",
+  "theme_color": "#171919",
   "icons": [
     {
       "src": "/art/app-icon.png",
       "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/art/app-icon-512.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

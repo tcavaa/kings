@@ -1,14 +1,16 @@
 /* The in-game palette is scoped to its lifecycle, including portal dialogs. */
 body.king-light-game {
   --game-ink: #173e32;
-  --game-muted: #587266;
-  --game-paper: #fffdf6;
-  --game-green: #087b59;
-  --game-line: #cedbd1;
 }
 body.king-light-game .k-game-screen {
   background: #dceae1 !important;
   color: var(--game-ink);
+}
+/* The Phaser canvas repaints every frame, so a blur behind a modal or sheet
+   would be recomputed every frame too; the scrims are ~80% opaque anyway. */
+body.king-light-game .western-backdrop,
+body.king-light-game .k-sheet::backdrop {
+  backdrop-filter: none;
 }
 body.king-light-game .k-game-header {
   background: #fffdf6;
@@ -96,15 +98,6 @@ body.king-light-game .k-game-round > i {
   background: #ecaa2d;
   box-shadow: 0 0 0 1px #be8021;
 }
-body.king-light-game .k-turn-status {
-  background: #e3f1e8;
-  color: #245b43;
-  border-color: #bcd4c5;
-}
-body.king-light-game .k-turn-status b,
-body.king-light-game .k-turn-status small {
-  color: #245b43;
-}
 body.king-light-game .k-live-dot,
 body.king-light-game .k-game-connection i.on {
   background: #079b67;
@@ -171,7 +164,8 @@ body.king-light-game .k-data-table .is-negative {
 }
 body.king-light-game .k-data-table small,
 body.king-light-game .k-data-caption,
-body.king-light-game .k-data-empty {
+body.king-light-game .k-data-empty,
+body.king-light-game .k-muted {
   color: #5a7464;
 }
 body.king-light-game .k-type-code {
@@ -229,6 +223,9 @@ body.king-light-game .k-table-menu button:nth-child(2) svg {
 body.king-light-game .k-table-menu button:nth-child(3) svg {
   color: #6476c3;
 }
+body.king-light-game .k-table-menu small {
+  color: #587364;
+}
 body.king-light-game .k-chat-empty,
 body.king-light-game .k-chat-empty h4,
 body.king-light-game .k-chat-message > div > span {
@@ -262,14 +259,17 @@ body.king-light-game .k-chat-compose .k-chat-send {
   background: #087b59;
   color: #fff;
 }
+body.king-light-game .k-recording {
+  color: #b44941;
+}
 body.king-light-game .k-message-reactions button {
   color: #467451;
   border-color: #c2d6c2;
 }
 body.king-light-game .k-contract-modal {
-  background: #fffdf6;
+  background: #fffdf6 !important;
   color: #173e32;
-  border-color: #c2d4c4;
+  border-color: #c2d4c4 !important;
 }
 body.king-light-game .k-contract-heading,
 body.king-light-game .k-contract-footer {
@@ -294,7 +294,8 @@ body.king-light-game .k-contract-options > button {
   border-left: 4px solid var(--contract-color);
   background: #fffdf6;
   color: #244c37;
-  padding-left: 14px;
+  padding-left: 12px;
+  padding-right: 10px;
 }
 body.king-light-game .k-contract-icon {
   background: var(--contract-color);
@@ -361,15 +362,6 @@ body.king-light-game .k-suit-choices button[aria-pressed="true"] {
   box-shadow: inset 0 0 0 2px #168c5e;
   background: #d9eedb;
 }
-@media (max-width: 700px) {
-  body.king-light-game .k-game-round strong {
-    font-size: 23px;
-    padding: 2px 6px;
-  }
-}
-body.king-light-game .k-live-score.own > b {
-  color: #087b59;
-}
 body.king-light-game .k-last-trick {
   background: #fffdf4ee;
   color: #285d43;
@@ -381,19 +373,8 @@ body.king-light-game .k-last-trick > svg {
   color: #488061;
 }
 
-body.king-light-game .k-contract-modal {
-  background: #fffdf6 !important;
-  border-color: #c2d4c4 !important;
-}
-body.king-light-game .k-strategy-modal .k-contract-layout > aside {
-  background: #e9f2e9;
-}
 body.king-light-game .k-contract-options strong {
   color: #244c37;
-}
-body.king-light-game .k-contract-options > button {
-  padding-left: 12px;
-  padding-right: 10px;
 }
 body.king-light-game .k-rounds-trigger {
   display: flex;
@@ -414,25 +395,25 @@ body.king-light-game .k-rounds-trigger b {
     display: none;
   }
 }
-body.king-light-game .k-voice-trigger,
-body.king-light-game .k-sound-library button {
+body.king-light-game .k-voice-trigger {
   background: #edf5e9;
   color: #245b3d;
   border-color: #bdd1b7;
-}
-body.king-light-game .k-sound-library .is-playing {
-  background: #0c8059;
-  color: white;
 }
 body.king-light-game .k-probability p,
 body.king-light-game .k-table-menu-secondary span {
   color: #587364;
 }
+/* WinProbability's track and its citron bar were picked for dark panels. The
+   bar colour is inline, COLORS[i % 3] by seat order, so the citron one is
+   every third row from the first. */
+body.king-light-game .k-probability > div > div {
+  background: #173e321f;
+}
+body.king-light-game .k-probability > div:nth-of-type(3n + 1) i {
+  background: #8fa723 !important;
+}
 @media (max-width: 520px) {
-  body.king-light-game .k-game-header {
-    padding: 0 8px;
-    gap: 5px;
-  }
   body.king-light-game .k-game-tools {
     gap: 4px;
   }
@@ -591,36 +572,7 @@ body.king-light-game .k-game-header .k-turn-status small {
   body.king-light-game .k-rounds-trigger {
     padding: 6px;
   }
-}
-/* Narrow phones: two rows — menu, room code and tools on top; round,
-   contract and trump centred underneath — so nothing overlaps. */
-@media (max-width: 600px) {
-  body.king-light-game .k-game-header {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 58px;
-    padding: 7px 10px 9px;
-    row-gap: 7px;
-    column-gap: 8px;
-  }
-  body.king-light-game .k-game-brand {
-    flex: none;
-  }
-  body.king-light-game .k-round-group {
-    order: 3;
-    flex: 1 0 100%;
-    justify-content: center;
-  }
-  body.king-light-game .k-game-round {
-    gap: 6px;
-  }
-  body.king-light-game .k-game-round > i {
-    display: block;
-  }
-}
-
-/* Phones: the standings and the replay button shrink so the table has room. */
-@media (max-width: 800px), (max-height: 540px) {
+  /* Phones: the standings and the replay button shrink so the table has room. */
   body.king-light-game .k-live-scores {
     width: 124px;
     left: 8px;
@@ -654,6 +606,32 @@ body.king-light-game .k-game-header .k-turn-status small {
   body.king-light-game .k-last-trick > span:first-child {
     width: 34px;
     height: 34px;
+  }
+}
+/* Narrow phones: two rows — menu, room code and tools on top; round,
+   contract and trump centred underneath — so nothing overlaps. */
+@media (max-width: 600px) {
+  body.king-light-game .k-game-header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 58px;
+    padding: 7px 10px 9px;
+    row-gap: 7px;
+    column-gap: 8px;
+  }
+  body.king-light-game .k-game-brand {
+    flex: none;
+  }
+  body.king-light-game .k-round-group {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+  }
+  body.king-light-game .k-game-round {
+    gap: 6px;
+  }
+  body.king-light-game .k-game-round > i {
+    display: block;
   }
 }
 
