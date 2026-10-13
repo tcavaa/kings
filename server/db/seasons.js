@@ -77,9 +77,13 @@ async function endSeason({ name, theme }) {
     if (open) {
       await tx`UPDATE seasons SET champion_name = ${champion}, ended_at = now() WHERE id = ${open.id}`;
     } else {
+      // Seasons count games played *after* their start, so the closed row
+      // starts where this season really began — or, for the very first
+      // season, just before its first game, which then still counts.
+      const startedAt = start.getTime() > 0 ? start : new Date(firstGameAt.getTime() - 1000);
       await tx`
         INSERT INTO seasons (champion_name, started_at, ended_at)
-        VALUES (${champion}, ${firstGameAt || start}, now())`;
+        VALUES (${champion}, ${startedAt}, now())`;
     }
     await tx`INSERT INTO seasons (name, theme, started_at) VALUES (${next.name}, ${next.theme}, now())`;
     return { champion };
