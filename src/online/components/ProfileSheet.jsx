@@ -66,6 +66,7 @@ export default function ProfileSheet({ p, onClose }) {
               onChange={p.pickProfile}
               onEdit={p.editProfile}
             />
+            {p.editNotice && <p role="status" className="k-form-error">{p.editNotice}</p>}
             <button
               className="k-button k-button-outline"
               onClick={p.startNewProfile}

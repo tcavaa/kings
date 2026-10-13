@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, LockOpen } from 'lucide-react'
+import { Plus, Trash2, LockOpen, Lock } from 'lucide-react'
 import { adminApi } from '../../lib/api'
 import { adminCall, ErrorNote, PanelTitle, inputStyle, muted } from './adminUi'
 
@@ -34,6 +34,15 @@ export default function PlayersAdmin({ passcode, onLocked }) {
     if (window.confirm(`წავშალოთ „${p.name}“? მისი თამაშები დარჩება.`)) run(() => adminApi.deletePlayer(passcode, p.id))
   }
 
+  // A player without a PIN can't change their own profile (nobody could tell
+  // it's them), so the admin gives them one and tells them what it is.
+  const setPin = (p) => {
+    const pin = window.prompt(`„${p.name}“-ის ახალი 4-ციფრიანი PIN-კოდი:`)
+    if (pin === null) return
+    if (!/^\d{4}$/.test(pin.trim())) { setError('PIN-კოდი ზუსტად 4 ციფრი უნდა იყოს.'); return }
+    run(() => adminApi.setPlayerPin(passcode, p.id, pin.trim()))
+  }
+
   const clearPin = (p) => {
     if (window.confirm(`მოვხსნათ „${p.name}“-ის PIN-კოდი?`)) run(() => adminApi.clearPlayerPin(passcode, p.id))
   }
@@ -60,10 +69,15 @@ export default function PlayersAdmin({ passcode, onLocked }) {
             {players.map((p) => (
               <li key={p.id} className="flex items-center gap-2 py-2 px-3" style={inputStyle}>
                 <span className="flex-1 text-sm">{p.name}</span>
-                {p.has_pin && (
+                {p.has_pin ? (
                   <button onClick={() => clearPin(p)} disabled={busy} title="PIN-ის მოხსნა"
                           className="p-1.5 hover:opacity-70 disabled:opacity-40" style={muted}>
                     <LockOpen size={15} />
+                  </button>
+                ) : (
+                  <button onClick={() => setPin(p)} disabled={busy} title="PIN-ის დაყენება"
+                          className="p-1.5 hover:opacity-70 disabled:opacity-40" style={muted}>
+                    <Lock size={15} />
                   </button>
                 )}
                 <button onClick={() => remove(p)} disabled={busy} title="წაშლა"

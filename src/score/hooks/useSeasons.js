@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { DEFAULT_THEME } from '../utils/themes'
+import { seasonChampions } from '../utils/winners'
 
 // Seasons, read-only: they are named, themed and ended from King Online's
 // /admin. Completed seasons have `ended_at` set; the CURRENT season is the
@@ -29,7 +30,7 @@ export function useSeasons() {
   const currentSeason = useMemo(() => rows.find(r => !r.ended_at) || null, [rows])
 
   // Most recent completed season's champion (may be "A & B" on a tie).
-  const currentChampion = seasons[0]?.champion_name ?? null
+  const currentChampion = seasons[0] ? seasonChampions(seasons[0]) : null
 
   const currentSeasonStart = useMemo(() => (
     currentSeason?.started_at

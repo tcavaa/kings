@@ -15,6 +15,9 @@ export function useProfiles() {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState(false)
+  // Shown when someone tries to edit a profile without a PIN: nobody can
+  // prove it's theirs, so only the admin can change it (by setting a PIN).
+  const [editNotice, setEditNotice] = useState(null)
   // The "locked-in" profile id (signed in on this device, with a session
   // token in localStorage). Never auto-set by the lobby — it only changes
   // when the user picks a profile (and types its PIN, if it has one).
@@ -69,6 +72,7 @@ export function useProfiles() {
   const active = activeId ? profiles.find((p) => p.id === activeId) || null : null
 
   const resetForm = () => {
+    setEditNotice(null)
     setEditing(null)
     setEditPin('')
     setEditPending(null)
@@ -96,11 +100,11 @@ export function useProfiles() {
   const editProfile = (profile) => {
     setEditPin('')
     if (profile.has_pin) {
+      setEditNotice(null)
       setEditPending(profile)
       return
     }
-    setEditing(profile)
-    setShowForm(true)
+    setEditNotice(`${profile.name}-ს PIN-კოდი არ აქვს — შესაცვლელად ადმინს სთხოვე PIN-ის დაყენება.`)
   }
 
   const startNewProfile = () => {
@@ -160,7 +164,7 @@ export function useProfiles() {
   }
 
   return {
-    profiles, loading, profileError, reload,
+    profiles, loading, profileError, editNotice, reload,
     activeId, active,
     showForm, editing, editPin, editPending, pinPending,
     closeProfileSheet, onProfileSaved, editProfile, startNewProfile, cancelForm,

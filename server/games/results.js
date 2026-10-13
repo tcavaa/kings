@@ -93,13 +93,18 @@ function playerStandings(games) {
   return [...rows.values()].sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
 }
 
-/** The champion(s) of a season table: "A & B" on a tie, null with no wins. */
-function championOf(table) {
+/** The champion(s) of a season table, sorted (several on a tie; empty with no wins). */
+function championsOf(table) {
   const best = table.reduce((m, r) => Math.max(m, r.wins), 0);
-  if (!best) return null;
-  return table.filter((r) => r.wins === best).map((r) => r.name).sort().join(' & ');
+  if (!best) return [];
+  return table.filter((r) => r.wins === best).map((r) => r.name).sort();
+}
+
+/** The champion(s) as display text: "A & B" on a tie, null with no wins. */
+function championOf(table) {
+  return championsOf(table).join(' & ') || null;
 }
 
 module.exports = {
-  winnerNames, emptyRoundStats, addRoundStats, inSeason, seasonTable, playerStandings, championOf,
+  winnerNames, emptyRoundStats, addRoundStats, inSeason, seasonTable, playerStandings, championOf, championsOf,
 };

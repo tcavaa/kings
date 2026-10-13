@@ -44,9 +44,14 @@ function standingsOf(games) {
   return table.map((r) => ({ ...r, gamesPlayed: r.games, avatar: avatars.get(r.name) || null }));
 }
 
-function Standings({ players, champion }) {
+// A season's champions as a list (rows saved before the list existed have
+// only the joined "A & B" text).
+const seasonChampions = (season) =>
+  season?.champion_names || String(season?.champion_name || "").split(" & ").filter(Boolean);
+
+function Standings({ players, champions = [] }) {
   if (!players.length) return <p className="k-data-empty">ამ სეზონში თამაში ჯერ არ არის.</p>;
-  const champs = new Set(String(champion || "").split(" & ").filter(Boolean));
+  const champs = new Set(champions);
   return (
     <div className="k-table-scroll">
       <table className="k-data-table">
@@ -265,7 +270,7 @@ export default function SeasonsPanel({ games }) {
               ))}
             </select>
           </header>
-          <Standings players={shownPast.players} champion={shownPast.season.champion_name} />
+          <Standings players={shownPast.players} champions={seasonChampions(shownPast.season)} />
         </section>
       )}
     </div>

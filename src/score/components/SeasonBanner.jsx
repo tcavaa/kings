@@ -63,7 +63,7 @@ function HeroDecor({ themeId }) {
  */
 export default function SeasonBanner({ seasonName, themeId, champion }) {
   const theme = getTheme(themeId)
-  const champions = splitWinnerNames(champion)
+  const champions = Array.isArray(champion) ? champion : splitWinnerNames(champion)
 
   return (
     <div className={`season-hero season-hero-${theme.id}`}>

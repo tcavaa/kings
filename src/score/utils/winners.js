@@ -52,9 +52,13 @@ export function isOnlineWinner(game, name) {
 }
 
 /**
- * Champion values can also hold co-champions ("A & B"). True when `name`
- * is (one of) the champion(s).
+ * Whether `name` is (one of) the champion(s). Takes a season's
+ * `champion_names` list; the joined "A & B" text of older rows also works.
  */
-export function isChampionName(championValue, name) {
-  return splitWinnerNames(championValue).includes(name)
+export function isChampionName(champions, name) {
+  return (Array.isArray(champions) ? champions : splitWinnerNames(champions)).includes(name)
 }
+
+/** A season's champions as a list (rows saved before the list existed have only the text). */
+export const seasonChampions = (season) =>
+  season?.champion_names || splitWinnerNames(season?.champion_name)

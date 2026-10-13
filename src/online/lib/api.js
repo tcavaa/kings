@@ -212,4 +212,7 @@ export const adminApi = {
   clearPlayerPin: (passcode, id)     => adminRequest(passcode, `/api/players/${encodeURIComponent(id)}`, {
     method: 'POST', body: JSON.stringify({ action: 'clear-pin' }),
   }),
+  setPlayerPin:  (passcode, id, pin) => adminRequest(passcode, `/api/players/${encodeURIComponent(id)}`, {
+    method: 'POST', body: JSON.stringify({ action: 'set-pin', pin }),
+  }),
 }

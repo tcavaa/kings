@@ -8,14 +8,15 @@
 const { db } = require('./connection');
 const { iso } = require('./mirror');
 const { gameEntries, barePayload } = require('./games');
-const { winnerNames, inSeason, seasonTable, championOf } = require('../games/results');
+const { winnerNames, inSeason, seasonTable, championOf, championsOf } = require('../games/results');
 const { badRequest } = require('../lib/httpError');
 
 const SEASON_THEMES = ['casual', 'summer', 'mountain', 'christmas'];
 
 async function listSeasons() {
   const rows = await db()`
-    SELECT id, name, theme, started_at, ended_at, champion_name FROM seasons ORDER BY started_at DESC`;
+    SELECT id, name, theme, started_at, ended_at, champion_name, champion_names
+      FROM seasons ORDER BY started_at DESC`;
   return rows.map((r) => ({ ...r, started_at: iso(r.started_at), ended_at: iso(r.ended_at) }));
 }
 
@@ -48,7 +49,7 @@ async function seasonStandings(start) {
   }
   // Only the winners are listed: /admin shows who is ahead.
   const table = seasonTable(games, start).map(({ name, wins }) => ({ name, wins }));
-  return { table, champion: championOf(table), firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
+  return { table, champion: championOf(table), champions: championsOf(table), firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
 }
 
 /** /admin: what ending the season now would record. */
@@ -72,18 +73,20 @@ async function endSeason({ name, theme }) {
     // One season end at a time; a second click waits and then finds no games.
     await tx`LOCK TABLE seasons IN SHARE ROW EXCLUSIVE MODE`;
     const { open, start } = await currentSeason(tx);
-    const { champion, firstGameAt } = await seasonStandings(start);
+    const { champion, champions, firstGameAt } = await seasonStandings(start);
     if (!champion) throw badRequest('No games in the current season yet.');
     if (open) {
-      await tx`UPDATE seasons SET champion_name = ${champion}, ended_at = now() WHERE id = ${open.id}`;
+      await tx`
+        UPDATE seasons SET champion_name = ${champion}, champion_names = ${champions}, ended_at = now()
+         WHERE id = ${open.id}`;
     } else {
       // Seasons count games played *after* their start, so the closed row
       // starts where this season really began — or, for the very first
       // season, just before its first game, which then still counts.
       const startedAt = start.getTime() > 0 ? start : new Date(firstGameAt.getTime() - 1000);
       await tx`
-        INSERT INTO seasons (champion_name, started_at, ended_at)
-        VALUES (${champion}, ${startedAt}, now())`;
+        INSERT INTO seasons (champion_name, champion_names, started_at, ended_at)
+        VALUES (${champion}, ${champions}, ${startedAt}, now())`;
     }
     await tx`INSERT INTO seasons (name, theme, started_at) VALUES (${next.name}, ${next.theme}, now())`;
     return { champion };

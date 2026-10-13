@@ -264,3 +264,14 @@ test("seasons: after the start, up to the end; ties share; champion", () => {
   assert.equal(championOf([]), null);
   assert.equal(playerStandings(games).length, 4);
 });
+
+test("a season's champions are a list, so a tie never splits a name", async () => {
+  const { championsOf, championOf } = require("../server/games/results.js");
+  const table = [{ name: "Tom & Jerry", wins: 3 }, { name: "Ana", wins: 3 }, { name: "Gio", wins: 1 }];
+  assert.deepEqual(championsOf(table), ["Ana", "Tom & Jerry"]);
+  assert.equal(championOf(table), "Ana & Tom & Jerry");
+  assert.deepEqual(championsOf([]), []);
+  const { isChampionName } = await import("../src/score/utils/winners.js");
+  assert.equal(isChampionName(["Ana", "Tom & Jerry"], "Tom & Jerry"), true);
+  assert.equal(isChampionName(["Ana", "Tom & Jerry"], "Tom"), false);
+});

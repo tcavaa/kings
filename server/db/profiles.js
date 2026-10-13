@@ -28,9 +28,12 @@ function pinMatches(pinHash, pin, profileId) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-// A profile with a PIN can only be changed or removed by someone who knows it.
+// An existing profile can only be changed or removed by someone who knows
+// its PIN. One without a PIN has nothing to prove ownership with, so only
+// /admin may change it (and can give it a PIN).
 function assertPinOwner(pinHash, currentPin, profileId) {
-  if (!pinHash || pinMatches(pinHash, currentPin, profileId)) return;
+  if (!pinHash) throw httpError(403, 'This player has no PIN — ask the admin to set one.');
+  if (pinMatches(pinHash, currentPin, profileId)) return;
   throw httpError(403, 'Wrong PIN');
 }
 
@@ -66,10 +69,17 @@ async function getProfile(id) {
  * it, undefined keeps it. `pin`: '1234' sets, null/'' clears, undefined keeps.
  * Changing an existing profile's PIN logs every other device out of it.
  */
+// Tied winners are shown joined with " & ", so a name may not contain it.
+function cleanName(name) {
+  const trimmed = String(name ?? '').trim().slice(0, 64);
+  if (/\s&\s/.test(trimmed)) throw badRequest('A name can\'t contain " & ".');
+  return trimmed;
+}
+
 async function upsertProfile({ id, name, avatar, pin, currentPin }) {
   if (!id || typeof id !== 'string' || id.length > 64) throw badRequest('profile.id is required');
   if (!name || !name.trim()) throw badRequest('profile.name is required');
-  const trimmed = name.trim().slice(0, 64);
+  const trimmed = cleanName(name);
 
   let nextPinHash; // undefined → leave alone, null → clear, string → set
   if (pin === undefined) {
@@ -149,7 +159,7 @@ async function listPlayers() {
 }
 
 async function createPlayer(name) {
-  const trimmed = String(name ?? '').trim().slice(0, 64);
+  const trimmed = cleanName(name);
   if (!trimmed) throw badRequest('Player name is required.');
   const id = `p_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   // Names identify players in every game, so one name per person.
@@ -166,6 +176,14 @@ async function createPlayer(name) {
 /** /admin: remove any player. Their games stay, under their name. */
 async function deletePlayer(id) {
   const res = await db()`DELETE FROM profiles WHERE id = ${id}`;
+  return res.count > 0;
+}
+
+/** /admin: give a player a PIN (e.g. one added without one) and log out their devices. */
+async function setPlayerPin(id, pin) {
+  if (!isValidPin(pin)) throw badRequest('PIN must be exactly 4 digits.');
+  const res = await db()`UPDATE profiles SET pin_hash = ${hashPin(pin, id)} WHERE id = ${id}`;
+  await db()`DELETE FROM profile_sessions WHERE profile_id = ${id}`;
   return res.count > 0;
 }
 
@@ -252,5 +270,5 @@ async function getProfileByName(name) {
 module.exports = {
   listProfiles, getProfile, getProfileByName, upsertProfile, deleteProfile, verifyProfilePin,
   getProfileAvatar, createProfileSession, profileForSession,
-  listPlayers, createPlayer, deletePlayer, clearPlayerPin,
+  listPlayers, createPlayer, deletePlayer, clearPlayerPin, setPlayerPin,
 };

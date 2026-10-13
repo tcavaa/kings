@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Globe, Handshake } from 'lucide-react'
 import TrophyIcon from './TrophyIcon'
-import { isChampionName } from '../utils/winners'
+import { isChampionName, seasonChampions } from '../utils/winners'
 import { seasonStandings } from '../utils/seasonStandings'
 import { getTheme } from '../utils/themes'
 
@@ -41,7 +41,7 @@ function SeasonStats({ season, data, loading }) {
           {players.map(p => {
             const winPct    = p.games > 0 ? ((p.wins / p.games) * 100).toFixed(0) + '%' : '—'
             const avg       = p.games > 0 ? (p.totalScore / p.games).toFixed(1) : '—'
-            const isChamp   = isChampionName(season.champion_name, p.name)
+            const isChamp   = isChampionName(seasonChampions(season), p.name)
             return (
               <tr key={p.name} style={{ borderBottom: '1px solid rgba(255,200,60,0.15)', background: isChamp ? 'rgba(0,0,0,0.15)' : undefined }}>
                 <td style={{ ...td, fontWeight: isChamp ? 700 : 400, color: isChamp ? '#ffe566' : 'rgba(255,235,160,0.9)' }}>
@@ -121,7 +121,7 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
                   <div style={{ textAlign: 'right' }}>
                     <div className="engraved-champion">{s.champion_name}</div>
                     <div className="engraved-label">
-                      {(s.champion_name || '').includes(' & ')
+                      {seasonChampions(s).length > 1
                         ? <>Co-Champions <Handshake size={10} style={{ verticalAlign: '-1px' }} /></>
                         : 'Champion'}
                     </div>
