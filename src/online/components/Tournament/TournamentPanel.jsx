@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react-online";
-import { useGame } from "../../context/GameContext";
+import { useGame, useLobby } from "../../context/GameContext";
 import AvatarImg from "../AvatarImg";
 
 const SIZES = [6, 9];
@@ -18,13 +18,13 @@ export default function TournamentPanel({ active, onNeedProfile }) {
     connected,
     publicSeat,
     tournament,
-    tournamentList,
     createTournament,
     joinTournament,
     leaveTournament,
     dismissTournament,
     refreshTournaments,
   } = useGame();
+  const { tournamentList } = useLobby();
 
   const [size, setSize] = useState(6);
   const [code, setCode] = useState("");

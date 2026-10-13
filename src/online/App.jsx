@@ -1,5 +1,5 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { GameProvider, useGame } from './context/GameContext'
+import { GameProvider, useGame, useToasts } from './context/GameContext'
 import Lobby        from './components/Lobby'
 import WaitingRoom  from './components/WaitingRoom'
 
@@ -44,7 +44,7 @@ const TOAST_STYLES = {
 }
 
 function ToastContainer() {
-  const { toasts } = useGame()
+  const { toasts } = useToasts()
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
       {toasts.map(toast => {

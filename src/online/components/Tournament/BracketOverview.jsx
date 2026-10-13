@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Eye, Trophy, Swords } from 'lucide-react-online'
-import { useGame } from '../../context/GameContext'
+import { useGame, useLobby } from '../../context/GameContext'
 import AvatarImg from '../AvatarImg'
 
 const PHASE_LABEL = {
@@ -76,9 +76,8 @@ function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
  * watching one. Open from the HUD during a tournament.
  */
 export default function BracketOverview({ onClose }) {
-  const {
-    tournamentOverview: ov, refreshOverview, roomCode, spectateTable,
-  } = useGame()
+  const { refreshOverview, roomCode, spectateTable } = useGame()
+  const { tournamentOverview: ov } = useLobby()
 
   // The server pushes an update whenever a table finishes, but scores move
   // constantly mid-round — poll while the panel is actually open.

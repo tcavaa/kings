@@ -8,7 +8,7 @@ import {
   Swords,
   Crown,
 } from "lucide-react-online";
-import { useGame } from "../context/GameContext";
+import { useGame, useLobby } from "../context/GameContext";
 import { api } from "../lib/api";
 import { useProfiles } from "../hooks/useProfiles";
 import ProfileSheet from "./ProfileSheet";
@@ -30,13 +30,13 @@ export default function Lobby({ onOpenLeaderboard }) {
     connected,
     publicSeat,
     tournament,
-    onlinePlayers,
     announcePresence,
     refreshLobby,
     resumableSeat,
     resumeSeat,
     dismissResumeSeat,
   } = useGame();
+  const { onlinePlayers } = useLobby();
 
   const [mode, setMode] = useState("championship");
   const [dialog, setDialog] = useState(null);
