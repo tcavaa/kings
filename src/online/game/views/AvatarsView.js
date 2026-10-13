@@ -1,5 +1,6 @@
 import { AvatarTextureCache } from "../lib/AvatarTextureCache.js";
 import { bake, bakedImage, fillRoundRect, strokeRoundRect } from "../lib/bake.js";
+import { georgianFont, latinFont } from "../lib/fonts.js";
 
 const GOLD = 0xf3ba45;
 const TEAL = 0x71baa3;
@@ -159,7 +160,7 @@ export class AvatarsView {
         .text(textX, nameOffY, nameLabel, {
           fontSize: "14px",
           color: v.isOwn ? "#163d31" : "#ffffff",
-          fontFamily: "Noto Sans Georgian, Inter, system-ui, Arial, sans-serif",
+          fontFamily: georgianFont(),
           fontStyle: "bold",
         })
         .setOrigin(beside ? 1 : 0.5, 0.5),
@@ -181,7 +182,7 @@ export class AvatarsView {
       .text(beside ? textX : -12, scoreOffY, scoreStr, {
         fontSize: "13px",
         color: scoreCol,
-        fontFamily: "Inter, system-ui, Arial, sans-serif",
+        fontFamily: latinFont(),
         fontStyle: "bold",
       })
       .setOrigin(beside ? 1 : 0, 0.5);
@@ -199,7 +200,7 @@ export class AvatarsView {
           .text(pillX, pillY, "წამყვანი", {
             fontSize: "10px",
             color: "#f5f2e9",
-            fontFamily: "Noto Sans Georgian, Arial, sans-serif",
+            fontFamily: georgianFont(),
             fontStyle: "bold",
           })
           .setOrigin(0.5),

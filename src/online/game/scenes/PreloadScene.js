@@ -1,5 +1,6 @@
 import Phaser from "../phaser.js";
 import { AVATAR_PX, bakeAvatar } from "../lib/AvatarTextureCache.js";
+import { waitForWebFonts } from "../lib/fonts.js";
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -7,6 +8,8 @@ export class PreloadScene extends Phaser.Scene {
   }
 
   preload() {
+    // Fetched alongside the images; the table waits for both (see create()).
+    this.fontsReady = waitForWebFonts();
     this.load.image("card-back-raw", "/art/card-back.webp");
     this.load.svg("avatar-default-raw", "/art/player-mark.svg", {
       width: AVATAR_PX,
@@ -53,6 +56,10 @@ export class PreloadScene extends Phaser.Scene {
       if (this.textures.exists(key)) this.textures.remove(key);
     }
 
-    this.scene.start("GameScene");
+    // Canvas text keeps the font it was first drawn in, so start the table
+    // only once the web fonts are in (or their wait timed out).
+    this.fontsReady.then(() => {
+      if (this.sys.isActive()) this.scene.start("GameScene");
+    });
   }
 }

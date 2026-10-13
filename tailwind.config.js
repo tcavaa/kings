@@ -5,7 +5,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        western: ['Noto Sans Georgian', 'Roboto Slab', 'Georgia', 'serif'],
+        // next/font's generated family (app/(online)/layout.jsx).
+        western: ['var(--font-noto-georgian)', 'Roboto Slab', 'Georgia', 'serif'],
       },
     },
   },
