@@ -1,65 +1,20 @@
 import { Fragment, useMemo, useState } from 'react'
 import { Handshake, Trophy } from 'lucide-react'
-import { useOnlineGames } from '../hooks/useOnlineData'
-import { GAME_TYPES } from '../constants/gameTypes'
+import { useGameData } from '../lib/gameData'
+import { usePaged } from '../hooks/usePaged'
 import { onlineWinnerNames, isOnlineWinner } from '../utils/winners'
 import { CardTypeIcon } from '../utils/gameIcons'
 import ScoreChart from './ScoreChart'
 import GameAnalytics from './GameAnalytics'
+import ShowMore from './ShowMore'
 
-// Convert online seat-based format to the internal {id, name} / UUID-keyed format
-// that ScoreChart and GameAnalytics expect. We use String(seat) as the id.
-function convertOnlineGame(game) {
-  const players = [...game.players]
-    .sort((a, b) => a.seat - b.seat)
-    .map(p => ({ id: String(p.seat), name: p.name }))
-
-  const rounds = (game.roundDetails || []).map(rd => {
-    const scores = {}
-    players.forEach(p => { scores[p.id] = rd.scores?.[+p.id] ?? 0 })
-
-    const type = GAME_TYPES.find(t => t.code === rd.gameType)
-    const countsByPlayerId = {}
-
-    if (type?.kind === 'count') {
-      players.forEach(p => {
-        const seat = +p.id
-        switch (rd.gameType) {
-          case 'Q':  countsByPlayerId[p.id] = rd.queensTaken?.[seat] ?? 0; break
-          case 'J':  countsByPlayerId[p.id] = rd.jacksTaken?.[seat]  ?? 0; break
-          case 'H':  countsByPlayerId[p.id] = rd.heartsTaken?.[seat] ?? 0; break
-          case 'T':  countsByPlayerId[p.id] = rd.tricksTaken?.[seat] ?? 0; break
-          case 'L2': {
-            const l2 = {}
-            ;(rd.trickWinners || []).slice(-2).forEach(s => { l2[s] = (l2[s] || 0) + 1 })
-            countsByPlayerId[p.id] = l2[seat] ?? 0
-            break
-          }
-          default:   countsByPlayerId[p.id] = rd.tricksTaken?.[seat] ?? 0 // P1/P2/P3
-        }
-      })
-    }
-
-    return {
-      gameTypeCode: rd.gameType,
-      scores,
-      ...(type?.kind === 'count' && { countsByPlayerId }),
-      ...(type?.kind === 'single' && {
-        singleTargetPlayerId: rd.kingOfHeartsTakenBy != null ? String(rd.kingOfHeartsTakenBy) : null,
-      }),
-      leaderPlayerId: String(rd.leaderSeat),
-    }
-  })
-
-  const participants = game.players.map(p => ({ name: p.name, score: p.score }))
-  return { players, rounds, participants }
-}
+const NONE = []
 
 // ─── Detail view ─────────────────────────────────────────────────────────────
 
-function OnlineGameDetail({ game, onBack }) {
-  const { players, rounds, participants } = useMemo(() => convertOnlineGame(game), [game])
-
+// `detail`/`result` are the game's ჩაწერა rows, already built by gameData
+// (players keyed by profile id); a game without round details has no detail.
+function OnlineGameDetail({ game, detail, result, onBack }) {
   // seat-ordered players for the table (includes original score for final row)
   const seatPlayers = [...game.players].sort((a, b) => a.seat - b.seat)
   const roundDetails = game.roundDetails || []
@@ -98,11 +53,15 @@ function OnlineGameDetail({ game, onBack }) {
         </div>
       </div>
 
-      {/* Score Progression chart */}
-      <ScoreChart players={players} rounds={rounds} />
+      {detail && (
+        <>
+          {/* Score Progression chart */}
+          <ScoreChart players={detail.players} rounds={detail.rounds} />
 
-      {/* Score by Type + Card Collection + Awards */}
-      <GameAnalytics players={players} rounds={rounds} participants={participants} />
+          {/* Score by Type + Card Collection + Awards */}
+          <GameAnalytics players={detail.players} rounds={detail.rounds} participants={result?.participants} />
+        </>
+      )}
 
       {/* Round-by-round breakdown table */}
       {roundDetails.length > 0 && (
@@ -179,18 +138,28 @@ const tdStyle = { padding: '7px 10px', textAlign: 'left' }
 // ─── List view ────────────────────────────────────────────────────────────────
 
 export default function OnlineHistoryTab() {
-  const { games, loading, error } = useOnlineGames()
+  const { data, loading, error } = useGameData()
+  const games = data?.online.games ?? NONE
   const [selectedGame, setSelectedGame] = useState(null)
+  const { visible, remaining, showMore } = usePaged(games)
+  const rowsById = useMemo(() => {
+    const m = new Map()
+    data?.online.results.forEach(r => m.set(r.id, { result: r }))
+    data?.online.details.forEach(d => { const row = m.get(d.game_result_id); if (row) row.detail = d })
+    return m
+  }, [data])
 
   if (selectedGame) {
-    return <OnlineGameDetail game={selectedGame} onBack={() => setSelectedGame(null)} />
+    const rows = rowsById.get(selectedGame.id) || {}
+    return <OnlineGameDetail game={selectedGame} detail={rows.detail} result={rows.result} onBack={() => setSelectedGame(null)} />
   }
 
-  if (loading) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>Loading online games…</p>
-  if (error)   return <p style={{ color: 'var(--accent-bad)', padding: '8px 0' }}>Failed to load: {error}</p>
+  if (loading && !data) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>Loading online games…</p>
+  if (!data)   return <p style={{ color: 'var(--accent-bad)', padding: '8px 0' }}>Failed to load: {error}</p>
   if (!games.length) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>No online games recorded yet.</p>
 
   return (
+    <>
     <div className="table">
       <div className="thead">
         <div className="tr history-tr">
@@ -201,7 +170,7 @@ export default function OnlineHistoryTab() {
         </div>
       </div>
       <div className="tbody">
-        {games.map(g => (
+        {visible.map(g => (
           <div key={g.id} className="tr history-tr">
             <div className="td">{new Date(g.playedAt).toLocaleDateString()}</div>
             <div className="td bold">
@@ -224,5 +193,7 @@ export default function OnlineHistoryTab() {
         ))}
       </div>
     </div>
+    <ShowMore remaining={remaining} onClick={showMore} />
+    </>
   )
 }

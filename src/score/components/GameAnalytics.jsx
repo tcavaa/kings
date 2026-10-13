@@ -5,15 +5,14 @@ import {
 } from 'recharts'
 import { computeGameStats, computeScoresByType, getGameAwards, TYPE_ROWS } from '../utils/analytics'
 import { computePerGameAchievements } from '../utils/achievements'
-import { CardTypeIcon, AwardIcon } from '../utils/gameIcons'
+import { CardTypeIcon } from '../utils/gameIcons'
+import { useChartTheme } from '../utils/chartTheme'
 import AchievementBadges from './AchievementBadges'
-import { PLAYER_COLORS as COLORS } from '../App'
-
-function getCssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
+import AwardsGrid from './AwardsGrid'
+import { PLAYER_COLORS as COLORS } from '../constants/colors'
 
 export default function GameAnalytics({ players, rounds, participants }) {
+  const chart = useChartTheme()
   const stats = useMemo(() => computeGameStats(players, rounds), [players, rounds])
   const scoresByType = useMemo(() => computeScoresByType(players, rounds), [players, rounds])
   const awards = useMemo(() => getGameAwards(players, stats, participants), [players, stats, participants])
@@ -32,14 +31,15 @@ export default function GameAnalytics({ players, rounds, participants }) {
     return maps
   }, [players, perGameAchievements])
 
-  // Bar chart: score contribution per game type per player (only non-zero types)
+  // Bar chart: score contribution per game type per player (only non-zero
+  // types). One series per sheet column, so equal names don't merge.
   const barData = useMemo(() => {
     return TYPE_ROWS.map(tr => {
       const point = { type: tr.label }
       let anyNonZero = false
-      players.forEach(p => {
+      players.forEach((p, i) => {
         const score = scoresByType[p.id]?.[tr.code] || 0
-        point[p.name] = score
+        point[`s${i}`] = score
         if (score !== 0) anyNonZero = true
       })
       return anyNonZero ? point : null
@@ -53,22 +53,20 @@ export default function GameAnalytics({ players, rounds, participants }) {
         <h2>Score by Game Type</h2>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 64 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--grid-stroke')} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
             <XAxis
               dataKey="type"
-              tick={{ fontSize: 11, fill: getCssVar('--muted') }}
+              tick={chart.tick}
               angle={-35}
               textAnchor="end"
               interval={0}
             />
-            <YAxis tick={{ fontSize: 11, fill: getCssVar('--muted') }} width={44} />
-            <ReferenceLine y={0} stroke={getCssVar('--text')} strokeDasharray="4 2" />
-            <Tooltip
-              contentStyle={{ background: getCssVar('--tooltip-bg'), border: `2px solid ${getCssVar('--text')}`, borderRadius: 8, fontSize: 13 }}
-            />
+            <YAxis tick={chart.tick} width={44} />
+            <ReferenceLine y={0} stroke={chart.text} strokeDasharray="4 2" />
+            <Tooltip contentStyle={chart.tooltipStyle} />
             <Legend wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
             {players.map((p, i) => (
-              <Bar key={p.id} dataKey={p.name} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
+              <Bar key={p.id} dataKey={`s${i}`} name={p.name} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -116,19 +114,7 @@ export default function GameAnalytics({ players, rounds, participants }) {
       {/* Game Awards */}
       <div className="card">
         <h2>Game Awards</h2>
-        <div className="awards-grid">
-          {awards.map((a, i) => (
-            <div key={i} className="award-card">
-              <div className="award-icon"><AwardIcon name={a.icon} /></div>
-              <div className="award-title">{a.title}</div>
-              <div className="award-player">{a.player}</div>
-              <div className="award-value">{a.value}</div>
-            </div>
-          ))}
-          {awards.length === 0 && (
-            <p style={{ color: 'var(--muted)', fontSize: 13 }}>No awards data available.</p>
-          )}
-        </div>
+        <AwardsGrid awards={awards} emptyText="No awards data available." />
       </div>
 
       {/* Per-game Achievements */}

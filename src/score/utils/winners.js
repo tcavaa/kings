@@ -1,10 +1,11 @@
 // Tie-aware winner helpers.
 //
-// A tied game has EVERY top scorer as a winner. Locally we store them in
-// game_results.winner_name joined with ' & ' (e.g. "Maks & Misha") so no
-// schema change is needed; these helpers are the single place that joins
-// and splits that format. The online API (King Online) sends a `winners`
-// array next to the legacy single `winner`.
+// A tied game has EVERY top scorer as a winner. Result rows (gameShapes.js)
+// carry them as a `winners` array of names, and `winner_name` joins them with
+// ' & ' (e.g. "Maks & Misha") for display. Read the array: splitting the
+// joined string would break a name that itself contains ' & '. Season
+// champions are stored joined, so those are still split. The online API
+// (King Online) sends a `winners` array next to the legacy single `winner`.
 
 const SEP = ' & '
 
@@ -19,8 +20,9 @@ export function splitWinnerNames(value) {
   return value.split(SEP).map(s => s.trim()).filter(Boolean)
 }
 
-/** Winner names of a local game_results row (accepts row or raw string). */
+/** Winner names of a result row (accepts a row or a raw joined string). */
 export function winnerNamesOf(resultOrName) {
+  if (Array.isArray(resultOrName?.winners)) return resultOrName.winners
   const raw = typeof resultOrName === 'string' ? resultOrName : resultOrName?.winner_name
   return splitWinnerNames(raw)
 }

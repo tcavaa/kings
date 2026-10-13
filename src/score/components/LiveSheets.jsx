@@ -1,17 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Radio, ArrowLeft, Crown } from 'lucide-react'
 import { useLiveSheets } from '../lib/gameData'
 import { GAME_TYPES } from '../constants/gameTypes'
-import { PLAYER_COLORS } from '../App'
+import { PLAYER_COLORS } from '../constants/colors'
+import { totalsByPlayer } from '../utils/rounds'
 import ScoreTable from './ScoreTable'
-import ScoreChart from './ScoreChart'
 import GameProgress from './GameProgress'
 
-const totalsOf = (sheet) => {
-  const totals = Object.fromEntries(sheet.players.map(p => [p.id, 0]))
-  sheet.rounds.forEach(r => sheet.players.forEach(p => { totals[p.id] += r?.scores?.[p.id] || 0 }))
-  return totals
-}
+// The chart library loads only when someone opens a live game.
+const ScoreChart = lazy(() => import('./ScoreChart'))
 
 function ago(iso) {
   const min = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000))
@@ -35,7 +32,7 @@ function SheetView({ sheet, onBack }) {
       </div>
       <ScoreTable players={sheet.players} rounds={sheet.rounds} gameFinished={finished} playerColors={PLAYER_COLORS} />
       <GameProgress playedRounds={sheet.rounds.length} totalRounds={target} />
-      {sheet.rounds.length > 0 && <ScoreChart players={sheet.players} rounds={sheet.rounds} />}
+      {sheet.rounds.length > 0 && <Suspense fallback={null}><ScoreChart players={sheet.players} rounds={sheet.rounds} /></Suspense>}
     </>
   )
 }
@@ -83,7 +80,7 @@ export default function LiveSheets({ children }) {
       <h2 className="icon-btn" style={{ justifyContent: 'flex-start' }}><Radio size={16} color="#dc2626" /> Live now</h2>
       <div style={{ display: 'grid', gap: 8 }}>
         {sheets.map(sheet => {
-          const totals = totalsOf(sheet)
+          const totals = totalsByPlayer(sheet.players, sheet.rounds)
           const ranked = [...sheet.players].sort((a, b) => totals[b.id] - totals[a.id])
           const target = sheet.players.length * GAME_TYPES.length
           return (

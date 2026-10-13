@@ -1,14 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Crown, Handshake, Skull, Pencil, Undo2 } from 'lucide-react'
 import { GAME_TYPES } from '../constants/gameTypes'
 import TrophyIcon from './TrophyIcon'
 import { isChampionName } from '../utils/winners'
+import { countsSum, normalizeCount, totalsByPlayer, validateRound } from '../utils/rounds'
 
 function AnimatedScore({ value, from = 0, showSign = true }) {
   const [displayed, setDisplayed] = useState(from)
   const frameRef = useRef(null)
 
-  useEffect(() => {
+  // Before paint, so the final value never flashes for a frame first.
+  useLayoutEffect(() => {
     const startVal = from
     const target = value
     if (startVal === target) { setDisplayed(target); return }
@@ -29,10 +31,8 @@ function AnimatedScore({ value, from = 0, showSign = true }) {
 }
 
 export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLastRound, gameFinished, playerColors = [], currentChampion }) {
-  const totals = players.reduce((acc, p) => { acc[p.id] = 0; return acc }, {})
-  rounds.forEach((r) => {
-    Object.entries(r?.scores || {}).forEach(([pid, score]) => { totals[pid] = (totals[pid] || 0) + score })
-  })
+  // Live-sheet rounds come from other phones: missing scores count as 0.
+  const totals = totalsByPlayer(players, rounds)
 
   const maxTotal = rounds.length > 0 && players.length > 0 ? Math.max(...players.map(p => totals[p.id])) : null
   const leaders = new Set(maxTotal !== null ? players.filter(p => totals[p.id] === maxTotal).map(p => p.id) : [])
@@ -45,15 +45,12 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
   const [newRowIdx, setNewRowIdx] = useState(-1)
   const prevTotalsRef = useRef({})
 
-  useEffect(() => {
+  // Layout effect: the new row and the totals start counting from their old
+  // values in the very first frame, not after one frame of the final ones.
+  useLayoutEffect(() => {
     if (rounds.length > prevRoundCountRef.current) {
-      // Compute totals WITHOUT the new last round (previous state)
-      const prev = {}
-      players.forEach(p => { prev[p.id] = 0 })
-      rounds.slice(0, -1).forEach(r => {
-        Object.entries(r.scores || {}).forEach(([pid, score]) => { prev[pid] += score })
-      })
-      prevTotalsRef.current = prev
+      // Totals WITHOUT the new last round (previous state)
+      prevTotalsRef.current = totalsByPlayer(players, rounds.slice(0, -1))
       setNewRowIdx(rounds.length - 1)
       const t = setTimeout(() => setNewRowIdx(-1), 900)
       prevRoundCountRef.current = rounds.length
@@ -79,7 +76,7 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
   }
   function cancelEdit() { setIsEditing(false) }
   function changeCount(pid, val) {
-    setDraftCounts((p) => ({ ...p, [pid]: Math.max(0, Number(val || 0)) }))
+    setDraftCounts((p) => ({ ...p, [pid]: normalizeCount(val) }))
   }
   function saveEdit() {
     if (!onEditLastRound || !lastRound) return
@@ -92,17 +89,13 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
 
   const draftSum = useMemo(() => {
     if (!isEditing || !lastRound || !lastRound.countsByPlayerId) return 0
-    return Object.values(draftCounts).reduce((a, b) => a + (Number(b) || 0), 0)
+    return countsSum(draftCounts)
   }, [isEditing, lastRound, draftCounts])
 
-  const validationMessage = useMemo(() => {
-    if (!isEditing || !selectedType) return ''
-    if (selectedType.kind === 'count') {
-      if (draftSum !== selectedType.totalUnits) return `Distribute exactly ${selectedType.totalUnits} ${selectedType.unitLabel || 'units'}`
-    }
-    if (selectedType.kind === 'single' && !draftSingle) return 'Select the player who took it'
-    return ''
-  }, [isEditing, selectedType, draftSum, draftSingle])
+  const validationMessage = useMemo(
+    () => (isEditing && selectedType ? validateRound(selectedType, draftCounts, draftSingle) : ''),
+    [isEditing, selectedType, draftCounts, draftSingle]
+  )
 
   // Danger zone: player more than 190pts behind leader (only after at least 1 round)
   const dangerIds = new Set(
@@ -167,12 +160,12 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
                   )}
                 </div>
                 {players.map((p) => {
-                  const display = r.scores[p.id]
+                  const display = r?.scores?.[p.id]
                   const className = typeof display === 'number' ? (display >= 0 ? 'td center pos' : 'td center neg') : 'td center'
                   return (
                     <div key={p.id} className={className}>
                       {isEditing && isLast && r.countsByPlayerId ? (
-                        <input type="number" min="0" inputMode="numeric" pattern="[0-9]*" className="num-input" value={draftCounts[p.id] ?? ''} onChange={(e) => changeCount(p.id, e.target.value)} />
+                        <input type="number" min="0" step="1" inputMode="numeric" pattern="[0-9]*" className="num-input" value={draftCounts[p.id] ?? ''} onChange={(e) => changeCount(p.id, e.target.value)} />
                       ) : isEditing && isLast && r.singleTargetPlayerId != null ? (
                         <input type="radio" name="editSingle" checked={draftSingle === p.id} onChange={() => setDraftSingle(p.id)} />
                       ) : isNew && typeof display === 'number' ? (

@@ -1,37 +1,43 @@
-import { Component, useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { computeScoresForRound } from './utils/scoring'
 import PlayerInput from './components/PlayerInput.jsx'
 import GameTypeSelector from './components/GameTypeSelector.jsx'
 import { GAME_TYPES } from './constants/gameTypes'
+import { PLAYER_COLORS } from './constants/colors'
 import ScoreTable from './components/ScoreTable.jsx'
 import GameTypeMatrix from './components/GameTypeMatrix.jsx'
-import PlayersPage from './components/PlayersPage.jsx'
-import WinnersPage from './components/WinnersPage.jsx'
-import ScoreChart from './components/ScoreChart.jsx'
-import GameAnalytics from './components/GameAnalytics.jsx'
 import WinProbability from './components/WinProbability.jsx'
 import GameProgress from './components/GameProgress.jsx'
-import StatsPage from './components/StatsPage.jsx'
-import MorePage from './components/MorePage.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import SeasonBanner from './components/SeasonBanner.jsx'
 import GameTimer from './components/GameTimer.jsx'
 import ThemeDecorations from './components/ThemeDecorations.jsx'
 import { saveGame, publishLiveSheet, removeLiveSheet } from './lib/gameData.js'
+import { sheetReducer, EMPTY_SHEET, targetRoundsOf } from './lib/sheetReducer.js'
 import LiveSheets from './components/LiveSheets.jsx'
 import { useSeasons } from './hooks/useSeasons'
 import { applyThemeToBody } from './utils/themes'
 import { formatDuration } from './utils/time'
+import { readStorage, writeStorage } from './utils/storage'
+import { totalsByPlayer } from './utils/rounds'
 import { RefreshCw, Trash2, Timer, ArrowLeft } from 'lucide-react'
-import confetti from 'canvas-confetti'
 import { playRoundEnd, playBigPenalty, playGameWin, playRematch } from './utils/sounds.js'
 import './styles/main.css'
 
-export const PLAYER_COLORS = ['#2563eb', '#059669', '#dc2626', '#d97706']
+// The score sheet itself loads first; the other tabs and the charts (with
+// their chart library) load when they are first shown.
+const PlayersPage = lazy(() => import('./components/PlayersPage.jsx'))
+const WinnersPage = lazy(() => import('./components/WinnersPage.jsx'))
+const StatsPage = lazy(() => import('./components/StatsPage.jsx'))
+const MorePage = lazy(() => import('./components/MorePage.jsx'))
+const ScoreChart = lazy(() => import('./components/ScoreChart.jsx'))
+const GameAnalytics = lazy(() => import('./components/GameAnalytics.jsx'))
 
-// Each game in progress is published under its own id so others can follow it.
-const newSheetId = () =>
-  (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '')
+const PageLoading = (
+  <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>Loading…</p></div>
+)
+
+const STATE_KEY = 'king-score-state'
 
 // Other people's games in progress are a bonus on the home screen: if one
 // can't be drawn, show the player picker on its own rather than a broken page.
@@ -41,58 +47,24 @@ class LiveSheetsBoundary extends Component {
   render() { return this.state.failed ? this.props.fallback : this.props.children }
 }
 
+function celebrate(soundEnabled) {
+  import('canvas-confetti')
+    .then(({ default: confetti }) => confetti({ particleCount: 180, spread: 90, origin: { y: 0.6 } }))
+    .catch(() => { /* no confetti, the game still finished */ })
+  if (soundEnabled) playGameWin()
+}
+
 function App() {
-  const [state, dispatch] = useReducer(
-    (s, action) => {
-      switch (action.type) {
-        case 'HYDRATE': {
-          const merged = { ...s, ...action.payload }
-          // Snapshots saved before the game clock existed have no
-          // startedAt — start counting from the moment they're restored.
-          if (merged.players && !merged.startedAt) merged.startedAt = Date.now()
-          if (merged.players && !merged.sheetId) merged.sheetId = newSheetId()
-          return merged
-        }
-        case 'START':
-          return { players: action.players, activePlayerIndex: 0, rounds: [], startedAt: Date.now(), endedAt: null, sheetId: newSheetId() }
-        case 'END_ROUND': {
-          const rounds = [...s.rounds, action.round]
-          const nextLeader = s.players ? (s.activePlayerIndex + 1) % s.players.length : 0
-          // Freeze the game clock the moment the final round is entered.
-          const target = s.players ? s.players.length * GAME_TYPES.length : Infinity
-          const endedAt = !s.endedAt && rounds.length >= target ? Date.now() : s.endedAt
-          return { ...s, rounds, activePlayerIndex: nextLeader, endedAt }
-        }
-        case 'EDIT_LAST': {
-          if (!s.rounds.length) return s
-          const next = [...s.rounds]
-          next[next.length - 1] = action.round
-          return { ...s, rounds: next }
-        }
-        case 'UNDO_LAST': {
-          if (!s.rounds.length) return s
-          const prevLeader = s.players
-            ? (s.activePlayerIndex - 1 + s.players.length) % s.players.length
-            : 0
-          // Undoing the final round un-finishes the game — resume the clock.
-          return { ...s, rounds: s.rounds.slice(0, -1), activePlayerIndex: prevLeader, endedAt: null }
-        }
-        case 'RESET':
-          return { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null, sheetId: null }
-        default:
-          return s
-      }
-    },
-    { players: null, activePlayerIndex: 0, rounds: [], startedAt: null, endedAt: null, sheetId: null }
-  )
+  const [state, dispatch] = useReducer(sheetReducer, EMPTY_SHEET)
   const { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId } = state
   const [hydrated, setHydrated] = useState(false)
-  const [preselectedTypeCode, setPreselectedTypeCode] = useState(null)
+  // The game type picked for the coming round, from the matrix or the selector.
+  const [selectedTypeCode, setSelectedTypeCode] = useState(null)
   // 'home' (Score) | 'history' | 'stats' | 'more' | 'players'
   const [view, setView] = useState('home')
   const [saving, setSaving] = useState(false)
-  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('king-sound') !== 'off')
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('king-theme') === 'dark')
+  const [soundEnabled, setSoundEnabled] = useState(() => readStorage('king-sound') !== 'off')
+  const [darkMode, setDarkMode] = useState(() => readStorage('king-theme') === 'dark')
   const {
     seasons, currentChampion, currentSeasonStart,
     currentSeasonName, currentSeasonTheme,
@@ -101,7 +73,7 @@ function App() {
   // Apply dark mode class to body
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode)
-    localStorage.setItem('king-theme', darkMode ? 'dark' : 'light')
+    writeStorage('king-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
   // Apply the current season's theme (Summer / Mountain / Christmas / Casual)
@@ -111,32 +83,29 @@ function App() {
 
   // Persist sound preference
   useEffect(() => {
-    localStorage.setItem('king-sound', soundEnabled ? 'on' : 'off')
+    writeStorage('king-sound', soundEnabled ? 'on' : 'off')
   }, [soundEnabled])
 
-  // Load from localStorage on first mount
+  // Load from localStorage on first mount. A snapshot from before the player
+  // lists were merged (old `p1`-style ids) is dropped: the next save below
+  // overwrites it.
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('king-score-state')
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (parsed && Array.isArray(parsed.rounds) && (parsed.players === null || Array.isArray(parsed.players))) {
-          const hasLegacyIds = Array.isArray(parsed.players) && parsed.players.some((p) => /^p\d+$/.test(p.id))
-          if (!hasLegacyIds) {
-            dispatch({ type: 'HYDRATE', payload: {
-              players: parsed.players,
-              activePlayerIndex: parsed.activePlayerIndex || 0,
-              rounds: parsed.rounds,
-              startedAt: parsed.startedAt || null,
-              endedAt: parsed.endedAt || null,
-              sheetId: parsed.sheetId || null,
-            } })
-          } else {
-            localStorage.removeItem('king-score-state')
-          }
+      const parsed = JSON.parse(readStorage(STATE_KEY) || 'null')
+      if (parsed && Array.isArray(parsed.rounds) && (parsed.players === null || Array.isArray(parsed.players))) {
+        const hasLegacyIds = Array.isArray(parsed.players) && parsed.players.some((p) => /^p\d+$/.test(p.id))
+        if (!hasLegacyIds) {
+          dispatch({ type: 'HYDRATE', payload: {
+            players: parsed.players,
+            activePlayerIndex: parsed.activePlayerIndex || 0,
+            rounds: parsed.rounds,
+            startedAt: parsed.startedAt || null,
+            endedAt: parsed.endedAt || null,
+            sheetId: parsed.sheetId || null,
+          } })
         }
       }
-    } catch (e) {}
+    } catch { /* a broken snapshot: start fresh */ }
     setHydrated(true)
   }, [])
 
@@ -144,17 +113,31 @@ function App() {
   useEffect(() => {
     if (!hydrated) return
     const snapshot = { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId }
-    try {
-      localStorage.setItem('king-score-state', JSON.stringify(snapshot))
-    } catch (e) {}
+    writeStorage(STATE_KEY, JSON.stringify(snapshot))
   }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
 
-  // Publish the game in progress so others can follow it live.
+  // Publish the game in progress so others can follow it live. The pending
+  // timer and the last request are kept so that ending the sheet can wait
+  // for them: a PUT landing after the DELETE would bring the sheet back.
+  const publishRef = useRef({ timer: null, request: null })
   useEffect(() => {
     if (!hydrated || !players || !sheetId) return
-    const t = setTimeout(() => publishLiveSheet(sheetId, { players, activePlayerIndex, rounds, startedAt, endedAt }), 600)
-    return () => clearTimeout(t)
+    const pub = publishRef.current
+    pub.timer = setTimeout(() => {
+      pub.timer = null
+      pub.request = publishLiveSheet(sheetId, { players, activePlayerIndex, rounds, startedAt, endedAt })
+    }, 600)
+    return () => { clearTimeout(pub.timer); pub.timer = null }
   }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
+
+  const endLiveSheet = useCallback(async (id) => {
+    if (!id) return
+    const pub = publishRef.current
+    clearTimeout(pub.timer)
+    pub.timer = null
+    await pub.request
+    removeLiveSheet(id)
+  }, [])
 
   const usedTypesByPlayer = useMemo(() => {
     const map = {}
@@ -168,84 +151,65 @@ function App() {
     return map
   }, [players, rounds])
 
-  const targetRoundsCount = useMemo(() => {
-    if (!players) return 0
-    return players.length * GAME_TYPES.length
-  }, [players])
+  const targetRoundsCount = useMemo(() => targetRoundsOf(players), [players])
 
   const gameFinished = !!(players && rounds.length >= targetRoundsCount && targetRoundsCount > 0)
 
   const finishedParticipants = useMemo(() => {
     if (!gameFinished || !players) return []
-    const totals = {}
-    players.forEach(p => { totals[p.id] = 0 })
-    rounds.forEach(r => {
-      if (r.scores) players.forEach(p => { totals[p.id] += r.scores[p.id] || 0 })
-    })
+    const totals = totalsByPlayer(players, rounds)
     return players.map(p => ({ name: p.name, score: totals[p.id] }))
   }, [gameFinished, players, rounds])
-
-  useEffect(() => {
-    if (!gameFinished) return
-    confetti({ particleCount: 180, spread: 90, origin: { y: 0.6 } })
-    if (soundEnabled) playGameWin()
-  }, [gameFinished])
 
   // Final game duration in seconds (null until the clock has both ends).
   const durationSeconds = startedAt && endedAt
     ? Math.max(0, Math.round((endedAt - startedAt) / 1000))
     : null
 
-  // The server works out totals and winners from the rounds, the same way the
-  // sheet does. A game that fails to save stays on screen to retry; the sheet
-  // id makes a retry after a lost response store it only once.
-  const saveGameToDB = useCallback(async (playersList, roundsList, gameDuration = null) => {
+  // Save the finished game, then clear the sheet or start a rematch with the
+  // same players. The server works out totals and winners from the rounds,
+  // the same way the sheet does. A game that fails to save stays on screen
+  // to retry; the sheet id makes a retry after a lost response store it only
+  // once.
+  const finishGame = useCallback(async ({ rematch = false } = {}) => {
+    if (!players) return
+    setSaving(true)
+    let saved = false
     try {
       await saveGame({
         sheetId,
-        players: playersList.map((p) => ({ id: p.id })),
-        rounds: roundsList,
-        durationSeconds: gameDuration ?? undefined,
+        players: players.map((p) => ({ id: p.id })),
+        rounds,
+        durationSeconds: durationSeconds ?? undefined,
       })
-      return true
+      saved = true
     } catch (err) {
       window.alert(`The game could not be saved (${err.message}). It is still here — try again.`)
-      return false
     }
-  }, [sheetId])
-
-  const handleComplete = useCallback(async () => {
-    if (!players) return
-    setSaving(true)
-    const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
     if (!saved) return
-    if (sheetId) removeLiveSheet(sheetId)
-    localStorage.removeItem('king-score-state')
-    dispatch({ type: 'RESET' })
-  }, [players, rounds, saveGameToDB, durationSeconds, sheetId])
-
-  const handleRematch = useCallback(async () => {
-    if (!players) return
-    setSaving(true)
-    const rematchers = [...players]
-    const saved = await saveGameToDB(players, rounds, durationSeconds)
-    setSaving(false)
-    if (!saved) return
-    if (sheetId) removeLiveSheet(sheetId)
-    localStorage.removeItem('king-score-state')
-    if (soundEnabled) playRematch()
-    dispatch({ type: 'START', players: rematchers })
-  }, [players, rounds, saveGameToDB, soundEnabled, durationSeconds, sheetId])
+    endLiveSheet(sheetId)
+    if (rematch) {
+      if (soundEnabled) playRematch()
+      dispatch({ type: 'START', players: [...players] })
+    } else {
+      dispatch({ type: 'RESET' })
+    }
+  }, [players, rounds, durationSeconds, sheetId, soundEnabled, endLiveSheet])
 
   const handleStart = useCallback((playersList) => {
+    setSelectedTypeCode(null)
     dispatch({ type: 'START', players: playersList })
   }, [])
 
   const onRoundComplete = useCallback((roundRecord) => {
     dispatch({ type: 'END_ROUND', round: roundRecord })
-    setPreselectedTypeCode(null)
-    if (soundEnabled) {
+    setSelectedTypeCode(null)
+    // Celebrate here, when the last round is entered, and not whenever a
+    // finished sheet is shown (a reload of an unsaved one would replay it).
+    if (rounds.length + 1 >= targetRoundsCount) {
+      celebrate(soundEnabled)
+    } else if (soundEnabled) {
       const minScore = Math.min(...Object.values(roundRecord.scores || {}))
       if (minScore <= -40) {
         playBigPenalty()
@@ -253,10 +217,11 @@ function App() {
         playRoundEnd()
       }
     }
-  }, [soundEnabled])
+  }, [soundEnabled, rounds.length, targetRoundsCount])
 
   const onUndoLastRound = useCallback(() => {
     if (!players || rounds.length === 0) return
+    setSelectedTypeCode(null)
     dispatch({ type: 'UNDO_LAST' })
   }, [players, rounds])
 
@@ -275,11 +240,10 @@ function App() {
   const handleReset = useCallback(() => {
     const ok = window.confirm('Are you sure you want to reset the current game? This will clear all progress.')
     if (!ok) return
-    if (sheetId) removeLiveSheet(sheetId)
-    localStorage.removeItem('king-score-state')
+    endLiveSheet(sheetId)
     dispatch({ type: 'RESET' })
     setView('home')
-  }, [sheetId])
+  }, [sheetId, endLiveSheet])
 
   return (
     <div className="app">
@@ -302,33 +266,35 @@ function App() {
       <GameTimer startedAt={startedAt} endedAt={endedAt} />
 
       <main className="app-content">
-        {view === 'players' && (
-          <PlayersPage onBack={() => setView('more')} currentChampion={currentChampion} />
-        )}
+        <Suspense fallback={PageLoading}>
+          {view === 'players' && (
+            <PlayersPage onBack={() => setView('more')} currentChampion={currentChampion} />
+          )}
 
-        {view === 'history' && (
-          <WinnersPage seasons={seasons} />
-        )}
+          {view === 'history' && (
+            <WinnersPage seasons={seasons} />
+          )}
 
-        {view === 'stats' && (
-          <StatsPage
-            currentSeasonStart={currentSeasonStart}
-            onBack={() => setView('home')}
-          />
-        )}
+          {view === 'stats' && (
+            <StatsPage
+              currentSeasonStart={currentSeasonStart}
+              onBack={() => setView('home')}
+            />
+          )}
 
-        {view === 'more' && (
-          <MorePage
-            onOpenPlayers={() => setView('players')}
-            soundEnabled={soundEnabled}
-            onToggleSound={() => setSoundEnabled(v => !v)}
-            darkMode={darkMode}
-            onToggleDark={() => setDarkMode(v => !v)}
-            seasonName={currentSeasonName}
-            seasonTheme={currentSeasonTheme}
-            onResetGame={handleReset}
-          />
-        )}
+          {view === 'more' && (
+            <MorePage
+              onOpenPlayers={() => setView('players')}
+              soundEnabled={soundEnabled}
+              onToggleSound={() => setSoundEnabled(v => !v)}
+              darkMode={darkMode}
+              onToggleDark={() => setDarkMode(v => !v)}
+              seasonName={currentSeasonName}
+              seasonTheme={currentSeasonTheme}
+              onResetGame={handleReset}
+            />
+          )}
+        </Suspense>
 
         {view === 'home' && !players && (
           <LiveSheetsBoundary fallback={<PlayerInput onStart={handleStart} />}>
@@ -349,7 +315,7 @@ function App() {
               players={players}
               usedTypesByPlayer={usedTypesByPlayer}
               activePlayerIndex={activePlayerIndex}
-              onPreselect={(code) => setPreselectedTypeCode(code)}
+              onPreselect={setSelectedTypeCode}
               playerColors={PLAYER_COLORS}
               currentChampion={currentChampion}
             />
@@ -359,7 +325,8 @@ function App() {
               players={players}
               activePlayerIndex={activePlayerIndex}
               usedTypesByPlayer={usedTypesByPlayer}
-              preselectedCode={preselectedTypeCode}
+              selectedTypeCode={selectedTypeCode}
+              onSelectType={setSelectedTypeCode}
               onRoundComplete={onRoundComplete}
             />
             <ScoreTable
@@ -381,25 +348,33 @@ function App() {
 
         {view === 'home' && players && gameFinished && (
           <>
-            <ScoreTable players={players} rounds={rounds} gameFinished playerColors={PLAYER_COLORS} currentChampion={currentChampion} />
+            {/* The final round can still be fixed or undone until the game is saved. */}
+            <ScoreTable
+              players={players}
+              rounds={rounds}
+              gameFinished
+              onEditLastRound={saving ? undefined : onEditLastRound}
+              onUndoLastRound={saving ? undefined : onUndoLastRound}
+              playerColors={PLAYER_COLORS}
+              currentChampion={currentChampion}
+            />
             {durationSeconds != null && (
               <div className="game-duration-note">
                 <Timer size={14} /> Game time: <strong>{formatDuration(durationSeconds)}</strong>
               </div>
             )}
             <div className="actions center">
-              <button className="primary" disabled={saving} onClick={handleComplete}>
+              <button className="primary" disabled={saving} onClick={() => finishGame()}>
                 {saving ? 'Saving...' : 'Complete'}
               </button>
-              <button className="primary success" disabled={saving} onClick={handleRematch}>
+              <button className="primary success" disabled={saving} onClick={() => finishGame({ rematch: true })}>
                 {saving ? '...' : <><RefreshCw size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />Rematch</>}
               </button>
-              <button className="link" disabled={saving} onClick={handleComplete}>
-                New Game
-              </button>
             </div>
-            <ScoreChart players={players} rounds={rounds} />
-            <GameAnalytics players={players} rounds={rounds} participants={finishedParticipants} />
+            <Suspense fallback={null}>
+              <ScoreChart players={players} rounds={rounds} />
+              <GameAnalytics players={players} rounds={rounds} participants={finishedParticipants} />
+            </Suspense>
           </>
         )}
       </main>

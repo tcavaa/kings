@@ -87,11 +87,12 @@ export function getGameAwards(players, stats, participants) {
 // Returns { [playerId]: { name, gamesPlayed, wins, totalScore, K, Q, J, H, L2, T, P1, P2, P3 } }
 export function computeGlobalStats(allDetails, allResults) {
   const map = {}
+  const resultById = new Map((allResults || []).map(r => [r.id, r]))
 
   allDetails.forEach(detail => {
     const { players, rounds, game_result_id } = detail
     if (!players || !rounds) return
-    const result = allResults?.find(r => r.id === game_result_id)
+    const result = resultById.get(game_result_id)
     const gameStats = computeGameStats(players, rounds)
 
     const totals = {}
@@ -129,6 +130,7 @@ export function computeGlobalStats(allDetails, allResults) {
 // of who outscored whom.
 export function computeComparison(selected, allDetails, allResults = []) {
   const ids = selected.map(s => s.id)
+  const resultById = new Map(allResults.map(r => [r.id, r]))
 
   const stats = {}
   selected.forEach(s => { stats[s.id] = { id: s.id, name: s.name, wins: 0, games: 0 } })
@@ -163,7 +165,7 @@ export function computeComparison(selected, allDetails, allResults = []) {
       if (r.scores) players.forEach(p => { totals[p.id] += r.scores[p.id] || 0 })
     })
 
-    const result = allResults.find(r => r.id === game_result_id)
+    const result = resultById.get(game_result_id)
     selected.forEach(s => {
       stats[s.id].games++
       if (result && isWinnerOf(result, s.name)) stats[s.id].wins++

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Swords, Trophy } from 'lucide-react'
 import { computeComparison } from '../utils/analytics'
+import HeatMatrix from './HeatMatrix'
 
 const MAX_SELECT = 4
 
@@ -178,41 +179,13 @@ function PairRecord({ cmp, a, b }) {
 
 // 3–4 player pairwise grid: cell[row][col] = times row outscored col
 function H2HMatrix({ selected, h2h, nameById }) {
+  const players = selected.map(s => ({ key: s.id, label: nameById[s.id] }))
   return (
-    <div style={{ overflowX: 'auto' }}>
-      <div className="king-matrix">
-        <div className="km-row km-header">
-          <div className="km-cell km-label">Beat ↓ / vs →</div>
-          {selected.map(s => (
-            <div key={s.id} className="km-cell km-col-header">{nameById[s.id]}</div>
-          ))}
-        </div>
-        {selected.map(rowP => {
-          const row = h2h[rowP.id] || {}
-          const maxInRow = Math.max(0, ...Object.values(row))
-          return (
-            <div key={rowP.id} className="km-row">
-              <div className="km-cell km-row-header">{nameById[rowP.id]}</div>
-              {selected.map(colP => {
-                const isSelf = rowP.id === colP.id
-                const count = row[colP.id] || 0
-                let heatClass = 'heat-0'
-                if (!isSelf && maxInRow > 0) {
-                  const ratio = count / maxInRow
-                  if (ratio >= 0.75) heatClass = 'heat-3'
-                  else if (ratio >= 0.5) heatClass = 'heat-2'
-                  else if (ratio >= 0.25) heatClass = 'heat-1'
-                }
-                return (
-                  <div key={colP.id} className={`km-cell km-data ${isSelf ? 'km-self' : heatClass}`}>
-                    {isSelf ? '—' : count}
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
-    </div>
+    <HeatMatrix
+      corner="Beat ↓ / vs →"
+      rows={players}
+      cols={players}
+      countOf={(row, col) => h2h[row]?.[col]}
+    />
   )
 }
