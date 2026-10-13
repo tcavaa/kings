@@ -13,7 +13,7 @@ import { armShuffleSound } from "./lib/shuffleSound";
 // hair now and then and stutter down to 20.
 const IDLE_FPS = 32;
 
-function PhaserGame({ gameState, onCardPlay }) {
+function PhaserGame({ gameState, chatBubbles, onCardPlay }) {
   const containerRef = useRef(null);
   const gameRef = useRef(null);
   // Latest snapshot we tried to push into Phaser. The scene re-broadcasts
@@ -21,6 +21,9 @@ function PhaserGame({ gameState, onCardPlay }) {
   // ref so the table renders immediately on a refresh/rejoin instead of
   // staying blank until the next state-update arrives.
   const lastStateRef = useRef(null);
+  // Chat bubbles travel on their own event, never inside the table state, so
+  // a chat message touches only the bubble layer. Replayed with the state.
+  const lastBubblesRef = useRef(null);
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -62,6 +65,11 @@ function PhaserGame({ gameState, onCardPlay }) {
     EventBus.emit("state-update", gameState);
   }, [gameState]);
 
+  useEffect(() => {
+    lastBubblesRef.current = chatBubbles || {};
+    EventBus.emit("chat-bubbles", lastBubblesRef.current);
+  }, [chatBubbles]);
+
   // Re-fit the FIT-scaled canvas as soon as the *visible* viewport changes.
   // Phaser listens to window resize and orientation itself, and otherwise
   // re-reads the container's size every 500 ms. On mobile, browser chrome
@@ -90,6 +98,9 @@ function PhaserGame({ gameState, onCardPlay }) {
   // some other React-side change forces a fresh state-update.
   useEffect(() => {
     const replay = () => {
+      if (lastBubblesRef.current) {
+        EventBus.emit("chat-bubbles", lastBubblesRef.current);
+      }
       if (lastStateRef.current) {
         EventBus.emit("state-update", lastStateRef.current);
       }
@@ -138,7 +149,7 @@ function PhaserGame({ gameState, onCardPlay }) {
   );
 }
 
-// gameState is memoized upstream (GameLayout) and onCardPlay is
-// useCallback-stable, so memo() makes unrelated GameLayout renders
+// gameState and chatBubbles are memoized upstream (GameLayout) and onCardPlay
+// is useCallback-stable, so memo() makes unrelated GameLayout renders
 // (drawer/menu/chat toggles) skip this component entirely.
 export default memo(PhaserGame);

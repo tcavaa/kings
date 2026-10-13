@@ -31,6 +31,7 @@ export class GameScene extends Phaser.Scene {
     this.table.draw(this.L);
     this.trick = new TrickView(this);
     this.avatars = new AvatarsView(this, () => this._repaint());
+    this.chat = new ChatBubblesView(this);
     // Drawing order between layers doesn't matter: each sets its own depth.
     this.views = [
       new OpponentsView(this),
@@ -38,7 +39,7 @@ export class GameScene extends Phaser.Scene {
       new HandView(this),
       this.trick,
       new CenterView(this),
-      new ChatBubblesView(this),
+      this.chat,
     ];
 
     // Idle frame rate. PhaserGame starts the loop with an fps limit; while
@@ -181,6 +182,7 @@ export class GameScene extends Phaser.Scene {
 
   _cleanupBus() {
     this.avatars?.photos.dispose();
+    this.chat?.dispose();
     this.trick?.endFlight();
     if (this._onResize) this.scale?.off("resize", this._onResize);
     this._onResize = null;

@@ -1,7 +1,28 @@
 // King Online's root layout — the old client/index.html. Its own <html>, so
 // none of its CSS (Tailwind's preflight included) can ever reach the score
 // app: moving between the two root layouts is a full page load.
+import { Inter, Noto_Sans_Georgian } from 'next/font/google'
 import '../../src/online/styles/index.css'
+
+// Self-hosted by next/font: no render-blocking request to Google at runtime.
+// Both are variable fonts (no `weight`), which covers every weight the CSS
+// uses, 200–900 with the in-between ones (350, 450, 650…). next/font
+// declares its own families (each with a size-matched local fallback) and
+// publishes the family list in these CSS variables: the CSS uses
+// var(--font-…), and the Phaser table reads the same variables
+// (src/online/game/lib/fonts.js) and waits for the fonts before drawing text.
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+const notoGeorgian = Noto_Sans_Georgian({
+  // Every subset is self-hosted (unicode-range picks per glyph); `subsets`
+  // only chooses what to preload: the Georgian text this app is mostly in.
+  subsets: ['georgian'],
+  display: 'swap',
+  variable: '--font-noto-georgian',
+})
 
 export const metadata = {
   title: 'KING — The Card Club',
@@ -33,18 +54,7 @@ export const viewport = {
 
 export default function OnlineLayout({ children }) {
   return (
-    <html lang="ka">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* Variable fonts over the whole 200–800 range the CSS uses (350, 450,
-            650… included). Not next/font: the Phaser scenes draw canvas text
-            by the plain family names, which next/font would hash. */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@200..800&family=Noto+Sans+Georgian:wght@200..800&display=swap"
-        />
-      </head>
+    <html lang="ka" className={`${inter.variable} ${notoGeorgian.variable}`}>
       <body>
         <div id="root">{children}</div>
       </body>

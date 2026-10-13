@@ -1,25 +1,46 @@
 import { relSeat } from "../layout.js";
+import { EventBus } from "../EventBus.js";
+import { latinFont } from "../lib/fonts.js";
 
-const TEXT_STYLE = {
+// A function, not a constant: the font names are only known in the browser.
+const textStyle = () => ({
   fontSize: "13px",
   color: "#1a1a1a",
-  fontFamily: "Inter, system-ui, Arial, sans-serif",
+  fontFamily: latinFont(),
   fontStyle: "bold",
   wordWrap: { width: 240, useAdvancedWrap: true },
   align: "center",
-};
+});
 
 // ── Chat bubbles above each speaking player's avatar ─────────────────────
 // Kept per seat: a bubble already on screen stays as it is (no second pop-in)
 // until that seat says something else or the bubble expires.
+//
+// The messages arrive on their own EventBus channel ("chat-bubbles"), not in
+// the table state, so a chat message redraws only this layer and never
+// touches the rest of the table. The table state still decides where they sit
+// (who is seated, which seat is ours, the layout), through render().
 export class ChatBubblesView {
   constructor(scene) {
     this.scene = scene;
     this.bubbles = new Map(); // seat -> { key, obj }
+    this.messages = {}; // seat -> { message, at }, the latest from React
+    this._onBubbles = (messages) => {
+      this.messages = messages || {};
+      // Drawn at once, even mid trick-flight: bubbles sit above everything
+      // and don't depend on the cards. Before the first table state arrives
+      // there are no avatars yet; the first render() picks them up.
+      if (scene._isLive() && scene.gameState) this.render(scene.gameState, scene.L);
+    };
+    EventBus.on("chat-bubbles", this._onBubbles);
+  }
+
+  dispose() {
+    EventBus.off("chat-bubbles", this._onBubbles);
   }
 
   render(state, L) {
-    const chatBubbles = state.chatBubbles || {};
+    const chatBubbles = this.messages;
     const players = state.players || [];
     const mySeat = state.mySeat ?? 0;
 
@@ -45,7 +66,7 @@ export class ChatBubblesView {
 
   _draw(pos, message) {
     const { scene } = this;
-    const text = scene.add.text(0, 0, message, TEXT_STYLE).setOrigin(0.5);
+    const text = scene.add.text(0, 0, message, textStyle()).setOrigin(0.5);
     const tw = Math.max(40, Math.min(260, text.width + 24));
     const th = text.height + 14;
 

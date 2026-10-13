@@ -1,6 +1,6 @@
 /* KING 02 — paper, ink, electric citron. One system; no theme layers. */
 :root {
-  font-family: Inter, "Noto Sans Georgian", sans-serif;
+  font-family: var(--font-inter), var(--font-noto-georgian), sans-serif;
   color: #f2f2ed;
   background: #171919;
   --paper: #f0f0e9;
@@ -68,7 +68,7 @@ input {
 .font-western,
 .font-typewriter,
 .font-handwritten {
-  font-family: Inter, "Noto Sans Georgian", sans-serif;
+  font-family: var(--font-inter), var(--font-noto-georgian), sans-serif;
   letter-spacing: 0;
 }
 .h-screen-dvh {

@@ -1,4 +1,5 @@
 import { addCardRing, createFaceUpCard, CARD_H } from "../objects/Card.js";
+import { georgianFont } from "../lib/fonts.js";
 
 // Show during type/trump selection and the discard window (so non-leaders
 // still see what 2 cards came from the center after the leader picks).
@@ -40,7 +41,7 @@ export class CenterView {
       .text(TABLE_CX, TABLE_CY + (CARD_H * pk) / 2 + 28, "❖  პრიკუპი  ❖", {
         fontSize: "11px",
         color: "#d5b982",
-        fontFamily: "Noto Sans Georgian, Inter, Arial",
+        fontFamily: georgianFont(),
         stroke: "#000",
         strokeThickness: 3,
       })

@@ -3,7 +3,7 @@
 //
 // Deliberately dependency-free: this module is imported by GameContext (the
 // entry chunk), so basing it on Phaser.Events.EventEmitter would drag the
-// entire 1.5 MB Phaser bundle onto the lobby's critical path and defeat the
+// whole Phaser bundle onto the lobby's critical path and defeat the
 // React.lazy code-splitting of the game screen.
 class Emitter {
   constructor() {

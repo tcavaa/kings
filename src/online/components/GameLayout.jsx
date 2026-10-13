@@ -89,6 +89,8 @@ export default function GameLayout() {
   // Table-side typing indicator: seats typing in chat get a "…" bubble above
   // their avatar via the same canvas bubble pipeline as real messages — a
   // real message (spread last) always wins over the typing placeholder.
+  // Bubbles reach the canvas on their own channel (PhaserGame's `chatBubbles`
+  // prop), never inside `gameState`, so chat traffic leaves the table alone.
   const bubblesWithTyping = useMemo(
     () => ({
       ...Object.fromEntries(
@@ -121,7 +123,6 @@ export default function GameLayout() {
       round,
       cumulativeScores,
       trickAnimation,
-      chatBubbles: bubblesWithTyping,
       // While offline (or not yet back in our seat) a tap can't reach the
       // server in time, so the hand stays locked like a play in flight.
       playPending: playPending || reconnecting,
@@ -145,7 +146,6 @@ export default function GameLayout() {
       round,
       cumulativeScores,
       trickAnimation,
-      bubblesWithTyping,
       playPending,
       reconnecting,
       spectating,
@@ -227,7 +227,11 @@ export default function GameLayout() {
     <div
       className={`k-game-screen ${canSpeak ? "has-sounds" : ""} fixed top-0 left-0 right-0 h-screen-dvh overflow-hidden safe-area-pad`}
     >
-      <PhaserGame gameState={gameState} onCardPlay={handleCardPlay} />
+      <PhaserGame
+        gameState={gameState}
+        chatBubbles={bubblesWithTyping}
+        onCardPlay={handleCardPlay}
+      />
 
       <TopBar
         waiting={
