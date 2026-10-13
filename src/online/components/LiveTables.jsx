@@ -1,5 +1,5 @@
 import { Eye } from "lucide-react-online";
-import { useGame } from "../context/GameContext";
+import { useGame, useLobby } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 
 const TOTAL_ROUNDS = 27;
@@ -82,7 +82,8 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
  * empty "live" section on the page.
  */
 export default function LiveTables({ active, onNeedProfile }) {
-  const { liveGames, connected, publicSeat, tournament, watchGame } = useGame();
+  const { connected, publicSeat, tournament, watchGame } = useGame();
+  const { liveGames } = useLobby();
   const busy = publicSeat !== null || (!!tournament && tournament.status !== "done");
   if (!liveGames.length) return null;
 

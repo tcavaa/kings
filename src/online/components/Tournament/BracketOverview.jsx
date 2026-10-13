@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Eye, Trophy, Swords } from 'lucide-react-online'
-import { useGame } from '../../context/GameContext'
+import { useGame, useLobby } from '../../context/GameContext'
 import AvatarImg from '../AvatarImg'
 
 const PHASE_LABEL = {
@@ -76,9 +76,8 @@ function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
  * watching one. Open from the HUD during a tournament.
  */
 export default function BracketOverview({ onClose }) {
-  const {
-    tournamentOverview: ov, refreshOverview, roomCode, spectateTable,
-  } = useGame()
+  const { refreshOverview, roomCode, spectateTable } = useGame()
+  const { tournamentOverview: ov } = useLobby()
 
   // The server pushes an update whenever a table finishes, but scores move
   // constantly mid-round — poll while the panel is actually open.
@@ -90,11 +89,28 @@ export default function BracketOverview({ onClose }) {
 
   const watch = (rc) => { spectateTable(rc); onClose() }
 
+  // A dialog's keyboard basics: focus moves in, Escape closes, and focus
+  // goes back to the button that opened it.
+  const closeRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
+  useEffect(() => {
+    const previous = document.activeElement
+    closeRef.current?.focus()
+    const onKey = (e) => { if (e.key === 'Escape') onCloseRef.current() }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      previous?.focus?.()
+    }
+  }, [])
+
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3"
          style={{ background: 'rgba(32,18,10,0.72)', backdropFilter: 'blur(4px)' }}
          onClick={onClose}>
-      <div className="w-full max-w-md max-h-[88vh] flex flex-col rounded-2xl overflow-hidden"
+      <div role="dialog" aria-modal="true" aria-label="ტურნირის მიმოხილვა"
+           className="w-full max-w-md max-h-[88vh] flex flex-col rounded-2xl overflow-hidden"
            style={{
              background: 'linear-gradient(180deg, #172725 0%, #13221f 100%)',
              border: '1px solid rgba(151,176,162,0.45)',
@@ -106,7 +122,7 @@ export default function BracketOverview({ onClose }) {
           <h3 className="text-sm font-western uppercase tracking-wider" style={{ color: '#eeeae1' }}>
             ტურნირი {ov?.code ? `· ${ov.code}` : ''}
           </h3>
-          <button onClick={onClose} aria-label="დახურვა" style={{ color: '#eeeae1' }}>
+          <button ref={closeRef} onClick={onClose} aria-label="დახურვა" style={{ color: '#eeeae1' }}>
             <X size={20} />
           </button>
         </div>

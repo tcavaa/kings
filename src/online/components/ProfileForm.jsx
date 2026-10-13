@@ -92,8 +92,15 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
     }
   };
 
+  // Deleting takes a second tap: it removes the profile for everyone,
+  // ჩაწერა included.
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const onDelete = async () => {
     if (!editing?.id || busy) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
     setError("");
     setBusy(true);
     try {
@@ -172,6 +179,11 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
             : "4 ციფრი. შენი პროფილის გასახსნელად ახალ მოწყობილობაზე."}
         </small>
       </label>
+      {confirmDelete && (
+        <p className="k-form-error" role="alert">
+          {`„${editing?.name}“ წაიშლება ყველასთვის, ჩაწერის ჩათვლით.`}
+        </p>
+      )}
       {(pinErr || error) && (
         <p className="k-form-error" role="alert">
           {pinErr || error}
@@ -195,6 +207,15 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
             უკან დაბრუნება
           </button>
         )}
+        {editing && confirmDelete && (
+          <button
+            type="button"
+            className="k-link"
+            onClick={() => setConfirmDelete(false)}
+          >
+            არა, დავტოვოთ
+          </button>
+        )}
         {editing && (
           <button
             type="button"
@@ -203,7 +224,7 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
             onClick={onDelete}
           >
             <Trash2 size={13} />
-            პროფილის წაშლა
+            {confirmDelete ? "დიახ, წაშალე ყველგან" : "პროფილის წაშლა"}
           </button>
         )}
       </div>

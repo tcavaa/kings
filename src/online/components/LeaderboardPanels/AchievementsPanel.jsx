@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import AchievementBadges from "../AchievementBadges";
+import PlayerSelect, { usePlayerChoice } from "./PlayerSelect";
 import {
   computeAllLifetimeAchievements,
   ACHIEVEMENT_DEFS,
@@ -13,11 +14,11 @@ export default function AchievementsPanel({
     () => computeAllLifetimeAchievements(games),
     [games],
   );
-  const [selected, setSelected] = useState("");
-  const names = Array.from(
-    new Set([...players.map((p) => p.name), ...Object.keys(lifetime)]),
-  );
-  const name = playerName ?? (names.includes(selected) ? selected : names[0]);
+  // Ranked players only: removed ჩაწერა players still have badges in
+  // `lifetime`, but appear nowhere else.
+  const names = useMemo(() => players.map((p) => p.name), [players]);
+  const [chosen, setChosen] = usePlayerChoice(names);
+  const name = playerName ?? chosen;
   const achievements = lifetime[name] || {};
   const count = Object.values(achievements).filter((v) => v > 0).length;
   return (
@@ -28,15 +29,12 @@ export default function AchievementsPanel({
           <h2>მიღწევების კოლექცია</h2>
         </div>
         {!playerName && (
-          <select
-            aria-label="მოთამაშის მიღწევები"
+          <PlayerSelect
+            label="მოთამაშის მიღწევები"
+            names={names}
             value={name || ""}
-            onChange={(e) => setSelected(e.target.value)}
-          >
-            {names.map((n) => (
-              <option key={n}>{n}</option>
-            ))}
-          </select>
+            onChange={setChosen}
+          />
         )}
       </header>
       <div className="k-collection-heading">

@@ -13,17 +13,22 @@ import {
 import { api } from "../../lib/api";
 import { aggregatePlayers, isWinnerName } from "../../lib/leaderboard";
 import AvatarImg from "../AvatarImg";
+import { signed, winRate, averageScore } from "../../utils/format";
+import {
+  CHART_COLOURS as COLOURS,
+  gridProps,
+  axisProps,
+  tooltipProps,
+  legendProps,
+  lineProps,
+} from "../../utils/chartTheme";
 
 // Seasons are King Score's: each has a start, an end (none while it runs)
 // and a champion. A season counts league games — online ones and the ones
 // recorded at a table — exactly like the score app's season tables.
-const COLOURS = ["#d7fa52", "#b8c5a5", "#789e98", "#e0a458", "#c98fd1"];
 const RACE_PLAYERS = 5;
 const fmt = (d) =>
   new Date(d).toLocaleDateString("ka-GE", { day: "2-digit", month: "short", year: "numeric" });
-const pct = (p) => (p.gamesPlayed ? Math.round((p.wins / p.gamesPlayed) * 100) : 0);
-const avg = (p) => (p.gamesPlayed ? (p.totalScore / p.gamesPlayed).toFixed(1) : "0");
-const signed = (v) => (Number(v) > 0 ? `+${v}` : `${v}`);
 
 function Standings({ players, champion }) {
   if (!players.length) return <p className="k-data-empty">ამ სეზონში თამაში ჯერ არ არის.</p>;
@@ -57,8 +62,8 @@ function Standings({ players, champion }) {
               <td>
                 <b>{p.wins}</b>
               </td>
-              <td>{pct(p)}%</td>
-              <td>{signed(avg(p))}</td>
+              <td>{winRate(p)}%</td>
+              <td>{signed(averageScore(p))}</td>
             </tr>
           ))}
         </tbody>
@@ -84,29 +89,21 @@ function SeasonRace({ games, players }) {
     <div className="k-season-race">
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(151,176,162,0.12)" />
-          <XAxis dataKey="n" stroke="rgba(225,233,225,0.6)" tick={{ fontSize: 11 }} />
-          <YAxis stroke="rgba(225,233,225,0.6)" width={34} tick={{ fontSize: 11 }} allowDecimals={false} />
+          <CartesianGrid {...gridProps} />
+          <XAxis dataKey="n" {...axisProps} />
+          <YAxis width={34} allowDecimals={false} {...axisProps} />
           <Tooltip
-            contentStyle={{
-              background: "#20251f",
-              border: "1px solid rgba(151,176,162,0.4)",
-              borderRadius: 2,
-              fontSize: 12,
-              color: "#eeeae1",
-            }}
+            {...tooltipProps}
             labelFormatter={(n) => `თამაში ${n} · ${rows[n - 1]?.date ?? ""}`}
           />
-          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Legend {...legendProps} />
           {names.map((name, i) => (
             <Line
               key={name}
               type="stepAfter"
               dataKey={name}
               stroke={COLOURS[i % COLOURS.length]}
-              strokeWidth={2.4}
-              dot={false}
-              activeDot={{ r: 4 }}
+              {...lineProps}
             />
           ))}
         </LineChart>

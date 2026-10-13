@@ -12,6 +12,7 @@ import { useGame, useChat } from "../context/GameContext";
 import { voicePlayer } from "../lib/voicePlayer";
 import AvatarImg from "./AvatarImg";
 import Sheet from "./ui/Sheet";
+import { useVoiceRecorder } from "../hooks/useVoiceRecorder";
 
 const MAX_RECORD_MS = 15 * 1000;
 
@@ -110,78 +111,22 @@ export default function ChatOverlay({ open, onClose }) {
   };
 
   // ── Voice recording ─────────────────────────────────────────────────────
-  const [recording, setRecording] = useState(false);
-  const [recSecs, setRecSecs] = useState(0);
-  const recRef = useRef(null); // { recorder, chunks, cancelled, startAt, tickId, maxId }
-
-  const stopRecording = (cancel = false) => {
-    const r = recRef.current;
-    if (!r) return;
-    r.cancelled = cancel;
-    if (r.recorder.state !== "inactive") r.recorder.stop();
-  };
-
-  const startRecording = async () => {
-    if (recording) {
-      stopRecording(false);
-      return;
-    }
-    if (
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices?.getUserMedia ||
-      typeof MediaRecorder === "undefined"
-    ) {
-      addToast("ამ ბრაუზერში ხმის ჩაწერა არ არის მხარდაჭერილი.", "error");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      // Chrome/Firefox → webm/opus; iOS Safari → mp4/aac. Receivers play
-      // whatever mime tag rides along with the bytes.
-      const mime = MediaRecorder.isTypeSupported?.("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported?.("audio/mp4")
-          ? "audio/mp4"
-          : "";
-      const recorder = mime
-        ? new MediaRecorder(stream, { mimeType: mime })
-        : new MediaRecorder(stream);
-      const r = { recorder, chunks: [], cancelled: false, startAt: Date.now() };
-      recRef.current = r;
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size) r.chunks.push(e.data);
-      };
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        clearInterval(r.tickId);
-        clearTimeout(r.maxId);
-        setRecording(false);
-        setRecSecs(0);
-        recRef.current = null;
-        if (r.cancelled || !r.chunks.length) return;
-        const durationSec = Math.max(
-          1,
-          Math.round((Date.now() - r.startAt) / 1000),
-        );
-        const blob = new Blob(r.chunks, {
-          type: recorder.mimeType || "audio/webm",
-        });
-        sendVoice(blob, durationSec);
-      };
-
-      recorder.start();
-      setRecording(true);
-      setRecSecs(0);
-      r.tickId = setInterval(() => setRecSecs((s) => s + 1), 1000);
-      r.maxId = setTimeout(() => stopRecording(false), MAX_RECORD_MS);
-    } catch {
-      addToast("მიკროფონზე წვდომა ვერ მოხერხდა.", "error");
-    }
-  };
-
-  // Closing the drawer mid-recording throws the clip away.
-  useEffect(() => () => stopRecording(true), []);
+  const {
+    recording,
+    secs: recSecs,
+    toggle: startRecording,
+    stop: stopRecording,
+  } = useVoiceRecorder({
+    maxMs: MAX_RECORD_MS,
+    onClip: sendVoice,
+    onError: (why) =>
+      addToast(
+        why === "unsupported"
+          ? "ამ ბრაუზერში ხმის ჩაწერა არ არის მხარდაჭერილი."
+          : "მიკროფონზე წვდომა ვერ მოხერხდა.",
+        "error",
+      ),
+  });
 
   const typingPlayers = Object.keys(typingSeats || {})
     .map((s) => players.find((p) => p.seat === Number(s)))

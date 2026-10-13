@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { GAME_TYPES, getGameType } from "../../constants/gameTypes";
+import PlayerSelect, { usePlayerChoice } from "./PlayerSelect";
 
 /**
  * Per-game-type performance for the chosen player.
@@ -37,7 +38,8 @@ function buildPerf(games, playerName) {
 }
 
 export default function GameTypePerformance({ games, players }) {
-  const [me, setMe] = useState(players[0]?.name || "");
+  const names = useMemo(() => players.map((p) => p.name), [players]);
+  const [me, setMe] = usePlayerChoice(names);
   const rows = useMemo(() => buildPerf(games, me), [games, me]);
 
   const sorted = useMemo(() => [...rows].sort((a, b) => b.avg - a.avg), [rows]);
@@ -51,15 +53,12 @@ export default function GameTypePerformance({ games, players }) {
           <span className="k-eyebrow">02 / PERFORMANCE</span>
           <h2>შედეგები ტიპების მიხედვით</h2>
         </div>
-        <select
-          aria-label="მოთამაშის შედეგები"
+        <PlayerSelect
+          label="მოთამაშის შედეგები"
+          names={names}
           value={me}
-          onChange={(e) => setMe(e.target.value)}
-        >
-          {players.map((p) => (
-            <option key={p.name}>{p.name}</option>
-          ))}
-        </select>
+          onChange={setMe}
+        />
       </header>
       {!sorted.length ? (
         <p className="k-data-empty">

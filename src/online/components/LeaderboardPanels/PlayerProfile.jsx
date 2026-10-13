@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react-online";
 import AvatarImg from "../AvatarImg";
 import AchievementsPanel from "./AchievementsPanel";
 import PastGamesList from "./PastGamesList";
+import { signed, winRate, averageScore } from "../../utils/format";
 
 export default function PlayerProfile({
   player,
@@ -25,20 +26,13 @@ export default function PlayerProfile({
       ?.closest(".k-player-profile")
       ?.scrollIntoView({ block: "start" });
   }, [player.name]);
-  const signed = (n) => `${n > 0 ? "+" : ""}${n}`;
   const stats = [
     ["თამაში", player.gamesPlayed],
     ["გამარჯვება", player.wins],
-    [
-      "მოგების მაჩვენებელი",
-      `${Math.round((player.wins / player.gamesPlayed) * 100)}%`,
-    ],
+    ["მოგების მაჩვენებელი", `${winRate(player)}%`],
     ["ჯამური ქულა", signed(player.totalScore)],
     ["საუკეთესო შედეგი", signed(player.bestScore)],
-    [
-      "საშუალო ქულა",
-      signed(Math.round(player.totalScore / player.gamesPlayed)),
-    ],
+    ["საშუალო ქულა", signed(averageScore(player))],
   ];
   return (
     <section className="k-player-profile">
@@ -69,7 +63,7 @@ export default function PlayerProfile({
           </div>
         ))}
       </dl>
-      <AchievementsPanel games={games} playerName={player.name} />
+      <AchievementsPanel games={matches} playerName={player.name} />
       <section className="k-profile-history">
         <header>
           <span className="k-eyebrow">RECENT PLAY</span>

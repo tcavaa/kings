@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, lazy, Suspense } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -6,27 +6,22 @@ import {
   X,
   Users,
   Swords,
-  LogOut,
   Crown,
 } from "lucide-react-online";
-import { useGame } from "../context/GameContext";
-import {
-  listProfiles,
-  getActiveProfileId,
-  clearActiveProfile,
-  onProfileSessionLost,
-  verifyPin,
-  checkPin,
-} from "../lib/profiles";
+import { useGame, useLobby } from "../context/GameContext";
 import { api } from "../lib/api";
-import ProfileForm, { ProfilePicker } from "./ProfileForm";
-import PinPromptModal from "./PinPromptModal";
+import { useProfiles } from "../hooks/useProfiles";
+import ProfileSheet from "./ProfileSheet";
 import PublicRoomPanel from "./PublicRoomPanel";
 import LiveTables from "./LiveTables";
-const TournamentPanel = lazy(() => import("./Tournament/TournamentPanel"));
+// Small, and shown on the first tab click: not worth a lazy chunk.
+import TournamentPanel from "./Tournament/TournamentPanel";
 import ClubShell, { openScoreApp } from "./ui/ClubShell";
 import Sheet from "./ui/Sheet";
-import AvatarImg from "./AvatarImg";
+
+// After this long without a connection the server is most likely asleep
+// (Render's free tier cold-starts in up to ~30 s); say so.
+const WAKING_NOTE_MS = 5000;
 
 export default function Lobby({ onOpenLeaderboard }) {
   const {
@@ -35,31 +30,18 @@ export default function Lobby({ onOpenLeaderboard }) {
     connected,
     publicSeat,
     tournament,
-    onlinePlayers,
     announcePresence,
     refreshLobby,
     resumableSeat,
     resumeSeat,
     dismissResumeSeat,
   } = useGame();
+  const { onlinePlayers } = useLobby();
 
   const [mode, setMode] = useState("championship");
   const [dialog, setDialog] = useState(null);
-  const [profileError, setProfileError] = useState(false);
-
-  const [profiles, setProfiles] = useState([]);
-  // The "locked-in" profile id (signed in on this device, with a session
-  // token in localStorage). Never auto-set by the lobby — it only changes
-  // when the user picks a profile (and types its PIN, if it has one).
-  const [activeId, setActiveId] = useState(() => getActiveProfileId());
-  // The game server refused our session (PIN changed, profile removed).
-  useEffect(() => onProfileSessionLost(() => setActiveId(null)), []);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  // A PIN-protected profile waiting for its PIN before the edit form opens,
-  // and the PIN that opened it (the server needs it to save or delete).
-  const [editPending, setEditPending] = useState(null);
-  const [editPin, setEditPin] = useState("");
+  const profileState = useProfiles();
+  const { active } = profileState;
   // Pre-fill the room code from the last successful join so a quick refresh
   // or an accidental tab close doesn't force the player to retype it.
   const [joinCode, setJoinCode] = useState(() => {
@@ -69,55 +51,18 @@ export default function Lobby({ onOpenLeaderboard }) {
       return "";
     }
   });
-  const [loading, setLoading] = useState(true);
-
-  // The profile the user is trying to lock in to (PIN modal in flight).
-  // null means no modal. Once the modal succeeds we promote `pinPending`
-  // into `activeId`.
-  const [pinPending, setPinPending] = useState(null);
 
   // Today's championship quota for the locked-in profile — null while
   // loading/unknown. Refetched whenever the active profile changes.
   const [quota, setQuota] = useState(null);
 
-  // Load profiles from the server every time the lobby mounts. We
-  // intentionally do NOT auto-pick the first one — on a fresh visit, the
-  // user has to actively choose (and unlock) someone.
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setProfileError(false);
-    try {
-      const list = await listProfiles();
-      const arr = Array.isArray(list) ? list : [];
-      setProfiles(arr);
-      // Only keep `activeId` if it still resolves to a real profile. If the
-      // saved profile was deleted on another device, drop the lock-in.
-      setActiveId((prev) => {
-        if (prev && arr.some((p) => p.id === prev)) return prev;
-        if (prev) clearActiveProfile();
-        return null;
-      });
-      // First-time visitors with no saved profiles land straight in the
-      // "create profile" form. Otherwise we always start by showing the
-      // picker, even if there's a lock-in (the lock-in shows up there as
-      // the highlighted entry).
-      setShowForm(arr.length === 0);
-      return arr;
-    } catch (err) {
-      setProfileError(true);
-      setProfiles([]);
-      setShowForm(true);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  const [waking, setWaking] = useState(false);
   useEffect(() => {
-    reload();
-  }, [reload]);
-
-  const active = activeId ? profiles.find((p) => p.id === activeId) : null;
+    setWaking(false);
+    if (connected) return undefined;
+    const t = setTimeout(() => setWaking(true), WAKING_NOTE_MS);
+    return () => clearTimeout(t);
+  }, [connected]);
 
   // Fetch who's online and which tables are live, and tell the server who is
   // here once a profile is chosen. Nobody on the homepage is in a room, so
@@ -150,54 +95,8 @@ export default function Lobby({ onOpenLeaderboard }) {
 
   const quotaSpent = quota != null && quota.remaining <= 0;
 
-
-  const onProfileSaved = async (saved) => {
-    await reload();
-    // Newly-created or just-edited profile: saving it signed this device in
-    // (the server needed the PIN to save), so lock straight in.
-    if (saved?.id) setActiveId(getActiveProfileId());
-    setShowForm(false);
-    setEditing(null);
-    setEditPin("");
-    setDialog(null);
-  };
-
-  const editProfile = (profile) => {
-    setEditPin("");
-    if (profile.has_pin) {
-      setEditPending(profile);
-      return;
-    }
-    setEditing(profile);
-    setShowForm(true);
-  };
-
-  // Picking a *different* profile pops the PIN prompt. Clicking the
-  // already-active one is a no-op (no need to re-authenticate). Profiles
-  // without a PIN are promoted instantly.
-  const pickProfile = async (profile) => {
-    if (!profile?.id) return;
-    if (profile.id === activeId) return;
-    if (profile.has_pin) {
-      setPinPending(profile);
-      return;
-    }
-    try {
-      const out = await verifyPin(profile.id, "");
-      if (out.ok) setActiveId(profile.id);
-    } catch {
-      setProfileError(true);
-    }
-  };
-
-  const switchProfile = () => {
-    clearActiveProfile();
-    setActiveId(null);
-  };
-
-  // Action buttons no longer need their own PIN prompt — `activeId` being
-  // truthy already implies "verified on this device", so we just fire the
-  // socket call directly.
+  // Action buttons need no PIN prompt of their own — an active profile is
+  // already verified on this device, so we just fire the socket call.
   const handleCreate = () => {
     if (!active) return;
     // Every table is a league table (the casual "classic" mode is gone).
@@ -291,7 +190,11 @@ export default function Lobby({ onOpenLeaderboard }) {
       <div className="k-live-line">
         <span>
           <i className={connected ? "k-live-dot" : ""} />
-          {connected ? "სივრცე ღიაა" : "სერვერთან დაკავშირება…"}
+          {connected
+            ? "სივრცე ღიაა"
+            : waking
+              ? "სერვერი იღვიძებს — ამას ნახევარი წუთი შეიძლება დასჭირდეს…"
+              : "სერვერთან დაკავშირება…"}
         </span>
         <span>
           <Users size={14} />
@@ -377,15 +280,7 @@ export default function Lobby({ onOpenLeaderboard }) {
             />
           )}
           {mode === "tournament" && (
-            <Suspense
-              fallback={
-                <p className="k-empty" role="status">
-                  იტვირთება…
-                </p>
-              }
-            >
-              <TournamentPanel active={active} onNeedProfile={openProfile} />
-            </Suspense>
+            <TournamentPanel active={active} onNeedProfile={openProfile} />
           )}
         </div>
       </section>
@@ -431,98 +326,7 @@ export default function Lobby({ onOpenLeaderboard }) {
         <span>— KING REFLECTIONS</span>
       </div>
       {dialog === "profile" && (
-        <Sheet
-          title={active ? "შენი სივრცე." : "ყველაფერი შენით იწყება."}
-          onClose={() => setDialog(null)}
-        >
-          <div className="k-profile-area">
-            {loading ? (
-              <p role="status">პროფილები იტვირთება…</p>
-            ) : profileError ? (
-              <div className="k-empty">
-                <p>პროფილების ჩატვირთვა ვერ მოხერხდა.</p>
-                <button className="k-button" onClick={reload}>
-                  სცადე ხელახლა <ArrowRight size={16} />
-                </button>
-              </div>
-            ) : showForm ? (
-              <ProfileForm
-                key={editing?.id || "new"}
-                editing={editing}
-                currentPin={editPin}
-                onDone={onProfileSaved}
-                onCancel={
-                  profiles.length
-                    ? () => {
-                        setShowForm(false);
-                        setEditing(null);
-                        setEditPin("");
-                      }
-                    : null
-                }
-              />
-            ) : (
-              <>
-                {active && (
-                  <div className="k-member">
-                    <AvatarImg avatar={active.avatar} size={64} />
-                    <div>
-                      <small>PLAYER PROFILE</small>
-                      <h3>{active.name}</h3>
-                    </div>
-                    <button
-                      className="k-icon-button"
-                      title="პროფილის გადართვა"
-                      onClick={switchProfile}
-                    >
-                      <LogOut size={18} />
-                    </button>
-                  </div>
-                )}
-                <ProfilePicker
-                  profiles={profiles}
-                  value={activeId}
-                  onChange={pickProfile}
-                  onEdit={editProfile}
-                />
-                <button
-                  className="k-button k-button-outline"
-                  onClick={() => {
-                    setEditing(null);
-                    setShowForm(true);
-                  }}
-                >
-                  ახალი პროფილი <Plus size={18} />
-                </button>
-              </>
-            )}
-          </div>
-          {pinPending && (
-            <PinPromptModal
-              profile={pinPending}
-              onSuccess={({ profile }) => {
-                setActiveId(profile.id);
-                setPinPending(null);
-                setDialog(null);
-              }}
-              onCancel={() => setPinPending(null)}
-            />
-          )}
-          {editPending && (
-            <PinPromptModal
-              profile={editPending}
-              check={checkPin}
-              hint="შეიყვანე კოდი პროფილის შესაცვლელად."
-              onSuccess={({ profile, pin }) => {
-                setEditPin(pin);
-                setEditing(profile);
-                setShowForm(true);
-                setEditPending(null);
-              }}
-              onCancel={() => setEditPending(null)}
-            />
-          )}
-        </Sheet>
+        <ProfileSheet p={profileState} onClose={() => setDialog(null)} />
       )}
       {dialog === "private" && (
         <Sheet title="შენი ხალხი. შენი მაგიდა." onClose={() => setDialog(null)}>

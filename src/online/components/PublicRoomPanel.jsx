@@ -1,5 +1,5 @@
 import { ArrowUpRight, Plus, Check, LogOut } from "lucide-react-online";
-import { useGame } from "../context/GameContext";
+import { useGame, useLobby } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 
 // The homepage league table (every King Online table is a league table).
@@ -8,7 +8,6 @@ const MODE = "championship";
 export default function PublicRoomPanel({ active, quota, onNeedProfile }) {
   const {
     connected,
-    publicRoom,
     publicSeat,
     publicSeatMode,
     sitPublic,
@@ -16,6 +15,7 @@ export default function PublicRoomPanel({ active, quota, onNeedProfile }) {
     setPublicEmoji,
     tournament,
   } = useGame();
+  const { publicRoom } = useLobby();
   const table = publicRoom?.[MODE] || { seats: [] };
   const seats = table.seats || [];
   const seated = publicSeat !== null;

@@ -1,61 +1,19 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import AvatarImg from "../AvatarImg";
-import { isWinnerName, isRemovedPlayer } from "../../lib/leaderboard";
+import PlayerSelect, { usePlayerChoice } from "./PlayerSelect";
 
 /**
- * "You vs Ramaz" panel: select a player from the dropdown and see your record
- * against everyone else, computed from the games array.
+ * "You vs Ramaz" panel: select a player from the dropdown and see their
+ * record against everyone else. `pairs` is buildPairStats(games).
  */
-function buildH2H(games) {
-  // pair-key (sorted player names) -> { a, b, aWins, bWins, aTotal, bTotal,
-  //                                     aBest, bBest, gamesShared }
-  const map = new Map();
-  for (const g of games) {
-    const players = (g.players || []).filter((p) => !isRemovedPlayer(p));
-    if (players.length < 2) continue;
-    for (let i = 0; i < players.length; i++) {
-      for (let j = i + 1; j < players.length; j++) {
-        const A = players[i],
-          B = players[j];
-        const [first, second] = [A.name, B.name].sort();
-        const key = `${first}${second}`;
-        const Afirst = first === A.name;
-        const row = map.get(key) || {
-          a: first,
-          b: second,
-          aWins: 0,
-          bWins: 0,
-          aTotal: 0,
-          bTotal: 0,
-          aBest: -Infinity,
-          bBest: -Infinity,
-          gamesShared: 0,
-        };
-        row.gamesShared += 1;
-        const aScore = Afirst ? (A.score ?? 0) : (B.score ?? 0);
-        const bScore = Afirst ? (B.score ?? 0) : (A.score ?? 0);
-        row.aTotal += aScore;
-        row.bTotal += bScore;
-        if (aScore > row.aBest) row.aBest = aScore;
-        if (bScore > row.bBest) row.bBest = bScore;
-        // Tie-aware: a shared top score means both names take a win.
-        if (isWinnerName(g, row.a)) row.aWins += 1;
-        if (isWinnerName(g, row.b)) row.bWins += 1;
-        map.set(key, row);
-      }
-    }
-  }
-  return Array.from(map.values());
-}
-
-export default function HeadToHeadPanel({ games, players }) {
-  const [me, setMe] = useState(players[0]?.name || "");
-  const h2h = useMemo(() => buildH2H(games), [games]);
+export default function HeadToHeadPanel({ pairs, players }) {
+  const names = useMemo(() => players.map((p) => p.name), [players]);
+  const [me, setMe] = usePlayerChoice(names);
 
   // Filter rows to those involving "me" and orient them so "me" is on the left.
   const mine = useMemo(() => {
     if (!me) return [];
-    return h2h
+    return pairs
       .filter((r) => r.a === me || r.b === me)
       .map((r) =>
         r.a === me
@@ -79,16 +37,10 @@ export default function HeadToHeadPanel({ games, players }) {
             },
       )
       .sort((x, y) => y.games - x.games);
-  }, [h2h, me]);
+  }, [pairs, me]);
 
-  // Find avatars by name (best-effort lookup).
-  const avatarFor = (name) => {
-    for (const g of games) {
-      const p = (g.players || []).find((pp) => pp.name === name);
-      if (p?.avatar) return p.avatar;
-    }
-    return null;
-  };
+  const avatarFor = (name) =>
+    players.find((p) => p.name === name)?.avatar || null;
 
   if (!players.length) return null;
 
@@ -99,15 +51,12 @@ export default function HeadToHeadPanel({ games, players }) {
           <span className="k-eyebrow">01 / HEAD TO HEAD</span>
           <h2>პირისპირ</h2>
         </div>
-        <select
-          aria-label="მოთამაშე პირისპირ შედარებისთვის"
+        <PlayerSelect
+          label="მოთამაშე პირისპირ შედარებისთვის"
+          names={names}
           value={me}
-          onChange={(e) => setMe(e.target.value)}
-        >
-          {players.map((p) => (
-            <option key={p.name}>{p.name}</option>
-          ))}
-        </select>
+          onChange={setMe}
+        />
       </header>
       {!mine.length ? (
         <p className="k-data-empty">საერთო თამაშები ჯერ არ არის.</p>

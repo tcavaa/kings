@@ -1,12 +1,13 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
-import { GameProvider, useGame } from './context/GameContext'
+import { GameProvider, useGame, useToasts } from './context/GameContext'
 import Lobby        from './components/Lobby'
 import WaitingRoom  from './components/WaitingRoom'
 
 // Heavy screens are code-split so the lobby doesn't pay for them up front:
 // GameLayout drags in Phaser (~1.5 MB), GameOverScreen pulls canvas-confetti
 // + recharts (via ScoreChart), Leaderboard pulls the recharts panels.
-const GameLayout     = lazy(() => import('./components/GameLayout'))
+const loadGameLayout = () => import('./components/GameLayout')
+const GameLayout     = lazy(loadGameLayout)
 const GameOverScreen = lazy(() => import('./components/GameOverScreen'))
 const Leaderboard    = lazy(() => import('./components/Leaderboard'))
 // The /admin sound-management page. Lazy so ordinary players never download
@@ -28,7 +29,7 @@ function ScreenLoader() {
     <div className="fixed inset-0 flex flex-col items-center justify-center gap-3"
          style={{ background: '#0b1615' }}>
 
-      <span className="text-sm font-typewriter" style={{ color: 'rgba(90,54,32,0.85)' }}>
+      <span className="text-sm font-typewriter" style={{ color: '#c4cfbf' }}>
         თამაში იტვირთება…
       </span>
     </div>
@@ -43,7 +44,7 @@ const TOAST_STYLES = {
 }
 
 function ToastContainer() {
-  const { toasts } = useGame()
+  const { toasts } = useToasts()
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none">
       {toasts.map(toast => {
@@ -67,8 +68,15 @@ function ToastContainer() {
 }
 
 function AppInner() {
-  const { appPhase } = useGame()
+  const { appPhase, publicSeat, tournament } = useGame()
   const [view, setView] = useState('main') // 'main' | 'leaderboard'
+  // A quick-match seat or a tournament entry can turn into a game at any
+  // moment, without a WaitingRoom to prefetch the table from: fetch the
+  // (large) game chunk now so the deal doesn't wait on it.
+  const tableAhead = publicSeat !== null || (!!tournament && tournament.status !== 'done')
+  useEffect(() => {
+    if (tableAhead) loadGameLayout().catch(() => { /* retried by lazy() */ })
+  }, [tableAhead])
   // A table can start while the leaderboard is open (a quick-match seat
   // filling, a tournament draw or final) — show it.
   useEffect(() => {

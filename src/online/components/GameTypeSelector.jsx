@@ -3,6 +3,7 @@ import { Check, ArrowRight } from "lucide-react-online";
 import { useGame } from "../context/GameContext";
 import { GAME_TYPES } from "../constants/gameTypes";
 import ModalShell from "./ModalShell";
+import { useTapLock } from "../hooks/useTapLock";
 
 import PlayingCard from "./ui/PlayingCard";
 
@@ -10,6 +11,7 @@ export default function GameTypeSelector() {
   const { selectGameType, usedTypes, leaderSeat, players, hand, round } =
     useGame();
   const [selected, setSelected] = useState(null);
+  const [sent, once] = useTapLock();
 
   const usedByLeader = usedTypes?.[leaderSeat] ?? [];
   const leaderName =
@@ -18,7 +20,6 @@ export default function GameTypeSelector() {
   const available = GAME_TYPES.filter((t) => !usedByLeader.includes(t.code));
   const used = GAME_TYPES.filter((t) => usedByLeader.includes(t.code));
   const selectedType = GAME_TYPES.find((t) => t.code === selected);
-  const SelectedIcon = selectedType?.Icon;
 
   return (
     <ModalShell
@@ -91,8 +92,8 @@ export default function GameTypeSelector() {
         </span>
         <button
           className="k-button"
-          disabled={!selected}
-          onClick={() => selected && selectGameType(selected)}
+          disabled={!selected || sent}
+          onClick={() => selected && once(() => selectGameType(selected))}
         >
           {selectedType ? `${selectedType.name} — დავიწყოთ` : "აირჩიე თამაში"}
           <ArrowRight size={18} />

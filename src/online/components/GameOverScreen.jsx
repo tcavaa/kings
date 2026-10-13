@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import ClubShell from "./ui/ClubShell";
 import AvatarImg from "./AvatarImg";
-import { ArrowUpRight, ArrowRight, Check, RefreshCw } from "lucide-react-online";
+import {
+  ArrowUpRight,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  RefreshCw,
+  Swords,
+} from "lucide-react-online";
 import { useGame } from "../context/GameContext";
-import { getGameType } from "../constants/gameTypes";
-import { SuitIcon } from "./Icons";
 const ScoreChart = lazy(() => import("./ScoreChart"));
 import StatRow from "./StatRow";
 import AchievementBadges from "./AchievementBadges";
+import RoundBreakdownTable from "./LeaderboardPanels/RoundBreakdownTable";
+import BracketOverview from "./Tournament/BracketOverview";
 import { computePerGameAchievements, countCodes } from "../utils/achievements";
-import { scoreColorClass } from "../utils/scoreColor";
+import { computeGameStats } from "../utils/gameStats";
 
 export default function GameOverScreen(props) {
   const game = useGame();
@@ -32,8 +39,15 @@ function ResultsContent({ onOpenLeaderboard, game }) {
     rematch,
     requestRematch,
     leaveRoom,
+    tournamentSeat,
+    spectating,
   } = game;
   const [tab, setTab] = useState("overview");
+  const [bracketOpen, setBracketOpen] = useState(false);
+  // Tournament games can't be replayed, and a watcher has no seat to replay
+  // with: both get a way back instead of the rematch button.
+  const isWatcher = !!spectating || mySeat === null || mySeat === undefined;
+  const canRematch = !tournamentSeat && !isWatcher;
   useEffect(() => {
     const winners = finalResults.winners?.length
       ? finalResults.winners
@@ -90,49 +104,11 @@ function ResultsContent({ onOpenLeaderboard, game }) {
       ? roundDetails
       : finalResults.roundDetails || [];
 
-  const stats = useMemo(() => {
-    const tally = {};
-    playerList.forEach((p) => {
-      tally[p.seat] = {
-        roundsLed: 0,
-        totalTricks: 0,
-        queensTaken: 0,
-        jacksTaken: 0,
-        heartsTaken: 0,
-        kingsOfHeartsTaken: 0,
-        bestRound: { score: -Infinity, round: null, type: null },
-        worstRound: { score: Infinity, round: null, type: null },
-      };
-    });
-    details.forEach((d) => {
-      const ld = d.leaderSeat;
-      if (tally[ld]) tally[ld].roundsLed++;
-      for (const seat of [0, 1, 2]) {
-        if (!tally[seat]) continue;
-        tally[seat].totalTricks += d.tricksTaken?.[seat] ?? 0;
-        tally[seat].queensTaken += d.queensTaken?.[seat] ?? 0;
-        tally[seat].jacksTaken += d.jacksTaken?.[seat] ?? 0;
-        tally[seat].heartsTaken += d.heartsTaken?.[seat] ?? 0;
-        if (d.kingOfHeartsTakenBy === seat) tally[seat].kingsOfHeartsTaken++;
-        const sc = d.scores?.[seat] ?? 0;
-        if (sc > tally[seat].bestRound.score) {
-          tally[seat].bestRound = {
-            score: sc,
-            round: d.round,
-            type: d.gameType,
-          };
-        }
-        if (sc < tally[seat].worstRound.score) {
-          tally[seat].worstRound = {
-            score: sc,
-            round: d.round,
-            type: d.gameType,
-          };
-        }
-      }
-    });
-    return tally;
-  }, [details, playerList]);
+  // Same tally (and same per-round-type rule) as the leaderboard's report.
+  const stats = useMemo(
+    () => computeGameStats(playerList, details),
+    [details, playerList],
+  );
 
   // Per-game achievements, computed on the fly from this game's rounds.
   const achievements = useMemo(
@@ -142,6 +118,15 @@ function ResultsContent({ onOpenLeaderboard, game }) {
   const achieversList = playerList.filter(
     (p) => (achievements[p.seat] || []).length > 0,
   );
+
+  // "This moment is yours" only to a winner.
+  const headline = isTie
+    ? ["ერთი თამაში.", "რამდენიმე გამარჯვებული."]
+    : winnerSeats.has(mySeat)
+      ? ["ეს მომენტი", "შენია."]
+      : isWatcher
+        ? ["თამაში", "დასრულდა."]
+        : ["კარგი თამაში.", "შემდეგი შენი იქნება."];
 
   return (
     <ClubShell
@@ -154,9 +139,9 @@ function ResultsContent({ onOpenLeaderboard, game }) {
         <div>
           <span className="k-eyebrow">THAT WAS A GOOD GAME.</span>
           <h1>
-            {isTie ? "ერთი თამაში." : "ეს მომენტი"}
+            {headline[0]}
             <br />
-            <em>{isTie ? "რამდენიმე გამარჯვებული." : "შენია."}</em>
+            <em>{headline[1]}</em>
           </h1>
           <p>
             {mode === "championship" ? "KING / RANKED" : "KING / CLASSIC"}{" "}
@@ -227,7 +212,7 @@ function ResultsContent({ onOpenLeaderboard, game }) {
               </div>
             ))}
           </div>
-          {rematch?.newRoomCode && (
+          {canRematch && rematch?.newRoomCode && (
             <p className="k-rematch-note" role="status">
               <RefreshCw size={16} />
               ახალი მაგიდა: {rematch.newRoomCode} · {joinedSet.size}/
@@ -235,18 +220,29 @@ function ResultsContent({ onOpenLeaderboard, game }) {
             </p>
           )}
           <div className="k-result-actions">
-            <button
-              className="k-button"
-              disabled={iJoined}
-              onClick={handlePlayAgain}
-            >
-              {iJoined
-                ? "ველოდებით დანარჩენებს…"
-                : rematch?.newRoomCode
-                  ? "შეუერთდი ახალ თამაშს"
-                  : "კიდევ ერთი თამაში"}
-              {iJoined ? <Check size={18} /> : <ArrowRight size={18} />}
-            </button>
+            {canRematch ? (
+              <button
+                className="k-button"
+                disabled={iJoined}
+                onClick={handlePlayAgain}
+              >
+                {iJoined
+                  ? "ველოდებით დანარჩენებს…"
+                  : rematch?.newRoomCode
+                    ? "შეუერთდი ახალ თამაშს"
+                    : "კიდევ ერთი თამაში"}
+                {iJoined ? <Check size={18} /> : <ArrowRight size={18} />}
+              </button>
+            ) : (
+              <button className="k-button" onClick={leaveRoom}>
+                <ArrowLeft size={18} /> ლობიში დაბრუნება
+              </button>
+            )}
+            {tournamentSeat && (
+              <button className="k-link" onClick={() => setBracketOpen(true)}>
+                ტურნირის ცხრილი <Swords size={18} />
+              </button>
+            )}
             {onOpenLeaderboard && (
               <button className="k-link" onClick={onOpenLeaderboard}>
                 ლიდერბორდი <ArrowUpRight size={18} />
@@ -288,27 +284,8 @@ function ResultsContent({ onOpenLeaderboard, game }) {
           )}
           {tab === "details" && (
             <div className="k-result-details">
-              {" "}
               {details.length > 0 && (
-                <div
-                  className="rounded-2xl overflow-hidden mb-5"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #172725 0%, #13221f 100%)",
-                    border: "1px solid rgba(151,176,162,0.35)",
-                  }}
-                >
-                  <div
-                    className="px-5 py-4"
-                    style={{ borderBottom: "1px solid rgba(151,176,162,0.32)" }}
-                  >
-                    <h2
-                      className="text-base font-bold text-white"
-                      style={{ color: "#eeeae1" }}
-                    >
-                      მოთამაშეების სტატისტიკა
-                    </h2>
-                  </div>
+                <ResultsCard title="მოთამაშეების სტატისტიკა">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4">
                     {playerList.map((p) => {
                       const s = stats[p.seat] || {};
@@ -339,21 +316,15 @@ function ResultsContent({ onOpenLeaderboard, game }) {
                               value={s.roundsLed}
                             />
                             <StatRow label="მინუსები" value={s.totalTricks} />
-                            <StatRow
-                              label="აღებული დამები"
-                              value={s.queensTaken}
-                            />
+                            <StatRow label="აღებული დამები" value={s.queens} />
                             <StatRow
                               label="აღებული ვალეტები"
-                              value={s.jacksTaken}
+                              value={s.jacks}
                             />
-                            <StatRow
-                              label="აღებული გულები"
-                              value={s.heartsTaken}
-                            />
+                            <StatRow label="აღებული გულები" value={s.hearts} />
                             <StatRow
                               label="აღებული კინგი"
-                              value={s.kingsOfHeartsTaken}
+                              value={s.kingsOfHearts}
                             />
                             <StatRow
                               label="საუკეთესო ხელი"
@@ -370,28 +341,10 @@ function ResultsContent({ onOpenLeaderboard, game }) {
                       );
                     })}
                   </div>
-                </div>
+                </ResultsCard>
               )}
               {achieversList.length > 0 && (
-                <div
-                  className="rounded-2xl overflow-hidden mb-5"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #172725 0%, #13221f 100%)",
-                    border: "1px solid rgba(151,176,162,0.35)",
-                  }}
-                >
-                  <div
-                    className="px-5 py-4"
-                    style={{ borderBottom: "1px solid rgba(151,176,162,0.32)" }}
-                  >
-                    <h2
-                      className="text-base font-bold text-white"
-                      style={{ color: "#eeeae1" }}
-                    >
-                      მიღწევები
-                    </h2>
-                  </div>
+                <ResultsCard title="მიღწევები">
                   <div className="p-4 flex flex-col gap-4">
                     {achieversList.map((p) => (
                       <div key={p.seat}>
@@ -407,157 +360,14 @@ function ResultsContent({ onOpenLeaderboard, game }) {
                       </div>
                     ))}
                   </div>
-                </div>
+                </ResultsCard>
               )}
               {(roundScores.length > 0 || details.length > 0) && (
-                <div
-                  className="rounded-2xl overflow-hidden mb-6"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #172725 0%, #13221f 100%)",
-                    border: "1px solid rgba(151,176,162,0.35)",
-                  }}
-                >
-                  <div
-                    className="px-5 py-4"
-                    style={{ borderBottom: "1px solid rgba(151,176,162,0.32)" }}
-                  >
-                    <h2
-                      className="text-base font-bold text-white"
-                      style={{ color: "#eeeae1" }}
-                    >
-                      ხელების დეტალები
-                    </h2>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead style={{ background: "rgba(213,185,130,0.07)" }}>
-                        <tr>
-                          <th
-                            className="px-3 py-2 text-left text-[10px] uppercase tracking-widest"
-                            style={{ color: "rgba(213,185,130,0.7)" }}
-                          >
-                            ხელი
-                          </th>
-                          <th
-                            className="px-3 py-2 text-left text-[10px] uppercase tracking-widest"
-                            style={{ color: "rgba(213,185,130,0.7)" }}
-                          >
-                            თამაში
-                          </th>
-                          <th
-                            className="px-3 py-2 text-left text-[10px] uppercase tracking-widest"
-                            style={{ color: "rgba(213,185,130,0.7)" }}
-                          >
-                            წამყვანი
-                          </th>
-                          <th
-                            className="px-3 py-2 text-left text-[10px] uppercase tracking-widest"
-                            style={{ color: "rgba(213,185,130,0.7)" }}
-                          >
-                            კოზირი
-                          </th>
-                          {playerList.map((p) => (
-                            <th
-                              key={p.seat}
-                              className="px-3 py-2 text-center text-[10px] uppercase tracking-widest"
-                              style={{ color: "rgba(213,185,130,0.7)" }}
-                            >
-                              {p.name}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(details.length ? details : roundScores).map(
-                          (rs, idx) => {
-                            const gt = getGameType(rs.gameType);
-                            const TypeIcon = gt?.Icon;
-                            const leaderName =
-                              playerList.find((p) => p.seat === rs.leaderSeat)
-                                ?.name ?? "—";
-                            return (
-                              <tr
-                                key={idx}
-                                style={{
-                                  borderTop: "1px solid rgba(151,176,162,0.18)",
-                                }}
-                              >
-                                <td
-                                  className="px-3 py-2 font-mono"
-                                  style={{ color: "rgba(213,185,130,0.7)" }}
-                                >
-                                  {rs.round}
-                                </td>
-                                <td className="px-3 py-2">
-                                  <span
-                                    className="inline-flex items-center gap-1 text-xs rounded-md px-1.5 py-0.5"
-                                    style={{
-                                      backgroundColor: `${gt?.color ?? "#555"}22`,
-                                      color: gt?.color ?? "#eeeae1",
-                                    }}
-                                  >
-                                    {TypeIcon && <TypeIcon size={11} />}{" "}
-                                    {rs.gameType}
-                                  </span>
-                                </td>
-                                <td
-                                  className="px-3 py-2 text-[11px]"
-                                  style={{ color: "rgba(225,233,225,0.7)" }}
-                                >
-                                  {leaderName}
-                                </td>
-                                <td
-                                  className="px-3 py-2 text-[11px]"
-                                  style={{
-                                    color: rs.trumpSuit
-                                      ? "#d5b982"
-                                      : "rgba(225,233,225,0.4)",
-                                  }}
-                                >
-                                  {rs.trumpSuit ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <SuitIcon
-                                        suit={rs.trumpSuit}
-                                        size={11}
-                                        mono
-                                        style={{ color: "#d5b982" }}
-                                      />
-                                      {rs.trumpSuit}
-                                    </span>
-                                  ) : (
-                                    "—"
-                                  )}
-                                </td>
-                                {playerList.map((p) => {
-                                  const v = rs.scores?.[p.seat] ?? 0;
-                                  return (
-                                    <td
-                                      key={p.seat}
-                                      className={`px-3 py-2 text-center font-mono font-semibold
-                              ${scoreColorClass(v)}`}
-                                      style={{
-                                        color:
-                                          v > 0
-                                            ? "#7ac7a5"
-                                            : v < 0
-                                              ? "#ef918b"
-                                              : "rgba(225,233,225,0.45)",
-                                      }}
-                                    >
-                                      {v > 0 ? "+" : ""}
-                                      {v}
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
-                          },
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <RoundBreakdownTable
+                  details={details.length ? details : roundScores}
+                  playerList={playerList}
+                  showLeader
+                />
               )}
               {!details.length && !roundScores.length && (
                 <p>ხელების დეტალები ხელმისაწვდომი არ არის.</p>
@@ -566,6 +376,33 @@ function ResultsContent({ onOpenLeaderboard, game }) {
           )}
         </section>
       </div>
+      {bracketOpen && <BracketOverview onClose={() => setBracketOpen(false)} />}
     </ClubShell>
+  );
+}
+
+/** A titled block on the results screen's details tab. */
+function ResultsCard({ title, children }) {
+  return (
+    <div
+      className="rounded-2xl overflow-hidden mb-5"
+      style={{
+        background: "linear-gradient(180deg, #172725 0%, #13221f 100%)",
+        border: "1px solid rgba(151,176,162,0.35)",
+      }}
+    >
+      <div
+        className="px-5 py-4"
+        style={{ borderBottom: "1px solid rgba(151,176,162,0.32)" }}
+      >
+        <h2
+          className="text-base font-bold text-white"
+          style={{ color: "#eeeae1" }}
+        >
+          {title}
+        </h2>
+      </div>
+      {children}
+    </div>
   );
 }

@@ -1,9 +1,9 @@
 import {
   Heart, Diamond, Spade, Club,
 } from 'lucide-react-online'
+import { SUIT_NAMES } from '../constants/suits'
 
 const SUIT_ICONS = { H: Heart, D: Diamond, S: Spade, C: Club }
-const SUIT_NAMES = { H: 'გული', D: 'აგური', S: 'ყვავი', C: 'ჯვარი' }
 const SUIT_COLOR = { H: '#dc2626', D: '#dc2626', S: '#1a1a1a', C: '#1a1a1a' }
 
 /**

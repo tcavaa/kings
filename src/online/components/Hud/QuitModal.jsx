@@ -36,8 +36,6 @@ export default function QuitModal({ confirmKind, onCloseConfirm }) {
       )
     }
 
-    const Icon = kind === 'game' ? Flag : DoorOpen
-    const title = kind === 'game' ? 'ნებდები?' : 'დათმობ ამ ხელს?'
     const body = kind === 'game'
       ? `${proposerName}-ს უნდა დანებება — თამაში ახლავე დასრულდება და ვინც ქულებით ლიდერობს, ის მოიგებს.`
       : isPositiveRound
@@ -45,39 +43,20 @@ export default function QuitModal({ confirmKind, onCloseConfirm }) {
         : `${proposerName}-ს უნდა ამ ხელის დათმობა — მთელი -40 მას ჩაეწერება და მაგიდა შემდეგ ხელზე გადავა.`
 
     return (
-      <ModalShell className="items-center z-40 px-4" panelClassName="max-w-sm p-4 lg:p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <Icon size={18} style={{ color: '#d5b982' }} />
-            <h2 className="text-sm lg:text-base font-western uppercase tracking-wide" style={{ color: '#eeeae1' }}>
-              {title}
-            </h2>
-          </div>
-          <p className="text-xs lg:text-sm font-typewriter mb-4" style={{ color: 'rgba(225,233,225,0.85)' }}>
-            {body}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => voteQuit(true)}
-              className="flex-1 py-2 rounded-lg font-western uppercase text-[11px] lg:text-sm tracking-wider transition-all active:scale-95 casino-btn-gold inline-flex items-center justify-center gap-1.5"
-            >
-              <Check size={14} /> თანახმა ვარ
-            </button>
-            <button
-              onClick={() => voteQuit(false)}
-              className="casino-btn-secondary flex-1 py-2 rounded-lg font-western uppercase text-[11px] lg:text-sm tracking-wider transition-all active:scale-95 inline-flex items-center justify-center gap-1.5"
-            >
-              <X size={14} /> უარი
-            </button>
-          </div>
-      </ModalShell>
+      <QuitDialog
+        kind={kind}
+        body={body}
+        confirmLabel={<><Check size={14} /> თანახმა ვარ</>}
+        cancelLabel={<><X size={14} /> უარი</>}
+        onConfirm={() => voteQuit(true)}
+        onCancel={() => voteQuit(false)}
+      />
     )
   }
 
   // ── 1: local confirmation before sending the proposal ───────────────────
   if (!confirmKind) return null
 
-  const Icon = confirmKind === 'game' ? Flag : DoorOpen
-  const title = confirmKind === 'game' ? 'ნებდები?' : 'დათმობ ამ ხელს?'
   const body = confirmKind === 'game'
     ? away.length
       ? `${away.map(p => p.name).join(' და ')} მაგიდას გაეთიშა. თამაში დასრულდება და ქულების ლიდერი მოიგებს — მაგიდასთან დარჩენილები უნდა დათანხმდნენ.`
@@ -87,30 +66,41 @@ export default function QuitModal({ confirmKind, onCloseConfirm }) {
       : 'ამ ხელის მთელი -40 შენ ჩაგეწერება და მაგიდა შემდეგ ხელზე გადავა. ორივე მოთამაშე უნდა დათანხმდეს.'
 
   return (
+    <QuitDialog
+      kind={confirmKind}
+      body={body}
+      confirmLabel={confirmKind === 'game' ? 'შესთავაზე დანებება' : 'შესთავაზე დათმობა'}
+      cancelLabel="გაუქმება"
+      onConfirm={() => { proposeQuit(confirmKind); onCloseConfirm() }}
+      onCancel={onCloseConfirm}
+    />
+  )
+}
+
+/** The one dialog shape both the proposer's confirm and the vote share. */
+function QuitDialog({ kind, body, confirmLabel, cancelLabel, onConfirm, onCancel }) {
+  const Icon = kind === 'game' ? Flag : DoorOpen
+  const title = kind === 'game' ? 'ნებდები?' : 'დათმობ ამ ხელს?'
+  const buttonClass = 'flex-1 py-2 rounded-lg font-western uppercase text-[11px] lg:text-sm tracking-wider transition-all active:scale-95 inline-flex items-center justify-center gap-1.5'
+  return (
     <ModalShell className="items-center z-40 px-4" panelClassName="max-w-sm p-4 lg:p-5">
-        <div className="flex items-center gap-2 mb-2">
-          <Icon size={18} style={{ color: '#d5b982' }} />
-          <h2 className="text-sm lg:text-base font-western uppercase tracking-wide" style={{ color: '#eeeae1' }}>
-            {title}
-          </h2>
-        </div>
-        <p className="text-xs lg:text-sm font-typewriter mb-4" style={{ color: 'rgba(225,233,225,0.85)' }}>
-          {body}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { proposeQuit(confirmKind); onCloseConfirm() }}
-            className="flex-1 py-2 rounded-lg font-western uppercase text-[11px] lg:text-sm tracking-wider transition-all active:scale-95 casino-btn-gold"
-          >
-            {confirmKind === 'game' ? 'შესთავაზე დანებება' : 'შესთავაზე დათმობა'}
-          </button>
-          <button
-            onClick={onCloseConfirm}
-            className="casino-btn-secondary flex-1 py-2 rounded-lg font-western uppercase text-[11px] lg:text-sm tracking-wider transition-all active:scale-95"
-          >
-            გაუქმება
-          </button>
-        </div>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={18} style={{ color: '#d5b982' }} />
+        <h2 className="text-sm lg:text-base font-western uppercase tracking-wide" style={{ color: '#eeeae1' }}>
+          {title}
+        </h2>
+      </div>
+      <p className="text-xs lg:text-sm font-typewriter mb-4" style={{ color: 'rgba(225,233,225,0.85)' }}>
+        {body}
+      </p>
+      <div className="flex gap-2">
+        <button onClick={onConfirm} className={`casino-btn-gold ${buttonClass}`}>
+          {confirmLabel}
+        </button>
+        <button onClick={onCancel} className={`casino-btn-secondary ${buttonClass}`}>
+          {cancelLabel}
+        </button>
+      </div>
     </ModalShell>
   )
 }

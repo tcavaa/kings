@@ -19,18 +19,30 @@ export const voicePlayer = {
       return
     }
     this.stop()
-    audio = new Audio(url)
+    const el = new Audio(url)
+    audio = el
     currentUrl = url
-    audio.onended = () => { currentUrl = null; notify() }
-    audio.onerror = () => { currentUrl = null; notify() }
-    audio.play().catch(() => { currentUrl = null; notify() })
+    // Each callback checks it still belongs to the current clip: switching
+    // clips while the first is loading rejects its play(), and that late
+    // rejection must not mark the second clip as stopped.
+    const done = () => {
+      if (audio !== el) return
+      currentUrl = null
+      notify()
+    }
+    el.onended = done
+    el.onerror = done
+    el.play().catch(done)
     notify()
   },
 
   stop() {
     if (audio) {
+      audio.onended = null
+      audio.onerror = null
       audio.pause()
       audio.currentTime = 0
+      audio = null
     }
     currentUrl = null
     notify()

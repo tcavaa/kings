@@ -1,34 +1,11 @@
 import { useMemo, useState } from "react";
-import { winnersOf, isWinnerName, isRemovedPlayer } from "../../lib/leaderboard";
-function buildPairData(games) {
-  // pair-key (sorted names) -> { label, [nameA]: aWins, [nameB]: bWins }
-  const map = new Map();
-  for (const g of games) {
-    const players = (g.players || []).filter((p) => !isRemovedPlayer(p));
-    if (players.length < 2 || !winnersOf(g).length) continue;
-    for (let i = 0; i < players.length; i++) {
-      for (let j = i + 1; j < players.length; j++) {
-        const A = players[i].name,
-          B = players[j].name;
-        const [first, second] = [A, B].sort();
-        const key = `${first}|${second}`;
-        const row = map.get(key) || {
-          pair: `${first} vs ${second}`,
-          [first]: 0,
-          [second]: 0,
-        };
-        // Tie-aware: a shared top score credits both sides of the pair.
-        if (isWinnerName(g, first)) row[first] = (row[first] || 0) + 1;
-        if (isWinnerName(g, second)) row[second] = (row[second] || 0) + 1;
-        map.set(key, row);
-      }
-    }
-  }
-  return Array.from(map.values());
-}
 
-export default function RivalryGraph({ games }) {
-  const data = useMemo(() => buildPairData(games), [games]);
+/** Win records of every pair, the pairs who met most often first. */
+export default function RivalryGraph({ pairs }) {
+  const data = useMemo(
+    () => [...pairs].sort((x, y) => y.gamesShared - x.gamesShared),
+    [pairs],
+  );
   const [limit, setLimit] = useState(6);
   return (
     <section className="k-analysis-panel">
@@ -41,23 +18,22 @@ export default function RivalryGraph({ games }) {
       </header>
       <div className="k-rivalries">
         {data.slice(0, limit).map((r) => {
-          const [a, b] = Object.keys(r).filter((k) => k !== "pair");
-          const total = r[a] + r[b];
+          const total = r.aWins + r.bWins;
           return (
-            <div key={r.pair}>
+            <div key={`${r.a}|${r.b}`}>
               <div>
                 <span>
-                  {a} <b>{r[a]}</b>
+                  {r.a} <b>{r.aWins}</b>
                 </span>
                 <span>
-                  <b>{r[b]}</b> {b}
+                  <b>{r.bWins}</b> {r.b}
                 </span>
               </div>
               <div
                 className="k-rivalry-track"
-                aria-label={`${a}: ${r[a]}, ${b}: ${r[b]}`}
+                aria-label={`${r.a}: ${r.aWins}, ${r.b}: ${r.bWins}`}
               >
-                <i style={{ width: `${total ? (r[a] / total) * 100 : 50}%` }} />
+                <i style={{ width: `${total ? (r.aWins / total) * 100 : 50}%` }} />
               </div>
             </div>
           );

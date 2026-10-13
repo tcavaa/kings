@@ -4,6 +4,7 @@ import { getGameType } from "../../constants/gameTypes";
 import { quoteForRound } from "../../constants/quotes";
 import ModalShell from "../ModalShell";
 import AvatarImg from "../AvatarImg";
+import { useTapLock } from "../../hooks/useTapLock";
 export default function RoundResult() {
   const {
     round,
@@ -20,6 +21,8 @@ export default function RoundResult() {
   const seatZero = players.find((p) => p.seat === 0);
   const present = players.filter((p) => p.connected !== false).map((p) => p.seat);
   const starter = seatZero?.connected !== false ? 0 : Math.min(...present);
+  const starterName = players.find((p) => p.seat === starter)?.name;
+  const [sent, once] = useTapLock();
   const last = roundScores[roundScores.length - 1],
     type = getGameType(chosenGameType),
     quote = quoteForRound(roomCode, round);
@@ -69,11 +72,19 @@ export default function RoundResult() {
       </blockquote>
       <div className="k-round-action">
         {mySeat === starter ? (
-          <button className="k-button" onClick={nextRound}>
+          <button
+            className="k-button"
+            disabled={sent}
+            onClick={() => once(nextRound)}
+          >
             შემდეგი ხელი <ArrowRight size={18} />
           </button>
         ) : (
-          <p role="status">ველოდებით წამყვანს…</p>
+          <p role="status">
+            {starterName
+              ? `შემდეგ ხელს ${starterName} დაიწყებს…`
+              : "ველოდებით შემდეგ ხელს…"}
+          </p>
         )}
       </div>
     </ModalShell>

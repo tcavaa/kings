@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react-online";
-import { useGame } from "../../context/GameContext";
+import { useGame, useLobby } from "../../context/GameContext";
 import AvatarImg from "../AvatarImg";
 
 const SIZES = [6, 9];
@@ -18,22 +18,22 @@ export default function TournamentPanel({ active, onNeedProfile }) {
     connected,
     publicSeat,
     tournament,
-    tournamentList,
     createTournament,
     joinTournament,
     leaveTournament,
     dismissTournament,
     refreshTournaments,
   } = useGame();
+  const { tournamentList } = useLobby();
 
   const [size, setSize] = useState(6);
   const [code, setCode] = useState("");
 
-  // Refresh the open-tournament list on mount and whenever ours changes
-  // (creating or leaving one changes what everybody else should see).
+  // Fetch the open-tournament list on mount and after a reconnect. Later
+  // changes (ours included) arrive in the server's own broadcast.
   useEffect(() => {
     if (connected) refreshTournaments();
-  }, [connected, tournament, refreshTournaments]);
+  }, [connected, refreshTournaments]);
 
   // One table at a time: not while sitting at the homepage table.
   const canAct = connected && !!active && publicSeat === null;

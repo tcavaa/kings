@@ -11,6 +11,7 @@ import {
   computePerGameAchievements,
   countCodes,
 } from "../../utils/achievements";
+import { computeGameStats } from "../../utils/gameStats";
 
 /** Detail page for one finished game. */
 export default function GameDetail({ game, onBack }) {
@@ -40,38 +41,11 @@ export default function GameDetail({ game, onBack }) {
     });
   }, [details, playerList]);
 
-  // Per-player stats — only count items in the rounds where they actually
-  // mattered (queens during 'Q' rounds, K♥ during 'K', etc.) so totals can
-  // never exceed the in-game maximums (3 K♥ events, 12 queens, 12 jacks,
-  // 24 hearts across a full game).
-  const stats = useMemo(() => {
-    const tally = {};
-    playerList.forEach((p) => {
-      tally[p.seat] = {
-        roundsLed: 0,
-        totalTricks: 0,
-        queens: 0,
-        jacks: 0,
-        hearts: 0,
-        kingsOfHearts: 0,
-      };
-    });
-    details.forEach((d) => {
-      if (tally[d.leaderSeat]) tally[d.leaderSeat].roundsLed++;
-      for (const { seat } of playerList) {
-        if (!tally[seat]) continue;
-        tally[seat].totalTricks += d.tricksTaken?.[seat] ?? 0;
-        if (d.gameType === "Q")
-          tally[seat].queens += d.queensTaken?.[seat] ?? 0;
-        if (d.gameType === "J") tally[seat].jacks += d.jacksTaken?.[seat] ?? 0;
-        if (d.gameType === "H")
-          tally[seat].hearts += d.heartsTaken?.[seat] ?? 0;
-        if (d.gameType === "K" && d.kingOfHeartsTakenBy === seat)
-          tally[seat].kingsOfHearts++;
-      }
-    });
-    return tally;
-  }, [details, playerList]);
+  // Per-player stats, by the per-round-type rule (see utils/gameStats).
+  const stats = useMemo(
+    () => computeGameStats(playerList, details),
+    [details, playerList],
+  );
 
   const achievements = useMemo(
     () => computePerGameAchievements(playerList, details),
