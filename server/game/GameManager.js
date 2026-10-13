@@ -266,6 +266,7 @@ class GameManager {
         // After a server restart no live socket exists, so everyone starts
         // disconnected until they re-join with the same room code + name.
         connected: false,
+        leftAt: Date.now(),
       })),
       gameState: snap.gameState ? GameState.fromSnapshot(snap.gameState) : null,
       // Rematch coordination is transient and never persisted — if the
@@ -406,6 +407,7 @@ class GameManager {
       }
       existingPlayer.id = socketId;
       existingPlayer.connected = true;
+      existingPlayer.leftAt = null;
       existingPlayer.ownerKey = existingPlayer.ownerKey || identity.ownerKey || null;
       if (identity.avatar) existingPlayer.avatar = identity.avatar;
       this.socketRoomMap.set(socketId, { roomCode, seat: existingPlayer.seat });
@@ -559,11 +561,21 @@ class GameManager {
     if (!room) throw new Error('Room not found.');
     if (!room.gameState) throw new Error('Game not started.');
     const mapping = this.socketRoomMap.get(socketId);
-    if (!mapping || mapping.seat !== 0) throw new Error('Only the room creator can advance the round.');
+    if (!mapping || mapping.seat !== this.roundStarterSeat(room)) {
+      throw new Error('Only the room creator can advance the round.');
+    }
     const result = room.gameState.startNextRound();
     if (!result.ok) throw new Error(result.error);
     this._persist(roomCode);
     return room.gameState;
+  }
+
+  /** Who starts the next round: seat 0, or the lowest connected seat while seat 0 is away. */
+  roundStarterSeat(room) {
+    const zero = room.players.find((p) => p.seat === 0);
+    if (zero?.connected) return 0;
+    const present = room.players.filter((p) => p.connected).map((p) => p.seat);
+    return present.length ? Math.min(...present) : 0;
   }
 
   getStateForPlayer(roomCode, seat) {
@@ -580,6 +592,7 @@ class GameManager {
     const player = room.players.find((p) => p.id === socketId);
     if (!player) return null;
     player.connected = false;
+    player.leftAt = Date.now();
     // The socket id is dead; drop its mapping so it can't accidentally be
     // resolved later (and so the map doesn't slowly leak across long
     // sessions). The player's row in `room.players` keeps `seat`/`name`,

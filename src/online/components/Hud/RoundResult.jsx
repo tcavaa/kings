@@ -11,10 +11,15 @@ export default function RoundResult() {
     roundScores,
     cumulativeScores,
     players,
-    isCreator,
+    mySeat,
     nextRound,
     roomCode,
   } = useGame();
+  // Seat 0 starts the next round; while it is away, the lowest seat still at
+  // the table does (the server applies the same rule).
+  const seatZero = players.find((p) => p.seat === 0);
+  const present = players.filter((p) => p.connected !== false).map((p) => p.seat);
+  const starter = seatZero?.connected !== false ? 0 : Math.min(...present);
   const last = roundScores[roundScores.length - 1],
     type = getGameType(chosenGameType),
     quote = quoteForRound(roomCode, round);
@@ -63,7 +68,7 @@ export default function RoundResult() {
         „{quote.text}“<small>— {quote.author}</small>
       </blockquote>
       <div className="k-round-action">
-        {isCreator ? (
+        {mySeat === starter ? (
           <button className="k-button" onClick={nextRound}>
             შემდეგი ხელი <ArrowRight size={18} />
           </button>

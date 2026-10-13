@@ -153,6 +153,8 @@ function act(b, st) {
   check('saved winners match game-over', JSON.stringify(saved?.winners) === JSON.stringify(over.winners));
   const quota = await store.getChampionshipQuota('Bot-A');
   check('the game counts toward the daily championship quota', quota.playedToday >= 1, JSON.stringify(quota));
+  // The seeded game always gets the same id: remove it so the next run saves it afresh.
+  await require(path.join(SERVER_DIR, 'db', 'connection.js')).getSql()`DELETE FROM finished_games WHERE id = ${id}`;
 
   const { playedAt: _p, ...stable } = saved || {};
   const digest = crypto.createHash('sha256').update(JSON.stringify({ over: { ...over, players: undefined }, stable })).digest('hex');

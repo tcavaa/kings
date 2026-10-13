@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Plus, LogOut } from "lucide-react-online";
+import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react-online";
 import { useGame } from "../../context/GameContext";
 import AvatarImg from "../AvatarImg";
 
@@ -10,7 +10,8 @@ const SIZES = [6, 9];
  *
  * A tournament needs exactly 6 or 9 entrants; the creator picks which. Once
  * the last seat fills the server draws the tables and everyone is dropped
- * straight onto a table, so this panel only ever shows the waiting stage.
+ * straight onto a table. Back in the lobby, this panel shows where your
+ * tournament stands: waiting, in progress, or finished with its winners.
  */
 export default function TournamentPanel({ active, onNeedProfile }) {
   const {
@@ -21,6 +22,7 @@ export default function TournamentPanel({ active, onNeedProfile }) {
     createTournament,
     joinTournament,
     leaveTournament,
+    dismissTournament,
     refreshTournaments,
   } = useGame();
 
@@ -35,6 +37,42 @@ export default function TournamentPanel({ active, onNeedProfile }) {
 
   // One table at a time: not while sitting at the homepage table.
   const canAct = connected && !!active && publicSeat === null;
+
+  if (tournament?.status === "done")
+    return (
+      <div className="k-tournament">
+        <section>
+          <span className="k-eyebrow">TOURNAMENT OVER / {tournament.code}</span>
+          <h3>
+            <Trophy size={22} className="inline" />{" "}
+            {(tournament.winners || []).map((w) => w.name).join(" და ") || "—"}
+          </h3>
+          <p>ტურნირი დასრულდა. გილოცავთ გამარჯვებულს!</p>
+          <button className="k-button" onClick={dismissTournament}>
+            ახალი ტურნირი <ArrowRight size={18} />
+          </button>
+        </section>
+      </div>
+    );
+
+  if (tournament && tournament.status !== "lobby")
+    return (
+      <div className="k-tournament">
+        <section>
+          <span className="k-eyebrow">YOUR TOURNAMENT / {tournament.code}</span>
+          <h3>
+            ტურნირი
+            <br />
+            მიმდინარეობს.
+          </h3>
+          <p>
+            {tournament.status === "final"
+              ? "ფინალი მიმდინარეობს. როცა დასრულდება, გამარჯვებული აქ გამოჩნდება."
+              : "ნახევარფინალები მიმდინარეობს. ფინალისტები ყველა მაგიდის დასრულების შემდეგ გაირკვევა."}
+          </p>
+        </section>
+      </div>
+    );
 
   if (tournament)
     return (

@@ -10,22 +10,27 @@ import ModalShell from '../ModalShell'
  *     already accepted while the third player decides).
  */
 export default function QuitModal({ confirmKind, onCloseConfirm }) {
-  const { quitProposal, proposeQuit, voteQuit, mySeat, chosenGameType } = useGame()
+  const { quitProposal, proposeQuit, voteQuit, mySeat, chosenGameType, players } = useGame()
 
   const isPositiveRound = typeof chosenGameType === 'string' && chosenGameType.startsWith('P')
+  // Players who are offline: if they stay away, the rest decide without them.
+  const away = players.filter(p => p.connected === false)
 
   // ── 2/3: a proposal is live ──────────────────────────────────────────────
   if (quitProposal) {
-    const { kind, proposerSeat, proposerName, acceptedSeats = [] } = quitProposal
+    const { kind, proposerSeat, proposerName, acceptedSeats = [], voters = [0, 1, 2] } = quitProposal
+    // Spectators don't vote.
+    if (mySeat === null || mySeat === undefined) return null
     const isMine    = proposerSeat === mySeat
     const iAccepted = acceptedSeats.includes(mySeat)
     const agreed    = Math.max(0, acceptedSeats.length - 1) // proposer doesn't count as a vote
+    const needed    = Math.max(0, voters.length - 1)
 
     if (isMine || iAccepted) {
       return (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <div className="western-pill px-5 py-2 text-xs font-typewriter">
-            {kind === 'game' ? 'დანებება' : 'ხელის დათმობა'} — ველოდებით თანხმობას… ({agreed}/2)
+            {kind === 'game' ? 'დანებება' : 'ხელის დათმობა'} — ველოდებით თანხმობას… ({agreed}/{needed})
           </div>
         </div>
       )
@@ -74,7 +79,9 @@ export default function QuitModal({ confirmKind, onCloseConfirm }) {
   const Icon = confirmKind === 'game' ? Flag : DoorOpen
   const title = confirmKind === 'game' ? 'ნებდები?' : 'დათმობ ამ ხელს?'
   const body = confirmKind === 'game'
-    ? 'თამაში მაშინვე დასრულდება და ქულების ლიდერი მოიგებს. ორივე მოთამაშე უნდა დათანხმდეს.'
+    ? away.length
+      ? `${away.map(p => p.name).join(' და ')} მაგიდას გაეთიშა. თამაში დასრულდება და ქულების ლიდერი მოიგებს — მაგიდასთან დარჩენილები უნდა დათანხმდნენ.`
+      : 'თამაში მაშინვე დასრულდება და ქულების ლიდერი მოიგებს. ორივე მოთამაშე უნდა დათანხმდეს.'
     : isPositiveRound
       ? 'ამ ხელს თმობ — +80-ს დანარჩენი ორი გაიყოფს. ორივე უნდა დათანხმდეს.'
       : 'ამ ხელის მთელი -40 შენ ჩაგეწერება და მაგიდა შემდეგ ხელზე გადავა. ორივე მოთამაშე უნდა დათანხმდეს.'

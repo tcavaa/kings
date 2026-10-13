@@ -144,6 +144,13 @@ async function surrender(clientsAtTable) {
   await sleep(1200);
   const done = cs.find((c) => c.complete);
   check('tournament reports a winner', !!done?.complete?.winners?.length);
+  check('every entrant sees the tournament as finished', cs.every((c) => c.tournament?.status === 'done'),
+    JSON.stringify(cs.map((c) => c.tournament?.status)));
+  const again = cs[0].events.length;
+  cs[0].emit('tournament-create', { playerName: names[0], size: 6 });
+  await sleep(400);
+  check('an entrant can start a new tournament afterwards',
+    cs[0].events.slice(again).some((e) => e.event === 'tournament-joined'));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   cs.forEach((c) => c.close());
