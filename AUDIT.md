@@ -32,12 +32,16 @@ git history (`git log -- AUDIT.md`).
     win probability, totals and clock formatting (`shared/`). King Online now
     uses the same recharts and lucide versions as King Score.
 
-## Left as is, on purpose
+- **14 Oct, last round:** the five items first left as is:
+  - **S14:** a profile without a PIN can only be changed from /admin, which
+    can give it a PIN; its owner edits it with that PIN from then on.
+  - **C-L42:** seasons store their champions as a list (`champion_names`),
+    and new names may not contain " & ".
+  - **P6:** chat bubbles reach the table on their own channel, outside the
+    table state.
+  - **P-L20:** fonts are self-hosted through `next/font`; the canvas reads
+    the resolved family names before drawing.
+  - **P-L16:** a custom Phaser build from `phaser/src` with only what the
+    table uses (game chunk about 42% smaller).
 
-| Item | Why |
-|---|---|
-| S14 — a profile without a PIN can be edited by anyone | By design: a PIN is what protects a profile; deleting players is admin-only. |
-| P-L16 — Phaser bundle size | Uses Phaser's prebuilt arcade bundle (~10% smaller); a custom build from `phaser/src` would need build flags and a maintained module list. |
-| P-L20 — fonts via a Google Fonts stylesheet | `next/font` renames the font families, which the canvas and chart text draw by name. The stylesheet now asks for the right weights with `display=swap`. |
-| C-L42 — a player named like "A & B" | Winners are read from the `winners` array everywhere; only the stored season champion string still joins names with " & ". |
-| P6 — chat bubbles travel in the canvas state | The table now redraws only the bubble layer when chat changes, so it no longer costs a full redraw. |
+Nothing from the audit is left open.
