@@ -26,7 +26,6 @@ All remaining issues are **medium** or **low**. The most valuable next steps:
 
 | Issue | Where |
 |---|---|
-| A player who leaves for good freezes the table: surrender needs all 3 votes, and only seat 0 can start the next round (B3) | [server/socket/handlers.js:671](server/socket/handlers.js:671) |
 | Tournaments live only in memory, so a restart orphans the bracket (B10) | [server/tournament/TournamentManager.js:27](server/tournament/TournamentManager.js:27) |
 | Lobby lists are still broadcast to everyone on every presence change (P2) | [server/socket/handlers.js:1172](server/socket/handlers.js:1172) |
 | The Phaser table is rebuilt on every state update, and trump-sparkle tweens leak (P5, P6) | [src/online/game/scenes/GameScene.js:354](src/online/game/scenes/GameScene.js:354) |
@@ -85,20 +84,6 @@ The identity and authentication holes are fixed (see the top). What's left is na
 
 ## Bugs — game server, API & database
 Most of the game rules work. What's left is in the lifecycle code around them: restarts (tournaments live only in memory, simultaneous rejoins), a socket's room membership is never made exclusive, and one departed player can freeze a table. On the API/DB side, score-sheet saves aren't idempotent.
-
-### B3. One departed player freezes the table · Medium
-**Where:** [server/socket/handlers.js:671](server/socket/handlers.js:671), [server/game/GameManager.js:536](server/game/GameManager.js:536), [server/game/GameManager.js:556](server/game/GameManager.js:556)
-**Problem:** If a seated player closes their tab mid-game, nothing ever acts for them.
-- `vote-quit` needs `accepted.size === 3`, and a disconnected seat can never vote. The two remaining players cannot quit the round or surrender, and the proposal expires after 30 s.
-- If seat 0 is the one who left at round end, `handleNextRound` rejects everyone else, who see 'ველოდებით წამყვანს…' forever.
-- The game is never written to `finished_games`, and in a tournament (no forfeit) one no-show deadlocks the bracket.
-
-**Fix:**
-- In `propose-quit`/`vote-quit`, count disconnected seats as accepted (or require only connected seats). Re-check a pending proposal in the `disconnect` handler.
-- In `handleNextRound`, accept the lowest connected seat when seat 0 is offline, and show the RoundResult button to that player.
-- Later: add a per-turn deadline (~60 s), armed by `markDisconnected` for the seat GameState is waiting on, that auto-plays the first legal card or the first unused type.
-
-*Found by 3 auditors.*
 
 ### B4. Simultaneous rejoins after a restart load the same room twice · Medium
 **Where:** [server/game/GameManager.js:288](server/game/GameManager.js:288), [server/socket/handlers.js:202](server/socket/handlers.js:202), [server/index.js:63](server/index.js:63)
@@ -184,7 +169,6 @@ Players get `hand-dealt` right after `round-started`, so these resets are harmle
 | # | Issue | Where | Fix |
 |---|---|---|---|
 | B-L1 | `player-left` sends a roster without avatars, so every remaining photo in the waiting room falls back to the default until the next join (4 auditors). | [server/socket/handlers.js:1156](server/socket/handlers.js:1156) | Send `players: playersView(room.players)`. |
-| B-L2 | Spectators get the quit/surrender vote dialog. A watcher who was seat 0 in an earlier game also sees the next-round button; clicking either only produces error toasts. | [server/socket/handlers.js:638](server/socket/handlers.js:638) | Render `QuitModal` only when `!isSpectator` (GameLayout.jsx:362). Use `isCreator && !spectating` in RoundResult.jsx:66. Call `setIsCreator(false)` on `spectate-started`. |
 | B-L3 | `select-trump` bypasses GameManager, so the trump choice and the prikup merge are never saved; a restart before the discard rewinds to trump selection (2 auditors). | [server/socket/handlers.js:449](server/socket/handlers.js:449) | Add `GameManager.handleSelectTrump` that calls `_persist` on success, and call it from the handler. |
 | B-L4 | A quit round's details keep the partial card counts and K-target, which contradict the flat quit scores and skew lifetime stats and ჩაწერა history. | [server/game/GameState.js:487](server/game/GameState.js:487) | Store null counts and target when `quitBySeat` is set, or have consumers skip quit rounds. |
 | B-L6 | If the `live_games` delete at game over fails, the next boot restores the finished game as live. | [server/game/GameManager.js:460](server/game/GameManager.js:460) | Retry the delete with backoff. In `hydrateAll`, drop `round_end` snapshots at round ≥ 27. |
@@ -206,25 +190,6 @@ Players get `hand-dealt` right after `round-started`, so these resets are harmle
 
 ## Bugs — King Online & King Score clients (incl. CSS)
 The serious King Online bugs (game-over timer, tournament reconnects, the leaderboard hiding the game, stale room codes) are fixed. What's left in `GameContext.jsx` is state that still isn't tied to a room (`finalResults`, chat, `selectedDiscards`) and a few reconnect edge cases. King Score's bugs are mostly data-integrity edge cases: duplicate saves, a season race, invalid rounds getting saved, and a failed load that stays cached. The CSS bugs are mostly poor contrast inside the cream in-game sheets.
-
-### C9. After a tournament starts or ends, the lobby's tournament panel is stuck · Medium
-**Where:** [src/online/components/Tournament/TournamentPanel.jsx:37](src/online/components/Tournament/TournamentPanel.jsx:37), [src/online/context/GameContext.jsx:451](src/online/context/GameContext.jsx:451), [server/socket/handlers.js:1394](server/socket/handlers.js:1394)
-**Problem:** The client's `tournament` state never gets out of its pre-draw snapshot:
-- It is cleared only by `tournament-left`, which the server sends only when someone leaves before the draw.
-- After the draw, the server never sends `tournament-state` again.
-- `tournament-complete` does not reset it, and the server never destroys the tournament.
-
-An eliminated player or the champion who goes back to the lobby sees a full bracket with "მაგიდები მზადდება…" and no leave button. They cannot create or join another tournament until a full reload; the server also keeps answering "You are already in a tournament."
-**Fix:**
-- **Server, `tournamentComplete`:**
-  - Emit `tournament-state` with status 'done'.
-  - Call `io.in(t.id).socketsLeave(t.id)` and destroy the tournament after a delay.
-  - Make `findBySocket` skip finished tournaments.
-- **Client:** on `tournament-complete`, mark the tournament done, or clear `tournament`, `tournamentOverview` and `tournamentFinal` when the result is dismissed.
-- **Panel:** branch on `tournament.status`:
-  - 'lobby': the current view.
-  - 'semifinal' or 'final': an "in progress" message and a bracket button.
-  - 'done': the winners and a "new tournament" button that clears the local state.
 
 ### C12. Reconnecting at a homepage quick-match table moves the user into the WaitingRoom · Medium
 **Where:** [src/online/context/GameContext.jsx:379](src/online/context/GameContext.jsx:379), [server/socket/handlers.js:354](server/socket/handlers.js:354)
@@ -272,16 +237,6 @@ Example: a player finishes game 1 and plays again. Their phone is locked when ga
 **Fix:**
 - Call `setFinalResults(null)` in `game-started`, in `leaveRoom`, and on `room-joined` for a different room.
 - Store `roomCode` with the results, and keep `prev` only when it matches `roomCodeRef.current`.
-
-### C16. Spectators get the quit/surrender vote dialog · Medium
-**Where:** [src/online/components/Hud/QuitModal.jsx:24](src/online/components/Hud/QuitModal.jsx:24), [src/online/components/GameLayout.jsx:362](src/online/components/GameLayout.jsx:362)
-**Problem:** Watchers are in the room's socket.io channel, so they receive `quit-proposal`. With `mySeat === null`, both `isMine` and `iAccepted` are false, and QuitModal shows the blocking vote dialog with Agree/Refuse. The dialog cannot be dismissed and stays up until the vote resolves or 30 s pass. Voting gets "You are not in a room."
-
-MenuDrawer already hides the quit actions from spectators, but QuitModal is never told the viewer is a spectator.
-**Fix:**
-- Pass `spectator={isSpectator}` to QuitModal.
-- When `spectator || mySeat == null`, render only the passive "waiting for votes" pill and never the confirm dialog.
-- Optionally, make `voteQuit` and `proposeQuit` do nothing while spectating.
 
 ### C17. "Play again" is offered after tournament games and always fails · Medium
 **Where:** [src/online/components/GameOverScreen.jsx:238](src/online/components/GameOverScreen.jsx:238), [server/socket/handlers.js:841](server/socket/handlers.js:841)

@@ -466,6 +466,9 @@ export function GameProvider({ children }) {
 
     socket.on('tournament-complete', (payload) => {
       tournamentCodeRef.current = ''
+      // Kept (as 'done', with its winners) so the lobby can show the result
+      // until it's dismissed.
+      setTournament(prev => prev && { ...prev, status: 'done', winners: payload.winners || [] })
       const names = (payload.winners || []).map(w => w.name).join(' და ')
       if (names) addToast(`ტურნირის გამარჯვებული: ${names} 🏆`, 'success')
     })
@@ -754,7 +757,7 @@ export function GameProvider({ children }) {
       }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS))
     })
 
-    socket.on('game-over', ({ finalScores, winner, winners, isTie, mode, players: p, roundDetails: rd, surrenderedBySeat }) => {
+    socket.on('game-over', ({ finalScores, winner, winners, isTie, mode, players: p, roundDetails: rd, surrenderedBySeat, abandonedSeats }) => {
       // Older server payloads carry only `winner` — normalise so the
       // game-over screen can always render from `winners`.
       const winnersList = Array.isArray(winners) && winners.length ? winners : (winner ? [winner] : [])
@@ -777,7 +780,10 @@ export function GameProvider({ children }) {
         setAppPhase('gameover')
       }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS + 200)
       const winnerLabel = winnersList.map(w => w.name).join(' და ')
-      if (typeof surrenderedBySeat === 'number') {
+      if (Array.isArray(abandonedSeats) && abandonedSeats.length) {
+        const gone = abandonedSeats.map(s => (p || []).find(pl => pl.seat === s)?.name || `მოთამაშე ${s}`).join(' და ')
+        addToast(`${gone} წავიდა — თამაში დასრულდა, ${winnerLabel} იმარჯვებს!`, 'success')
+      } else if (typeof surrenderedBySeat === 'number') {
         const surrenderName = (p || []).find(pl => pl.seat === surrenderedBySeat)?.name || `მოთამაშე ${surrenderedBySeat}`
         addToast(`${surrenderName} დანებდა — ${winnerLabel} იმარჯვებს!`, 'success')
       } else if (tie) {
@@ -825,12 +831,14 @@ export function GameProvider({ children }) {
     })
 
     // ── Quit-round / surrender votes ────────────────────────────────────
-    socket.on('quit-proposal', ({ kind, proposerSeat, proposerName, acceptedSeats }) => {
+    socket.on('quit-proposal', ({ kind, proposerSeat, proposerName, acceptedSeats, voters }) => {
       setQuitProposal({
         kind,
         proposerSeat,
         proposerName,
         acceptedSeats: Array.isArray(acceptedSeats) ? acceptedSeats : [proposerSeat],
+        // Seats that must agree — a player who left for good doesn't vote.
+        voters: Array.isArray(voters) ? voters : [0, 1, 2],
       })
     })
 
@@ -951,7 +959,8 @@ export function GameProvider({ children }) {
     // disconnect banner for a few seconds so a fast auto-rejoin (which
     // socket.io-client does for free) goes unnoticed.
     let disconnectGraceTimer = null
-    socket.on('player-disconnected', ({ playerName }) => {
+    socket.on('player-disconnected', ({ playerName, players: p }) => {
+      if (p) setPlayers(p)
       if (disconnectGraceTimer) clearTimeout(disconnectGraceTimer)
       disconnectGraceTimer = setTimeout(() => {
         setDisconnectedPlayer(playerName)
@@ -1202,6 +1211,12 @@ export function GameProvider({ children }) {
   }, [])
 
   const leaveTournament  = useCallback(() => { socketRef.current?.emit('tournament-leave') }, [])
+  // Put away a finished tournament's result in the lobby.
+  const dismissTournament = useCallback(() => {
+    tournamentCodeRef.current = ''
+    setTournament(null)
+    setTournamentOverview(null)
+  }, [])
   const refreshTournaments = useCallback(() => { socketRef.current?.emit('tournament-list') }, [])
   const refreshOverview  = useCallback(() => { socketRef.current?.emit('tournament-overview') }, [])
 
@@ -1312,7 +1327,7 @@ export function GameProvider({ children }) {
     announcePresence, refreshLobby, watchGame,
     tournament, tournamentList, tournamentOverview, tournamentSeat,
     spectating,
-    createTournament, joinTournament, leaveTournament,
+    createTournament, joinTournament, leaveTournament, dismissTournament,
     refreshTournaments, refreshOverview, spectateTable, stopSpectating,
     roomMode,
     rematch, requestRematch,
@@ -1336,7 +1351,7 @@ export function GameProvider({ children }) {
     announcePresence, refreshLobby, watchGame,
     tournament, tournamentList, tournamentOverview, tournamentSeat,
     spectating,
-    createTournament, joinTournament, leaveTournament,
+    createTournament, joinTournament, leaveTournament, dismissTournament,
     refreshTournaments, refreshOverview, spectateTable, stopSpectating,
     roomMode,
     rematch, requestRematch,

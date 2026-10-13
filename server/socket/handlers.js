@@ -3,7 +3,9 @@
 const store = require('../db/store');
 const { ownsSeat } = require('../game/GameManager');
 
-const playerView = (p) => ({ id: p.id, name: p.name, avatar: p.avatar || null, seat: p.seat });
+const playerView = (p) => ({
+  id: p.id, name: p.name, avatar: p.avatar || null, seat: p.seat, connected: p.connected !== false,
+});
 const playersView = (players = []) => players.map(playerView);
 
 // ─── identity ───────────────────────────────────────────────────────────────
@@ -692,13 +694,15 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       }
       if (room.quitProposal) return emitError('Another proposal is already waiting on votes.');
 
-      const player = room.players.find((p) => p.seat === seat);
       const proposal = {
         kind,
         proposerSeat: seat,
         accepted: new Set([seat]),
         timer: setTimeout(() => {
           if (room.quitProposal !== proposal) return;
+          // Someone who was only briefly away may have counted as present
+          // when the vote opened and be gone by now.
+          if (_settleQuitProposal(io, room, roomCode, gameManager)) return;
           room.quitProposal = null;
           io.to(roomCode).emit('quit-rejected', { kind, proposerSeat: seat, reason: 'timeout' });
         }, QUIT_VOTE_MS),
@@ -706,12 +710,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (typeof proposal.timer.unref === 'function') proposal.timer.unref();
       room.quitProposal = proposal;
 
-      io.to(roomCode).emit('quit-proposal', {
-        kind,
-        proposerSeat: seat,
-        proposerName: player ? player.name : `Player ${seat}`,
-        acceptedSeats: [seat],
-      });
+      if (!_settleQuitProposal(io, room, roomCode, gameManager)) _emitQuitProposal(io, room, roomCode);
     } catch (err) {
       fail(err);
     }
@@ -729,8 +728,6 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (!proposal) return emitError('No proposal is waiting on votes.');
       if (seat === proposal.proposerSeat) return emitError('You proposed this — the other players must vote.');
       const { kind, proposerSeat } = proposal;
-      const proposerName =
-        room.players.find((p) => p.seat === proposerSeat)?.name || `Player ${proposerSeat}`;
 
       if (!accept) {
         _clearQuitProposal(room);
@@ -739,52 +736,8 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       }
 
       proposal.accepted.add(seat);
-      if (proposal.accepted.size < 3) {
-        // One yes in, one to go — rebroadcast so everyone's UI updates.
-        io.to(roomCode).emit('quit-proposal', {
-          kind,
-          proposerSeat,
-          proposerName,
-          acceptedSeats: [...proposal.accepted].sort((a, b) => a - b),
-        });
-        return;
-      }
-
-      // Unanimous — execute.
-      _clearQuitProposal(room);
-      const gs = room.gameState;
-
-      if (kind === 'game') {
-        _finishGame(io, room, roomCode, gameManager, { surrenderedBySeat: proposerSeat });
-        return;
-      }
-
-      const result = gameManager.handleQuitRound(roomCode, proposerSeat);
-      if (!result.ok) {
-        // The round moved on while votes were coming in (e.g. it ended
-        // naturally) — tell everyone the proposal fizzled.
-        io.to(roomCode).emit('quit-rejected', { kind, proposerSeat, reason: 'timeout' });
-        return;
-      }
-      const cardCounts = {};
-      for (let s = 0; s < 3; s++) cardCounts[s] = gs.hands[s].length;
-      const lastDetail = gs.roundDetails[gs.roundDetails.length - 1];
-      io.to(roomCode).emit('round-complete', {
-        winnerSeat: null,
-        trick: null,
-        roundEnds: true,
-        scores: result.scores,
-        cumulativeScores: result.cumulativeScores,
-        round: result.round,
-        gameType: result.gameType,
-        isGameOver: result.isGameOver,
-        cardCounts,
-        roundDetail: lastDetail,
-        quitBySeat: proposerSeat,
-      });
-      if (result.isGameOver) {
-        _finishGame(io, room, roomCode, gameManager);
-      }
+      // Not everyone present has agreed yet — rebroadcast so every UI updates.
+      if (!_settleQuitProposal(io, room, roomCode, gameManager)) _emitQuitProposal(io, room, roomCode);
     } catch (err) {
       fail(err);
     }
@@ -1237,7 +1190,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (result.stayed) {
         // Left a running game: the seat stays for its owner (see leaveRoom).
         if (room.players.every((p) => !p.connected)) gameManager.armRoomGrace(roomCode);
-        else io.to(roomCode).emit('player-disconnected', { playerName });
+        else io.to(roomCode).emit('player-disconnected', { playerName, players: playersView(room.players) });
         return;
       }
       io.to(roomCode).emit('player-left', {
@@ -1294,7 +1247,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         gameManager.armRoomGrace(roomCode);
         return;
       }
-      io.to(roomCode).emit('player-disconnected', { playerName });
+      io.to(roomCode).emit('player-disconnected', { playerName, players: playersView(room.players) });
     } catch (err) { /* no-op */ }
   });
 }
@@ -1316,6 +1269,76 @@ function _sanitizeEmoji(emoji) {
   const trimmed = emoji.trim();
   if (!trimmed || trimmed.length > 8) return null;
   return trimmed;
+}
+
+// A player who has been disconnected this long no longer has to vote: the
+// players still at the table can quit the round or end the game without them.
+const GONE_MS = Number(process.env.QUIT_GONE_MS) || 20 * 1000;  // env: tests only
+
+/** Seats that must agree to a quit/surrender: everyone not gone for good. */
+function _quitVoters(room) {
+  const now = Date.now();
+  return room.players
+    .filter((p) => p.connected || !p.leftAt || now - p.leftAt < GONE_MS)
+    .map((p) => p.seat);
+}
+
+function _emitQuitProposal(io, room, roomCode) {
+  const { kind, proposerSeat, accepted } = room.quitProposal;
+  io.to(roomCode).emit('quit-proposal', {
+    kind,
+    proposerSeat,
+    proposerName: room.players.find((p) => p.seat === proposerSeat)?.name || `Player ${proposerSeat}`,
+    acceptedSeats: [...accepted].sort((a, b) => a - b),
+    voters: _quitVoters(room),
+  });
+}
+
+/**
+ * Carry out the pending quit/surrender once every player still present has
+ * agreed. Ending the game this way makes the highest score the winner, the
+ * same as a surrender. Returns true when it ran.
+ */
+function _settleQuitProposal(io, room, roomCode, gameManager) {
+  const proposal = room.quitProposal;
+  if (!proposal) return false;
+  const voters = _quitVoters(room);
+  if (!voters.every((seat) => proposal.accepted.has(seat))) return false;
+  const { kind, proposerSeat } = proposal;
+  const goneSeats = room.players.map((p) => p.seat).filter((seat) => !voters.includes(seat));
+  _clearQuitProposal(room);
+
+  if (kind === 'game') {
+    _finishGame(io, room, roomCode, gameManager,
+      goneSeats.length ? { abandonedSeats: goneSeats } : { surrenderedBySeat: proposerSeat });
+    return true;
+  }
+
+  const gs = room.gameState;
+  const result = gameManager.handleQuitRound(roomCode, proposerSeat);
+  if (!result.ok) {
+    // The round moved on while votes were coming in (e.g. it ended
+    // naturally) — tell everyone the proposal fizzled.
+    io.to(roomCode).emit('quit-rejected', { kind, proposerSeat, reason: 'timeout' });
+    return true;
+  }
+  const cardCounts = {};
+  for (let s = 0; s < 3; s++) cardCounts[s] = gs.hands[s].length;
+  io.to(roomCode).emit('round-complete', {
+    winnerSeat: null,
+    trick: null,
+    roundEnds: true,
+    scores: result.scores,
+    cumulativeScores: result.cumulativeScores,
+    round: result.round,
+    gameType: result.gameType,
+    isGameOver: result.isGameOver,
+    cardCounts,
+    roundDetail: gs.roundDetails[gs.roundDetails.length - 1],
+    quitBySeat: proposerSeat,
+  });
+  if (result.isGameOver) _finishGame(io, room, roomCode, gameManager);
+  return true;
 }
 
 function _clearQuitProposal(room) {
@@ -1484,6 +1507,7 @@ function _makeTournamentBroadcaster(io, gameManager, tournamentManager) {
     },
 
     finalStarted(t, roomCode, finalists) {
+      io.to(t.id).emit('tournament-state', tournamentManager.lobbyView(t));
       io.to(t.id).emit('tournament-final', {
         roomCode,
         finalists: finalists.map((f) => ({
@@ -1496,12 +1520,15 @@ function _makeTournamentBroadcaster(io, gameManager, tournamentManager) {
     },
 
     tournamentComplete(t) {
+      io.to(t.id).emit('tournament-state', tournamentManager.lobbyView(t));
       io.to(t.id).emit('tournament-complete', {
         code: t.code,
         winners: t.winners,
         standings: t.standings,
       });
       io.to(t.id).emit('tournament-overview', overviewOf(t));
+      // It's over: its channel has nothing more to say.
+      io.in(t.id).socketsLeave(t.id);
     },
   };
 }
