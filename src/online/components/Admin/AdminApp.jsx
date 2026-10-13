@@ -4,6 +4,7 @@ import { adminApi, API_BASE } from '../../lib/api'
 import { voicePlayer } from '../../lib/voicePlayer'
 import SeasonsAdmin from './SeasonsAdmin'
 import PlayersAdmin from './PlayersAdmin'
+import ClubShell, { Wordmark } from '../ui/ClubShell'
 
 // Where the passcode lives between renders. sessionStorage, not local: the
 // latch should lift when the tab closes.
@@ -58,30 +59,33 @@ function PasscodeGate({ onUnlock }) {
   }
 
   return (
-    <div className="saloon-bg flex flex-col items-center justify-center px-4 py-8 min-h-screen">
-      <form onSubmit={submit} className="western-panel p-6 w-full max-w-xs text-center">
-        <h1 className="text-2xl font-western mb-1" style={{ color: '#d5b982' }}>ადმინი</h1>
-        <p className="text-xs font-typewriter mb-4" style={{ color: 'rgba(225,233,225,0.6)' }}>
+    <div className="k-admin k-admin-login">
+      <form onSubmit={submit} className="k-admin-panel k-admin-login-card">
+        <a href="/" aria-label="KING მთავარი"><Wordmark /></a>
+        <span className="k-eyebrow">THE CLUB / ADMIN</span>
+        <h1 className="text-2xl mb-1" style={{ color: '#d7fa52' }}>ადმინი</h1>
+        <p className="text-xs mb-4" style={{ color: 'rgba(225,233,225,0.6)' }}>
           შეიყვანე კოდი
         </p>
         <input
           type="password"
+          aria-label="ადმინისტრატორის კოდი"
+          autoComplete="current-password"
           autoFocus
           value={code}
           onChange={(e) => { setCode(e.target.value); setError('') }}
-          className="w-full text-center text-2xl tracking-[0.5em] font-mono px-3 py-3 rounded-lg mb-3"
+          className="w-full text-center text-2xl tracking-[0.5em] font-mono px-3 py-3 mb-3"
           style={{
-            background: 'rgba(35,57,45,0.95)',
-            border: '1px solid rgba(151,176,162,0.45)',
-            color: '#eeeae1',
+            background: '#252b24',
+            border: '1px solid #46513e',
+            color: '#eff1e8',
           }}
         />
         {error && (
-          <div className="text-xs font-typewriter mb-3" style={{ color: '#ef918b' }}>{error}</div>
+          <div className="text-xs mb-3" style={{ color: '#ef918b' }}>{error}</div>
         )}
         <button type="submit" disabled={busy || !code}
-                className="western-pill w-full px-4 py-2.5 text-sm font-bold disabled:opacity-40"
-                style={{ color: '#eeeae1' }}>
+                className="k-button w-full px-4 py-2.5 text-sm font-bold disabled:opacity-40">
           {busy ? 'მოწმდება…' : 'შესვლა'}
         </button>
       </form>
@@ -128,10 +132,10 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
 
   return (
     <div ref={innerRef}
-         className="flex items-center gap-2 py-2.5 px-3 rounded-xl"
+         className="k-admin-sound-row flex items-center gap-2 py-2.5 px-3"
          style={{
-           background: dragging ? 'rgba(23,39,35,0.98)' : 'rgba(35,57,45,0.95)',
-           border: `1px solid ${dragging ? 'rgba(213,185,130,0.55)' : 'rgba(151,176,162,0.25)'}`,
+           background: dragging ? '#30382b' : '#252b24',
+           border: `1px solid ${dragging ? '#d7fa52' : '#3b4436'}`,
            boxShadow: dragging
              ? '0 10px 24px rgba(0,0,0,0.26)'
              : '0 0 0 rgba(0,0,0,0)',
@@ -160,7 +164,7 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
       <span className="flex items-center justify-center rounded-full font-bold shrink-0"
             style={{
               width: 38, height: 38, background: '#172725',
-              border: `2px solid ${sound.color}`, color: '#eeeae1', fontSize: 16,
+              border: `2px solid ${sound.color}`, color: '#eff1e8', fontSize: 16,
             }}>
         {sound.glyph}
       </span>
@@ -169,19 +173,19 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
         <div className="flex-1 flex flex-wrap items-center gap-2">
           <input value={label} onChange={(e) => setLabel(e.target.value)}
                  className="flex-1 min-w-[8rem] px-2 py-1.5 rounded text-sm"
-                 style={{ background: '#fff', border: '1px solid rgba(151,176,162,0.4)', color: '#eeeae1' }} />
+                 style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }} />
           <input value={glyph} onChange={(e) => setGlyph(e.target.value)} maxLength={2}
                  title="ნიშანი"
                  className="w-12 px-2 py-1.5 rounded text-sm text-center"
-                 style={{ background: '#fff', border: '1px solid rgba(151,176,162,0.4)', color: '#eeeae1' }} />
+                 style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }} />
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
                  title="ფერი"
                  className="w-10 h-8 rounded cursor-pointer"
-                 style={{ border: '1px solid rgba(151,176,162,0.4)', background: 'transparent' }} />
+                 style={{ border: '1px solid #46513e', background: 'transparent' }} />
         </div>
       ) : (
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-bold truncate" style={{ color: '#eeeae1' }}>{sound.label}</div>
+          <div className="text-sm font-bold truncate" style={{ color: '#eff1e8' }}>{sound.label}</div>
           <div className="text-[10px] font-mono truncate" style={{ color: 'rgba(225,233,225,0.45)' }}>
             {sound.id}{sound.source === 'builtin' ? ' · ჩაშენებული' : ''}
           </div>
@@ -190,22 +194,22 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
 
       <div className="flex items-center gap-1 shrink-0">
         <button onClick={() => voicePlayer.toggle(url)} title="მოსმენა"
-                className="p-2 rounded-lg transition-opacity hover:opacity-70"
-                style={{ color: '#7ac7a5' }}>
+                className="p-2 transition-opacity hover:opacity-70"
+                style={{ color: '#d7fa52' }}>
           {playing ? <Square size={16} /> : <Play size={16} />}
         </button>
         {editing ? (
           <>
             <button onClick={save} disabled={busy || !label.trim()} title="შენახვა"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70 disabled:opacity-30"
-                    style={{ color: '#7ac7a5' }}>
+                    className="p-2 transition-opacity hover:opacity-70 disabled:opacity-30"
+                    style={{ color: '#d7fa52' }}>
               <Check size={16} />
             </button>
             <button onClick={() => {
                       setEditing(false)
                       setLabel(sound.label); setGlyph(sound.glyph); setColor(sound.color)
                     }} title="გაუქმება"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70"
+                    className="p-2 transition-opacity hover:opacity-70"
                     style={{ color: 'rgba(225,233,225,0.5)' }}>
               <X size={16} />
             </button>
@@ -213,12 +217,12 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
         ) : (
           <>
             <button onClick={() => setEditing(true)} title="რედაქტირება"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70"
-                    style={{ color: '#31536b' }}>
+                    className="p-2 transition-opacity hover:opacity-70"
+                    style={{ color: '#a5b295' }}>
               <Pencil size={16} />
             </button>
             <button onClick={remove} disabled={busy} title="წაშლა"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70 disabled:opacity-30"
+                    className="p-2 transition-opacity hover:opacity-70 disabled:opacity-30"
                     style={{ color: '#ef918b' }}>
               <Trash2 size={16} />
             </button>
@@ -263,8 +267,8 @@ function UploadForm({ passcode, onAdded, onError }) {
   }
 
   return (
-    <form onSubmit={submit} className="western-panel p-4 mb-5">
-      <h2 className="text-sm font-western uppercase tracking-wider mb-3" style={{ color: '#eeeae1' }}>
+    <form onSubmit={submit} className="k-admin-panel p-4 mb-5">
+      <h2 className="text-sm uppercase tracking-wider mb-3" style={{ color: '#eff1e8' }}>
         ახალი ხმა
       </h2>
       <div className="flex flex-col gap-3">
@@ -273,24 +277,23 @@ function UploadForm({ passcode, onAdded, onError }) {
           onChange={(e) => setName(e.target.value)}
           placeholder="სახელი (მაგ. ბედი)"
           maxLength={64}
-          className="px-3 py-2.5 rounded-lg text-sm"
-          style={{ background: 'rgba(35,57,45,0.95)', border: '1px solid rgba(151,176,162,0.4)', color: '#eeeae1' }}
+          className="px-3 py-2.5 text-sm"
+          style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }}
         />
-        <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer"
-               style={{ background: 'rgba(35,57,45,0.95)', border: '1px dashed rgba(151,176,162,0.5)' }}>
-          <Upload size={18} style={{ color: '#d5b982' }} />
-          <span className="text-sm font-typewriter truncate" style={{ color: file ? '#eeeae1' : 'rgba(225,233,225,0.5)' }}>
+        <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
+               style={{ background: '#252b24', border: '1px dashed #647158' }}>
+          <Upload size={18} style={{ color: '#d7fa52' }} />
+          <span className="text-sm truncate" style={{ color: file ? '#eff1e8' : 'rgba(225,233,225,0.5)' }}>
             {file ? file.name : 'აირჩიე აუდიო ფაილი (mp3, ogg, wav, m4a)'}
           </span>
           <input ref={fileRef} type="file" accept="audio/*" onChange={pick} className="hidden" />
         </label>
         <button type="submit" disabled={busy || !file || !name.trim()}
-                className="western-pill px-4 py-2.5 text-sm font-bold disabled:opacity-40"
-                style={{ color: '#eeeae1' }}>
+                className="k-button px-4 py-2.5 text-sm font-bold disabled:opacity-40">
           {busy ? 'იტვირთება…' : 'დამატება'}
         </button>
       </div>
-      <p className="text-[10px] font-typewriter mt-3" style={{ color: 'rgba(225,233,225,0.45)' }}>
+      <p className="text-[10px] mt-3" style={{ color: 'rgba(225,233,225,0.45)' }}>
         ნიშანი და ფერი ავტომატურად შეირჩევა — დამატების შემდეგ შეგიძლია შეცვალო.
       </p>
     </form>
@@ -490,27 +493,27 @@ function SoundsAdmin({ passcode, onLocked }) {
         <UploadForm passcode={passcode} onAdded={() => reload()} onError={setError} />
 
         {error && (
-          <div className="mb-4 px-4 py-3 rounded-xl text-sm font-typewriter"
+          <div className="mb-4 px-4 py-3 text-sm"
                style={{ background: 'rgba(239,145,139,0.12)', border: '1px solid rgba(239,145,139,0.4)', color: '#ef918b' }}>
             {error}
           </div>
         )}
 
-        <div className="western-panel p-4">
-          <h2 className="text-sm font-western uppercase tracking-wider mb-3" style={{ color: '#eeeae1' }}>
+        <div className="k-admin-panel p-4">
+          <h2 className="text-sm uppercase tracking-wider mb-3" style={{ color: '#eff1e8' }}>
             კატალოგი {sounds.length > 0 && `(${sounds.length})`}
           </h2>
           {sounds.length > 1 && (
-            <p className="text-[10px] font-typewriter mb-2" style={{ color: 'rgba(225,233,225,0.45)' }}>
+            <p className="text-[10px] mb-2" style={{ color: 'rgba(225,233,225,0.45)' }}>
               რიგის შესაცვლელად გადაათრიე ⠿ სახელური — ეს რიგი ჩანს თამაშშიც.
             </p>
           )}
           {loading ? (
-            <div className="text-sm font-typewriter py-3 text-center" style={{ color: 'rgba(225,233,225,0.55)' }}>
+            <div className="text-sm py-3 text-center" style={{ color: 'rgba(225,233,225,0.55)' }}>
               იტვირთება…
             </div>
           ) : sounds.length === 0 ? (
-            <div className="text-sm font-typewriter py-3 text-center" style={{ color: 'rgba(225,233,225,0.55)' }}>
+            <div className="text-sm py-3 text-center" style={{ color: 'rgba(225,233,225,0.55)' }}>
               ჯერ არცერთი ხმა არ არის.
             </div>
           ) : (
@@ -528,7 +531,7 @@ function SoundsAdmin({ passcode, onLocked }) {
           )}
         </div>
 
-        <p className="text-[10px] font-typewriter mt-4 text-center" style={{ color: 'rgba(225,233,225,0.4)' }}>
+        <p className="text-[10px] mt-4 text-center" style={{ color: 'rgba(225,233,225,0.4)' }}>
           ცვლილებები მოთამაშეებთან შემდეგი გვერდის გახსნისას გამოჩნდება.
         </p>
     </>
@@ -553,37 +556,29 @@ export default function AdminApp() {
   }
 
   return (
-    <div className="saloon-bg min-h-screen px-4 py-8">
-      <div className="max-w-xl mx-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-3xl font-western" style={{ color: '#d5b982' }}>ადმინი</h1>
-          <div className="flex items-center gap-2">
-            <a href="/" className="text-xs font-typewriter underline" style={{ color: 'rgba(225,233,225,0.6)' }}>
-              მთავარი
-            </a>
-            <button onClick={lock}
-                    title="გასვლა"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70"
-                    style={{ color: 'rgba(225,233,225,0.6)' }}>
-              <LogOut size={16} />
-            </button>
+    <ClubShell page="admin" title="ადმინისტრირება" onHome={() => window.location.assign('/')}>
+      <div className="k-admin">
+        <header className="k-admin-heading">
+          <div>
+            <span className="k-eyebrow">THE CLUB / CONTROL ROOM</span>
+            <h1>ადმინისტრირება</h1>
+            <p>ხმები, სეზონები და მოთამაშეები — ერთ სივრცეში.</p>
           </div>
-        </div>
-
-        <div className="flex gap-2 mb-5" role="tablist">
+          <button onClick={lock} className="k-button k-button-outline"><LogOut size={16} /> გასვლა</button>
+        </header>
+        <nav className="k-admin-tabs" aria-label="ადმინისტრირების სექციები">
           {TABS.map(({ id, label, Icon }) => (
-            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
-                    className="western-pill px-3 py-2 text-xs font-bold inline-flex items-center gap-1.5"
-                    style={{ color: '#eeeae1', opacity: tab === id ? 1 : 0.55 }}>
-              <Icon size={14} /> {label}
+            <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
+              <Icon size={18} /> {label}
             </button>
           ))}
-        </div>
-
-        {tab === 'sounds'  && <SoundsAdmin  passcode={passcode} onLocked={lock} />}
-        {tab === 'seasons' && <SeasonsAdmin passcode={passcode} onLocked={lock} />}
-        {tab === 'players' && <PlayersAdmin passcode={passcode} onLocked={lock} />}
+        </nav>
+        <section className="k-admin-workspace" aria-label={TABS.find(t => t.id === tab).label}>
+          {tab === 'sounds'  && <SoundsAdmin passcode={passcode} onLocked={lock} />}
+          {tab === 'seasons' && <SeasonsAdmin passcode={passcode} onLocked={lock} />}
+          {tab === 'players' && <PlayersAdmin passcode={passcode} onLocked={lock} />}
+        </section>
       </div>
-    </div>
+    </ClubShell>
   )
 }
