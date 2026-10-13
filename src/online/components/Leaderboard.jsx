@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Trophy,
-} from "lucide-react-online";
+} from "lucide-react";
 import { listGames, aggregatePlayers } from "../lib/leaderboard";
 import { api } from "../lib/api";
 import { withCurrentAvatars } from "../lib/playerAvatars";

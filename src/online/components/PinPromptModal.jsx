@@ -1,6 +1,6 @@
 import { AvatarPhoto } from "./AvatarImg";
 import { useEffect, useRef, useState } from "react";
-import { Lock, ShieldCheck, X, Delete } from "lucide-react-online";
+import { Lock, ShieldCheck, X, Delete } from "lucide-react";
 import { verifyPin } from "../lib/profiles";
 
 /**

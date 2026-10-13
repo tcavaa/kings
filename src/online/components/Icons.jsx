@@ -1,6 +1,6 @@
 import {
   Heart, Diamond, Spade, Club,
-} from 'lucide-react-online'
+} from 'lucide-react'
 import { SUIT_NAMES } from '../constants/suits'
 
 const SUIT_ICONS = { H: Heart, D: Diamond, S: Spade, C: Club }

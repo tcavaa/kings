@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Eye, Trophy, Swords } from 'lucide-react-online'
+import { X, Eye, Trophy, Swords } from 'lucide-react'
 import { useGame, useLobby } from '../../context/GameContext'
 import AvatarImg from '../AvatarImg'
 

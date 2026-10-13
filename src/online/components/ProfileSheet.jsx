@@ -1,4 +1,4 @@
-import { ArrowRight, Plus, LogOut } from "lucide-react-online";
+import { ArrowRight, Plus, LogOut } from "lucide-react";
 import { checkPin } from "../lib/profiles";
 import ProfileForm, { ProfilePicker } from "./ProfileForm";
 import PinPromptModal from "./PinPromptModal";

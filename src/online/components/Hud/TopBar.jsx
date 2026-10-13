@@ -6,7 +6,7 @@ import {
   Check,
   MessageCircle,
   ChartNoAxesColumnIncreasing,
-} from "lucide-react-online";
+} from "lucide-react";
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
 import { SUIT_SYMBOLS, SUIT_NAMES } from "../../constants/suits";

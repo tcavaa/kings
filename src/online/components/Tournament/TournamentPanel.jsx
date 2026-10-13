@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react-online";
+import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react";
 import { useGame, useLobby } from "../../context/GameContext";
 import AvatarImg from "../AvatarImg";
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { AudioLines, Play } from "lucide-react-online";
+import { AudioLines, Play } from "lucide-react";
 import { useGame, useChat } from "../../context/GameContext";
 import { getSounds, subscribeSounds } from "../../lib/soundRegistry";
 import Sheet from "../ui/Sheet";

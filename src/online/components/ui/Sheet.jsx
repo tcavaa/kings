@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react-online";
+import { X } from "lucide-react";
 
 /** Focus-contained dialog; native dialog supplies inert background and Escape. */
 export default function Sheet({

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { Layers, ArrowUpRight } from "lucide-react-online";
+import { Layers, ArrowUpRight } from "lucide-react";
 function ActionPanel({ onLastTrick }) {
   return (
     <button

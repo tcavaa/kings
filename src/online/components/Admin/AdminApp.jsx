@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
-import { Volume2, Trash2, Upload, Play, Square, Pencil, Check, X, LogOut, GripVertical, Trophy, Users } from 'lucide-react-online'
+import { Volume2, Trash2, Upload, Play, Square, Pencil, Check, X, LogOut, GripVertical, Trophy, Users } from 'lucide-react'
 import { adminApi } from '../../lib/api'
 import { resolveUrl } from '../../lib/soundRegistry'
 import { inputStyle, describeError } from './adminUi'

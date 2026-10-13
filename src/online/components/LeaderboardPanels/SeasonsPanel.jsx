@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trophy } from "lucide-react-online";
+import { Trophy } from "lucide-react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,7 +9,7 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-} from "recharts-online";
+} from "recharts";
 import { api } from "../../lib/api";
 import { isWinnerName } from "../../lib/leaderboard";
 import { inSeason, seasonTable, winnerNames } from "../../../../server/games/results.js";

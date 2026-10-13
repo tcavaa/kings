@@ -1,6 +1,6 @@
 import { AvatarPhoto } from "./AvatarImg";
 import { useEffect, useRef, useState } from "react";
-import { Upload, Trash2, ArrowRight, Pencil, Check } from "lucide-react-online";
+import { Upload, Trash2, ArrowRight, Pencil, Check } from "lucide-react";
 import { saveProfile, fileToDataURL, deleteProfile } from "../lib/profiles";
 
 const PIN_DIGITS = 4;

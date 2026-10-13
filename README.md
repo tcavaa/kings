@@ -69,10 +69,7 @@ The two clients are mounted client-only (`next/dynamic`, `ssr: false`), each
 under its own root layout, so they render exactly as their Vite builds did and
 their stylesheets never meet (moving between them is a full page load).
 
-King Online stays on the libraries it was built with: recharts 2 and
-lucide-react 1.14 are installed side by side with the score app's recharts 3
-and lucide-react 1.25, as `recharts-online` / `lucide-react-online`.
-`react-is` is pinned to 19 so recharts 2 renders under React 19.
+Both clients use the same recharts 3 and lucide-react 1.25.
 
 Game rules live once: code only the clients share is in `shared/`; code the
 game server needs too sits under `server/` (Render deploys only that folder)

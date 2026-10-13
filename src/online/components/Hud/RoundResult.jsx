@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react-online";
+import { ArrowRight } from "lucide-react";
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
 import { quoteForRound } from "../../constants/quotes";

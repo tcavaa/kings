@@ -1,4 +1,4 @@
-import { AlertTriangle, WifiOff } from 'lucide-react-online'
+import { AlertTriangle, WifiOff } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 
 /**

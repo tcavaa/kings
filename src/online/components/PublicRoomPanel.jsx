@@ -1,4 +1,4 @@
-import { ArrowUpRight, Plus, Check, LogOut } from "lucide-react-online";
+import { ArrowUpRight, Plus, Check, LogOut } from "lucide-react";
 import { useGame, useLobby } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 

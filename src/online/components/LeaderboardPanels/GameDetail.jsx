@@ -1,5 +1,5 @@
 import { useMemo, useState, lazy, Suspense } from "react";
-import { ArrowLeft } from "lucide-react-online";
+import { ArrowLeft } from "lucide-react";
 import PodiumView from "./PodiumView";
 import PlayerStatsCards from "./PlayerStatsCards";
 import RoundBreakdownTable from "./RoundBreakdownTable";

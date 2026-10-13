@@ -1,4 +1,4 @@
-import { ArrowUpRight } from "lucide-react-online";
+import { ArrowUpRight } from "lucide-react";
 /** Small ლიგა/კლასიკური/ლაივი pill shown on each game row (and the detail header). */
 export function GameModeTag({ isChampionship, type, className = "" }) {
   const championship = isChampionship !== false; // records without the flag are legacy championship games

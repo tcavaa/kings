@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ArrowLeft } from "lucide-react-online";
+import { ArrowLeft } from "lucide-react";
 import AvatarImg from "../AvatarImg";
 import AchievementsPanel from "./AchievementsPanel";
 import PastGamesList from "./PastGamesList";

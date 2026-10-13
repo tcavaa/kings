@@ -8,7 +8,7 @@ import {
   ReferenceLine,
   Tooltip,
   Legend,
-} from "recharts-online";
+} from "recharts";
 import {
   CHART_COLOURS,
   gridProps,

@@ -1,4 +1,4 @@
-import { Ban, Star, Check, ArrowRight } from "lucide-react-online";
+import { Ban, Star, Check, ArrowRight } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import { SuitLabel } from "./Icons";
 import ModalShell from "./ModalShell";

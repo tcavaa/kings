@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { ArrowUpRight } from "lucide-react-online";
+import { ArrowUpRight } from "lucide-react";
 import { useGame } from "../../context/GameContext";
 function ScoreBoardPanel({ onOpen }) {
   const { players, cumulativeScores, mySeat } = useGame();

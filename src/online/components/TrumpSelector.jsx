@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ArrowRight, Heart, Diamond, Spade, Club } from "lucide-react-online";
+import { ArrowRight, Heart, Diamond, Spade, Club } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import ModalShell from "./ModalShell";
 import { SUIT_NAMES } from "../constants/suits";

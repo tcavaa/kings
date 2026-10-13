@@ -7,7 +7,7 @@ import {
   Play,
   Square,
   Smile,
-} from "lucide-react-online";
+} from "lucide-react";
 import { useGame, useChat } from "../context/GameContext";
 import { voicePlayer } from "../lib/voicePlayer";
 import AvatarImg from "./AvatarImg";

@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react'
-import { Timer } from 'lucide-react-online'
+import { Timer } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import { formatDuration } from '../../../../shared/duration.js'
 

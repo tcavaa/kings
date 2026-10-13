@@ -8,7 +8,7 @@ import {
   Check,
   RefreshCw,
   Swords,
-} from "lucide-react-online";
+} from "lucide-react";
 import { useGame } from "../context/GameContext";
 const ScoreChart = lazy(() => import("./ScoreChart"));
 import StatRow from "./StatRow";

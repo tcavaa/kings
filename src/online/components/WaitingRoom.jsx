@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, ArrowRight, Plus, ArrowLeft } from "lucide-react-online";
+import { Check, Copy, ArrowRight, Plus, ArrowLeft } from "lucide-react";
 import { useGame } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 import { Wordmark } from "./ui/ClubShell";

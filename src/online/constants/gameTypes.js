@@ -1,4 +1,4 @@
-import { Crown, Diamond, Spade, Heart, AlertTriangle, Ban, Plus, TrendingUp } from 'lucide-react-online'
+import { Crown, Diamond, Spade, Heart, AlertTriangle, Ban, Plus, TrendingUp } from 'lucide-react'
 import { GAME_TYPE_RULES } from '../../../server/game/gameTypes.js'
 
 // King Online's names, icons and colours for the nine game types. How each

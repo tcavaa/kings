@@ -7,7 +7,7 @@ import {
   Users,
   Swords,
   Crown,
-} from "lucide-react-online";
+} from "lucide-react";
 import { useGame, useLobby } from "../context/GameContext";
 import { api } from "../lib/api";
 import { useProfiles } from "../hooks/useProfiles";

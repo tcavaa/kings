@@ -1,4 +1,4 @@
-import { Flag, DoorOpen, Check, X } from 'lucide-react-online'
+import { Flag, DoorOpen, Check, X } from 'lucide-react'
 import { useGame } from '../../context/GameContext'
 import ModalShell from '../ModalShell'
 

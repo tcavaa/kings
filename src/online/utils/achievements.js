@@ -13,7 +13,7 @@ import {
   Star, Gem, Shield, TrendingUp, Flame, Rocket,
   Sparkles, Gamepad2, Joystick, Crown, Sparkle, Sun, Medal,
   Trophy, Skull, Swords, Zap, CloudLightning, Award,
-} from 'lucide-react-online'
+} from 'lucide-react'
 import { unitCountsOf } from '../../../server/game/gameTypes.js'
 import { winnerNames } from '../../../server/games/results.js'
 import {

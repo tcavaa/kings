@@ -1,6 +1,6 @@
 import "../styles/game-light.css";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Swords, Eye } from "lucide-react-online";
+import { Swords, Eye } from "lucide-react";
 import { useGame, useChat } from "../context/GameContext";
 import { EventBus } from "../game/EventBus";
 import PhaserGame from "../game/PhaserGame";

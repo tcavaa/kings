@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, LockOpen } from 'lucide-react-online'
+import { Plus, Trash2, LockOpen } from 'lucide-react'
 import { adminApi } from '../../lib/api'
 import { adminCall, ErrorNote, PanelTitle, inputStyle, muted } from './adminUi'
 

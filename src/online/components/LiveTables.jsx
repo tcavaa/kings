@@ -1,4 +1,4 @@
-import { Eye } from "lucide-react-online";
+import { Eye } from "lucide-react";
 import { useGame, useLobby } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 

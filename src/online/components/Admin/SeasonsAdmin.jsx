@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Trophy, Check } from 'lucide-react-online'
+import { Trophy, Check } from 'lucide-react'
 import Sheet from '../ui/Sheet'
 import { adminApi } from '../../lib/api'
 import { adminCall, ErrorNote, PanelTitle, inputStyle, muted } from './adminUi'

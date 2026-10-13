@@ -5,7 +5,7 @@ import {
   Layers,
   DoorOpen,
   Flag,
-} from "lucide-react-online";
+} from "lucide-react";
 import Sheet from "../ui/Sheet";
 import { useGame } from "../../context/GameContext";
 

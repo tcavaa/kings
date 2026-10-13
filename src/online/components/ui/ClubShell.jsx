@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   UserRound,
   NotebookPen,
-} from "lucide-react-online";
+} from "lucide-react";
 
 // The score keeper (King Score) lives at /score under its own root layout,
 // so getting there is a full page load rather than an in-app view.
