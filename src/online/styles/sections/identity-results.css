@@ -856,18 +856,6 @@
   max-height: calc(100dvh - 24px);
   overflow: auto;
 }
-.k-history {
-  color: #171919;
-}
-.k-detail {
-  background: #20271f;
-  padding: 24px;
-}
 .k-detail > div {
   max-width: none;
-}
-@media (max-width: 520px) {
-  .k-detail {
-    padding: 12px;
-  }
 }

@@ -280,8 +280,9 @@
 .k-used-types {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 22px;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 10px;
 }
 .k-used-types small {
   width: 100%;
@@ -505,8 +506,7 @@
     width: 48px;
     height: 69px;
   }
-  .k-contract-layout aside p,
-  .k-used-types {
+  .k-contract-layout aside p {
     display: none;
   }
   .k-contract-options {

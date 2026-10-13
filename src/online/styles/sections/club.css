@@ -14,6 +14,11 @@
 .k-seat-avatar:disabled {
   cursor: default;
 }
+/* An occupied seat is a disabled button, but it shows a player, not a dead
+   control: keep it out of the global button:disabled fade. */
+.k-seat-avatar:disabled:has(.k-avatar) {
+  opacity: 1;
+}
 .k-muted,
 .k-data-caption {
   color: #a7b19c;
@@ -150,13 +155,6 @@
 .k-strategy-modal .k-contract-options b {
   font-size: 17px;
 }
-.k-used-types {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 10px;
-}
 .k-voice-trigger {
   display: flex;
   align-items: center;
@@ -206,6 +204,7 @@
   height: 100dvh;
   max-height: 100dvh;
   width: min(510px, 100vw);
+  max-width: 100vw;
   border-left: 1px solid #414a3b;
   padding: 28px;
   box-shadow: -20px 0 80px #0005;
@@ -737,10 +736,6 @@
   z-index: 1;
   width: 40%;
   height: 40%;
-}
-.k-detail {
-  padding: 0;
-  background: transparent;
 }
 .k-history-report {
   color: #edf0e4;

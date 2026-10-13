@@ -26,7 +26,9 @@ export const viewport = {
   // the bottom HUD pills above the URL bar on iOS Safari.
   viewportFit: 'cover',
   interactiveWidget: 'resizes-content',
-  themeColor: '#0c1716',
+  // The ink of the club rail and the page canvas (:root in base.css); keep it
+  // and public/manifest.json in step with them.
+  themeColor: '#171919',
 }
 
 export default function OnlineLayout({ children }) {
@@ -35,11 +37,13 @@ export default function OnlineLayout({ children }) {
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        {/* Variable fonts over the whole 200–800 range the CSS uses (350, 450,
+            650… included). Not next/font: the Phaser scenes draw canvas text
+            by the plain family names, which next/font would hash. */}
         <link
           rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Georgian:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@200..800&family=Noto+Sans+Georgian:wght@200..800&display=swap"
         />
-        <style>{'html, body { margin: 0; padding: 0; background: #0c1716; }'}</style>
       </head>
       <body>
         <div id="root">{children}</div>

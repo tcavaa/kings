@@ -181,9 +181,6 @@
   letter-spacing: 0.7px;
   color: inherit;
 }
-.k-sheet.k-drawer {
-  max-width: 100vw;
-}
 .k-discard-card {
   position: relative;
   flex: none;

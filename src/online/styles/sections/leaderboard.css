@@ -203,7 +203,9 @@
   line-height: 1;
   font-weight: 500;
 }
-.k-leader-feature > .rounded-full {
+/* The avatar and name sit in one profile button; the margin clears the big
+   decorative "01", and position keeps them painted above it. */
+.k-leader-feature > .k-feature-profile {
   margin-top: 40px;
   position: relative;
 }
@@ -213,7 +215,7 @@
   position: relative;
   overflow-wrap: anywhere;
 }
-.k-leader-feature > div:not(.rounded-full) {
+.k-leader-feature > div {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 15px;
@@ -360,10 +362,15 @@
 .k-insights-grid > :last-child {
   grid-column: 1/-1;
 }
-.k-history,
+.k-history {
+  color: #171919;
+  margin-bottom: 35px;
+}
 .k-detail {
   color: #f2f2e9;
   margin-bottom: 35px;
+  padding: 0;
+  background: transparent;
 }
 .k-pagination {
   display: flex;
@@ -407,8 +414,15 @@
   .k-leader-feature > .k-eyebrow {
     grid-column: 1/-1;
   }
-  .k-leader-feature > .rounded-full {
-    margin: 12px 0;
+  /* The profile button spans the card: avatar and name side by side. */
+  .k-leader-feature > .k-feature-profile {
+    grid-column: 1/-1;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    margin: 12px 0 0;
+  }
+  .k-leader-feature .k-feature-profile .k-avatar {
     width: 64px !important;
     height: 64px !important;
   }
@@ -416,7 +430,7 @@
     margin: 0;
     font-size: 24px;
   }
-  .k-leader-feature > div:not(.rounded-full) {
+  .k-leader-feature > div {
     grid-column: 1/-1;
     grid-template-columns: auto 1fr auto 1fr;
     padding: 15px 0;
