@@ -1,6 +1,8 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
 import { Volume2, Trash2, Upload, Play, Square, Pencil, Check, X, LogOut, GripVertical, Trophy, Users } from 'lucide-react-online'
-import { adminApi, API_BASE } from '../../lib/api'
+import { adminApi } from '../../lib/api'
+import { resolveUrl } from '../../lib/soundRegistry'
+import { inputStyle, describeError } from './adminUi'
 import { voicePlayer } from '../../lib/voicePlayer'
 import SeasonsAdmin from './SeasonsAdmin'
 import PlayersAdmin from './PlayersAdmin'
@@ -52,7 +54,7 @@ function PasscodeGate({ onUnlock }) {
       writePass(code)
       onUnlock(code)
     } catch (err) {
-      setError(err.message || 'შეცდომა')
+      setError(describeError(err))
     } finally {
       setBusy(false)
     }
@@ -103,11 +105,9 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
   const [busy, setBusy] = useState(false)
   const [playing, setPlaying] = useState(false)
 
-  // The admin API returns raw catalogue urls (the registry's resolveUrl only
-  // runs on the player-facing copy), so apply the same page-origin-vs-API
-  // fix-up here: in dev the page is on :5173 while uploaded clips are served
-  // from :3001. No-op in production, where API_BASE is ''.
-  const url = sound.url.startsWith('/api/') ? `${API_BASE}${sound.url}` : sound.url
+  // The admin API returns raw catalogue urls, so apply the registry's
+  // page-origin-vs-API fix-up (a no-op in production, where API_BASE is '').
+  const url = resolveUrl(sound.url)
 
   useEffect(() => voicePlayer.subscribe((u) => setPlaying(u === url)), [url])
 
@@ -117,7 +117,7 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
       await adminApi.updateSound(passcode, sound.id, { label, glyph, color })
       setEditing(false)
       onChanged()
-    } catch (err) { onError(err.message) } finally { setBusy(false) }
+    } catch (err) { onError(describeError(err)) } finally { setBusy(false) }
   }
 
   const remove = async () => {
@@ -127,7 +127,7 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
       if (playing) voicePlayer.stop()
       await adminApi.deleteSound(passcode, sound.id)
       onChanged()
-    } catch (err) { onError(err.message) } finally { setBusy(false) }
+    } catch (err) { onError(describeError(err)) } finally { setBusy(false) }
   }
 
   return (
@@ -173,11 +173,11 @@ function SoundRow({ sound, passcode, onChanged, onError, onGrab, dragging, inner
         <div className="flex-1 flex flex-wrap items-center gap-2">
           <input value={label} onChange={(e) => setLabel(e.target.value)}
                  className="flex-1 min-w-[8rem] px-2 py-1.5 rounded text-sm"
-                 style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }} />
+                 style={inputStyle} />
           <input value={glyph} onChange={(e) => setGlyph(e.target.value)} maxLength={2}
                  title="ნიშანი"
                  className="w-12 px-2 py-1.5 rounded text-sm text-center"
-                 style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }} />
+                 style={inputStyle} />
           <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
                  title="ფერი"
                  className="w-10 h-8 rounded cursor-pointer"
@@ -263,7 +263,7 @@ function UploadForm({ passcode, onAdded, onError }) {
       setName(''); setFile(null)
       if (fileRef.current) fileRef.current.value = ''
       onAdded()
-    } catch (err) { onError(err.message) } finally { setBusy(false) }
+    } catch (err) { onError(describeError(err)) } finally { setBusy(false) }
   }
 
   return (
@@ -278,7 +278,7 @@ function UploadForm({ passcode, onAdded, onError }) {
           placeholder="სახელი (მაგ. ბედი)"
           maxLength={64}
           className="px-3 py-2.5 text-sm"
-          style={{ background: '#252b24', border: '1px solid #46513e', color: '#eff1e8' }}
+          style={inputStyle}
         />
         <label className="flex items-center gap-3 px-3 py-2.5 cursor-pointer"
                style={{ background: '#252b24', border: '1px dashed #647158' }}>
@@ -365,7 +365,7 @@ function SoundsAdmin({ passcode, onLocked }) {
     try {
       await adminApi.reorderSounds(passcode, ordered)
     } catch (err) {
-      setError(err.message)
+      setError(describeError(err))
       // Put the old order back — the save didn't land.
       setSounds(sounds)
     }
@@ -475,11 +475,11 @@ function SoundsAdmin({ passcode, onLocked }) {
     } catch (err) {
       // A stale sessionStorage code (server passcode changed) lands here —
       // drop it and fall back to the gate rather than showing an empty list.
-      if ((err.message || '').includes('HTTP 401')) {
+      if (err?.status === 401) {
         onLocked()
         return
       }
-      setError(err.message)
+      setError(describeError(err))
     } finally { setLoading(false) }
   }, [passcode, onLocked])
 

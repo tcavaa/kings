@@ -42,9 +42,13 @@ export function onProfileSessionLost(fn) {
 export const listProfiles = () => api.listProfiles()
 
 /**
- * Create or edit a profile and play as it. `avatar`: a data URL sets the
- * photo, null removes it, undefined keeps it. `currentPin` is the profile's
- * existing PIN — the server refuses to change a PIN-protected profile without it.
+ * Create or edit a profile. `avatar`: a data URL sets the photo, null removes
+ * it, undefined keeps it. `currentPin` is the profile's existing PIN — the
+ * server refuses to change a PIN-protected profile without it.
+ *
+ * A new profile becomes the one this device plays as, and editing the active
+ * one refreshes its session. Editing someone else's (fixing a friend's photo)
+ * leaves the active profile alone.
  */
 export async function saveProfile({ id, name, avatar, pin, currentPin }) {
   const profileId = id || `p_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -54,7 +58,7 @@ export async function saveProfile({ id, name, avatar, pin, currentPin }) {
     ...(pin === undefined ? {} : { pin }),
     ...(currentPin ? { currentPin } : {}),
   })
-  setProfileSession(saved.id, saved.token)
+  if (!id || id === getActiveProfileId()) setProfileSession(saved.id, saved.token)
   return saved
 }
 

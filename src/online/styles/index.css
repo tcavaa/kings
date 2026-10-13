@@ -5133,3 +5133,18 @@ input {
   .k-admin-confirm-actions { flex-direction: column-reverse; }
   .k-admin-sound-row { flex-wrap: wrap; }
 }
+
+/* Leaderboard leader card: the avatar and name sit inside the profile
+   button (Leaderboard.jsx), so the card's older `> .rounded-full` rules no
+   longer match anything. */
+.k-leader-feature > .k-feature-profile { margin-top: 40px; position: relative; }
+@media (max-width: 760px) {
+  .k-leader-feature > .k-feature-profile {
+    grid-column: 1/-1;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    margin: 12px 0 0;
+  }
+  .k-leader-feature .k-feature-profile .k-avatar { width: 64px !important; height: 64px !important; }
+}

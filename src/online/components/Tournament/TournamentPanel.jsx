@@ -29,11 +29,11 @@ export default function TournamentPanel({ active, onNeedProfile }) {
   const [size, setSize] = useState(6);
   const [code, setCode] = useState("");
 
-  // Refresh the open-tournament list on mount and whenever ours changes
-  // (creating or leaving one changes what everybody else should see).
+  // Fetch the open-tournament list on mount and after a reconnect. Later
+  // changes (ours included) arrive in the server's own broadcast.
   useEffect(() => {
     if (connected) refreshTournaments();
-  }, [connected, tournament, refreshTournaments]);
+  }, [connected, refreshTournaments]);
 
   // One table at a time: not while sitting at the homepage table.
   const canAct = connected && !!active && publicSeat === null;

@@ -20,6 +20,7 @@ import RoundResult from "./Hud/RoundResult";
 import QuitModal from "./Hud/QuitModal";
 import BracketOverview from "./Tournament/BracketOverview";
 import { quoteForRound } from "../constants/quotes";
+import { useWakeLock } from "../hooks/useWakeLock";
 
 /**
  * Orchestrator for the in-game experience: hosts the Phaser canvas and
@@ -53,6 +54,8 @@ export default function GameLayout() {
     tournamentSeat,
     spectating,
     stopSpectating,
+    quitProposal,
+    reconnecting,
   } = useGame();
   const { chatBubbles, typingSeats, canSpeak } = useChat();
 
@@ -107,8 +110,8 @@ export default function GameLayout() {
       centerCards,
       currentTrick,
       ledSuit,
-        currentTurn,
-        mySeat,
+      currentTurn,
+      mySeat,
       players,
       leaderSeat,
       gamePhase,
@@ -118,7 +121,9 @@ export default function GameLayout() {
       cumulativeScores,
       trickAnimation,
       chatBubbles: bubblesWithTyping,
-      playPending,
+      // While offline (or not yet back in our seat) a tap can't reach the
+      // server in time, so the hand stays locked like a play in flight.
+      playPending: playPending || reconnecting,
       // Lets the canvas tell "the seat this view is anchored to" apart from
       // "the person looking" — a watcher is anchored to seat 0 but owns none.
       spectator: !!spectating,
@@ -129,8 +134,8 @@ export default function GameLayout() {
       centerCards,
       currentTrick,
       ledSuit,
-        currentTurn,
-        mySeat,
+      currentTurn,
+      mySeat,
       players,
       leaderSeat,
       gamePhase,
@@ -141,6 +146,7 @@ export default function GameLayout() {
       trickAnimation,
       bubblesWithTyping,
       playPending,
+      reconnecting,
       spectating,
     ],
   );
@@ -199,30 +205,14 @@ export default function GameLayout() {
     return () => clearTimeout(t);
   }, [gamePhase, currentTurn, mySeat, trickAnimation]);
 
-  // ── Wake-lock: keep the screen awake while a game is in progress ────────
+  // Keep the screen awake while a game is in progress.
+  useWakeLock();
+
+  // Another player's quit proposal replaces any confirm dialog we had open;
+  // drop ours, or it pops back up once their vote is over.
   useEffect(() => {
-    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
-    let lock = null;
-    let cancelled = false;
-    const acquire = async () => {
-      try {
-        lock = await navigator.wakeLock.request("screen");
-      } catch {
-        /* user has battery saver / page hidden — fine */
-      }
-      if (cancelled && lock) lock.release().catch(() => {});
-    };
-    acquire();
-    const onVisibility = () => {
-      if (document.visibilityState === "visible" && !lock) acquire();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      cancelled = true;
-      document.removeEventListener("visibilitychange", onVisibility);
-      if (lock) lock.release().catch(() => {});
-    };
-  }, []);
+    if (quitProposal) setConfirmQuit(null);
+  }, [quitProposal]);
 
   return (
     // The wrapper must track the *visible* viewport height, not the layout

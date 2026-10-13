@@ -9,6 +9,7 @@ import {
 import { listGames, aggregatePlayers } from "../lib/leaderboard";
 import { api } from "../lib/api";
 import { withCurrentAvatars } from "../lib/playerAvatars";
+import { winRate } from "../utils/format";
 import ClubShell from "./ui/ClubShell";
 import AvatarImg from "./AvatarImg";
 import PlayersTable from "./LeaderboardPanels/PlayersTable";
@@ -50,7 +51,9 @@ export default function Leaderboard({ onBack }) {
     return counts;
   }, [allGames]);
   const aggregated = useMemo(() => aggregatePlayers(games), [games]);
-  const ranked = useMemo(
+  // Ranked in the table's current order; a profile opened from it shows the
+  // same rank as its row.
+  const rankedAll = useMemo(
     () =>
       [...aggregated]
         .sort((a, b) =>
@@ -58,12 +61,19 @@ export default function Leaderboard({ onBack }) {
             ? b.totalScore - a.totalScore
             : b.wins - a.wins || b.totalScore - a.totalScore,
         )
-        .map((p, i) => ({ ...p, rank: i + 1 }))
-        .filter((p) =>
-          p.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-        ),
-    [aggregated, sort, query],
+        .map((p, i) => ({ ...p, rank: i + 1 })),
+    [aggregated, sort],
   );
+  const ranked = useMemo(
+    () =>
+      rankedAll.filter((p) =>
+        p.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+      ),
+    [rankedAll, query],
+  );
+  const profilePlayer = profileName
+    ? rankedAll.find((p) => p.name === profileName)
+    : null;
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -211,14 +221,17 @@ export default function Leaderboard({ onBack }) {
             <div className="k-detail">
               <GameDetail game={selected} onBack={() => setSelected(null)} />
             </div>
-          ) : profileName ? (
+          ) : profilePlayer ? (
             <PlayerProfile
-              player={aggregated.find((p) => p.name === profileName)}
-              rank={aggregated.findIndex((p) => p.name === profileName) + 1}
+              player={profilePlayer}
+              rank={profilePlayer.rank}
               games={games}
               onBack={() => setProfileName(null)}
               onSelectGame={setSelected}
             />
+          ) : section === "rankings" && !leader ? (
+            // Every game in this filter was played by removed players only.
+            <p className="k-empty">ამ ფილტრით რეიტინგში მოთამაშე არ არის.</p>
           ) : section === "rankings" ? (
             <div className="k-ranking-layout">
               <aside className="k-leader-feature">
@@ -237,12 +250,7 @@ export default function Leaderboard({ onBack }) {
                 <div>
                   <strong>{leader.wins}</strong>
                   <span>გამარჯვება</span>
-                  <strong>
-                    {leader.gamesPlayed
-                      ? Math.round((leader.wins / leader.gamesPlayed) * 100)
-                      : 0}
-                    %
-                  </strong>
+                  <strong>{winRate(leader)}%</strong>
                   <span>მოგების მაჩვენებელი</span>
                 </div>
                 <span className="k-leader-foot">
@@ -291,7 +299,12 @@ export default function Leaderboard({ onBack }) {
             <SeasonsPanel games={games} />
           ) : section === "insights" ? (
             aggregated.length > 1 ? (
-              <Insights games={games} players={aggregated} gameType={gameType} />
+              <Insights
+                key={gameType}
+                games={games}
+                players={aggregated}
+                gameType={gameType}
+              />
             ) : (
               <p className="k-empty">
                 ანალიტიკისთვის საჭიროა ორი მოთამაშის შედეგები.

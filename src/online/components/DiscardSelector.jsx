@@ -3,9 +3,8 @@ import { useGame } from "../context/GameContext";
 import { SuitLabel } from "./Icons";
 import ModalShell from "./ModalShell";
 import PlayingCard from "./ui/PlayingCard";
+import { SUIT_SYMBOLS } from "../constants/suits";
 
-const SUIT_SYMBOLS = { H: "♥", D: "♦", S: "♠", C: "♣" };
-const isRed = (s) => s === "H" || s === "D";
 const cardKey = (c) => `${c.rank}-${c.suit}`;
 
 function isCardRestricted(card, gameType) {

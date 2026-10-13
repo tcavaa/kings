@@ -27,6 +27,45 @@ export function isWinnerName(game, name) {
  */
 export const isRemovedPlayer = (p) => p?.profileId === null
 
+/**
+ * Every pair of (current) players who shared a table, with each side's wins,
+ * total and best score: { a, b, aWins, bWins, aTotal, bTotal, aBest, bBest,
+ * gamesShared }, names sorted so `a` < `b`. Computed once for the head-to-head
+ * and rivalry panels.
+ */
+export function buildPairStats(games = []) {
+  const map = new Map()
+  for (const g of games) {
+    const players = (g.players || []).filter((p) => !isRemovedPlayer(p))
+    if (players.length < 2) continue
+    for (let i = 0; i < players.length; i++) {
+      for (let j = i + 1; j < players.length; j++) {
+        const A = players[i], B = players[j]
+        const [first, second] = [A.name, B.name].sort()
+        const key = `${first}\u0000${second}`
+        const aFirst = first === A.name
+        const row = map.get(key) || {
+          a: first, b: second,
+          aWins: 0, bWins: 0, aTotal: 0, bTotal: 0,
+          aBest: -Infinity, bBest: -Infinity, gamesShared: 0,
+        }
+        row.gamesShared += 1
+        const aScore = Number(aFirst ? A.score : B.score) || 0
+        const bScore = Number(aFirst ? B.score : A.score) || 0
+        row.aTotal += aScore
+        row.bTotal += bScore
+        if (aScore > row.aBest) row.aBest = aScore
+        if (bScore > row.bBest) row.bBest = bScore
+        // Tie-aware: a shared top score means both names take a win.
+        if (isWinnerName(g, row.a)) row.aWins += 1
+        if (isWinnerName(g, row.b)) row.bWins += 1
+        map.set(key, row)
+      }
+    }
+  }
+  return Array.from(map.values())
+}
+
 /** Aggregate stats per player name across the supplied games array. */
 export function aggregatePlayers(games = []) {
   const tally = new Map()
@@ -39,11 +78,14 @@ export function aggregatePlayers(games = []) {
         gamesPlayed: 0, wins: 0, totalScore: 0,
         bestScore: -Infinity, worstScore: Infinity,
       }
+      // One number for both the comparison and the stored value, so a game
+      // without a score can't leave best/worst undefined for good.
+      const s = Number(p.score) || 0
       t.gamesPlayed++
       if (isWinnerName(g, p.name)) t.wins++
-      t.totalScore += p.score ?? 0
-      if ((p.score ?? 0) > t.bestScore)  t.bestScore  = p.score
-      if ((p.score ?? 0) < t.worstScore) t.worstScore = p.score
+      t.totalScore += s
+      if (s > t.bestScore)  t.bestScore  = s
+      if (s < t.worstScore) t.worstScore = s
       if (!t.avatar && p.avatar) t.avatar = p.avatar
       tally.set(k, t)
     }

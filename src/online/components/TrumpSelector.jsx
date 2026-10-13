@@ -2,12 +2,14 @@ import { useState, useMemo } from "react";
 import { ArrowRight, Heart, Diamond, Spade, Club } from "lucide-react-online";
 import { useGame } from "../context/GameContext";
 import ModalShell from "./ModalShell";
+import { SUIT_NAMES } from "../constants/suits";
+import { useTapLock } from "../hooks/useTapLock";
 
 const SUITS = [
-  { code: "S", Icon: Spade, name: "ყვავი", color: "#1a1a1a" },
-  { code: "H", Icon: Heart, name: "გული", color: "#a31818" },
-  { code: "D", Icon: Diamond, name: "აგური", color: "#a31818" },
-  { code: "C", Icon: Club, name: "ჯვარი", color: "#1a1a1a" },
+  { code: "S", Icon: Spade, name: SUIT_NAMES.S, color: "#1a1a1a" },
+  { code: "H", Icon: Heart, name: SUIT_NAMES.H, color: "#a31818" },
+  { code: "D", Icon: Diamond, name: SUIT_NAMES.D, color: "#a31818" },
+  { code: "C", Icon: Club, name: SUIT_NAMES.C, color: "#1a1a1a" },
 ];
 
 import PlayingCard from "./ui/PlayingCard";
@@ -18,6 +20,7 @@ function HandPreviewCard({ card, isTrump }) {
 export default function TrumpSelector() {
   const { selectTrump, leaderSeat, players, chosenGameType, hand } = useGame();
   const [picked, setPicked] = useState(null);
+  const [sent, once] = useTapLock();
 
   const leaderName =
     players.find((p) => p.seat === leaderSeat)?.name ??
@@ -66,13 +69,17 @@ export default function TrumpSelector() {
         </div>
       </div>
       <footer className="k-contract-footer">
-        <button className="k-link" onClick={() => selectTrump(null)}>
+        <button
+          className="k-link"
+          disabled={sent}
+          onClick={() => once(() => selectTrump(null))}
+        >
           ვითამაშოთ უკოზიროდ
         </button>
         <button
           className="k-button"
-          disabled={!picked}
-          onClick={() => picked && selectTrump(picked)}
+          disabled={!picked || sent}
+          onClick={() => picked && once(() => selectTrump(picked))}
         >
           დაადასტურე არჩევანი <ArrowRight size={18} />
         </button>

@@ -8,13 +8,22 @@ export const inputStyle = {
   color: '#eff1e8',
 }
 
+/**
+ * An API error as the admin page shows it: the Georgian message, plus the
+ * server's own detail (which names the bad field) when there is one.
+ */
+export function describeError(err) {
+  const detail = err?.serverMessage
+  return detail && detail !== err.message ? `${err.message} (${detail})` : (err?.message || 'შეცდომა')
+}
+
 /** Run an admin call: a rejected passcode locks the page, any other error is shown. */
 export async function adminCall(fn, { onLocked, onError }) {
   try {
     return await fn()
   } catch (err) {
-    if ((err.message || '').includes('HTTP 401')) onLocked()
-    else onError(err.message.replace(/^HTTP \d+: /, ''))
+    if (err?.status === 401) onLocked()
+    else onError(describeError(err))
     return undefined
   }
 }

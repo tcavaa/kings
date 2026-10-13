@@ -34,6 +34,37 @@ export function getClientKey() {
   return k
 }
 
+/**
+ * A failed API call. `status` is the HTTP status (0 when the server never
+ * answered), `message` is Georgian and safe to show, and `serverMessage` is
+ * the server's own (English) text, for the admin page and the console.
+ */
+export class ApiError extends Error {
+  constructor(status, message, serverMessage = '') {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.serverMessage = serverMessage
+  }
+}
+
+const GEORGIAN_ERRORS = {
+  400: 'მონაცემები არასწორია.',
+  401: 'კოდი არასწორია.',
+  403: 'ამის უფლება არ გაქვს.',
+  404: 'ვერ მოიძებნა.',
+  409: 'ასეთი სახელი უკვე არსებობს.',
+  413: 'ფაილი ძალიან დიდია.',
+  429: 'ძალიან ბევრი მცდელობა — სცადე მოგვიანებით.',
+}
+const georgianFor = (status) =>
+  GEORGIAN_ERRORS[status] || (status >= 500 ? 'სერვერის შეცდომა — სცადე მოგვიანებით.' : 'მოთხოვნა ვერ შესრულდა.')
+
+// A request that hangs (a cold database, a dead network) fails instead of
+// leaving a spinner up forever. Writes carry uploads, so they get longer.
+const READ_TIMEOUT_MS = 20 * 1000
+const WRITE_TIMEOUT_MS = 60 * 1000
+
 async function request(path, options = {}) {
   const method = (options.method || 'GET').toUpperCase()
   const isWrite = method !== 'GET' && method !== 'HEAD'
@@ -44,12 +75,24 @@ async function request(path, options = {}) {
     ...(isWrite ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
   }
-  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
+  const signal = options.signal
+    ?? (typeof AbortSignal !== 'undefined' && AbortSignal.timeout
+      ? AbortSignal.timeout(isWrite ? WRITE_TIMEOUT_MS : READ_TIMEOUT_MS)
+      : undefined)
+  let res
+  try {
+    res = await fetch(`${API_BASE}${path}`, { ...options, headers, signal })
+  } catch (err) {
+    const timedOut = err?.name === 'TimeoutError' || err?.name === 'AbortError'
+    throw new ApiError(0, timedOut
+      ? 'სერვერი არ პასუხობს — სცადე ხელახლა.'
+      : 'სერვერთან კავშირი ვერ დამყარდა.', err?.message || '')
+  }
   if (!res.ok) {
     let body = ''
     try { body = await res.text() } catch { /* ignore */ }
-    const msg = body ? safeMessage(body) : res.statusText
-    throw new Error(`HTTP ${res.status}: ${msg}`)
+    const serverMessage = body ? safeMessage(body) : res.statusText
+    throw new ApiError(res.status, georgianFor(res.status), serverMessage)
   }
   if (res.status === 204) return null
   return res.json()
@@ -69,10 +112,9 @@ export const api = {
     method: 'DELETE', body: JSON.stringify({ currentPin }),
   }),
   // PIN check — returns { ok: true, hadPin, token } on success (the token
-  // signs this browser in as the profile). On a wrong PIN the server replies
-  // 401 → request() throws an Error whose .message contains "HTTP 401". We
-  // surface that as { ok: false } so callers can render a toast without
-  // try/catching. Too many wrong PINs come back as { reason: 'locked' }.
+  // signs this browser in as the profile). A wrong PIN (401), too many tries
+  // (429) and a profile that's gone (404) come back as { ok: false, reason }
+  // so callers can show a message without try/catching.
   verifyProfilePin: async (id, pin) => {
     try {
       const out = await request(`/api/profiles/${encodeURIComponent(id)}/verify-pin`, {
@@ -80,10 +122,9 @@ export const api = {
       })
       return { ok: !!out?.ok, hadPin: !!out?.hadPin, token: out?.token || null }
     } catch (err) {
-      const msg = err?.message || ''
-      if (msg.includes('HTTP 429')) return { ok: false, hadPin: true, reason: 'locked' }
-      if (msg.includes('HTTP 401')) return { ok: false, hadPin: true, reason: 'bad_pin' }
-      if (msg.includes('HTTP 404')) return { ok: false, hadPin: false, reason: 'not_found' }
+      if (err?.status === 429) return { ok: false, hadPin: true, reason: 'locked' }
+      if (err?.status === 401) return { ok: false, hadPin: true, reason: 'bad_pin' }
+      if (err?.status === 404) return { ok: false, hadPin: false, reason: 'not_found' }
       throw err
     }
   },
@@ -128,7 +169,7 @@ export const adminApi = {
       })
       return !!out?.ok
     } catch (err) {
-      if ((err?.message || '').includes('HTTP 401')) return false
+      if (err?.status === 401) return false
       throw err
     }
   },

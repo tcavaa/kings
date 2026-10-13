@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../../lib/api";
+import PlayerSelect, { usePlayerChoice } from "./PlayerSelect";
 const FIELDS = [
   ["K♥", "გულის მეფე", "kingsOfHearts"],
   ["Q", "დამები", "queens"],
@@ -7,8 +8,8 @@ const FIELDS = [
   ["♥", "გულები", "hearts"],
 ];
 export default function LifetimeCardStats({ players, gameType = "all" }) {
-  const [selected, setSelected] = useState("");
-  const name = selected || players[0]?.name;
+  const names = useMemo(() => players.map((p) => p.name), [players]);
+  const [name, setName] = usePlayerChoice(names);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -37,15 +38,12 @@ export default function LifetimeCardStats({ players, gameType = "all" }) {
           <span className="k-eyebrow">04 / PLAYER PROFILE</span>
           <h2>საერთო სტატისტიკა</h2>
         </div>
-        <select
-          aria-label="მოთამაშის საერთო სტატისტიკა"
+        <PlayerSelect
+          label="მოთამაშის საერთო სტატისტიკა"
+          names={names}
           value={name}
-          onChange={(e) => setSelected(e.target.value)}
-        >
-          {players.map((p) => (
-            <option key={p.name}>{p.name}</option>
-          ))}
-        </select>
+          onChange={setName}
+        />
       </header>
       {error ? (
         <div className="k-data-empty">

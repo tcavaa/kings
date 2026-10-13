@@ -6,6 +6,7 @@ import { getProfileToken, dropProfileSession } from '../lib/profiles'
 import { voicePlayer } from '../lib/voicePlayer'
 import { readSeatMarker, writeSeatMarker, clearSeatMarker } from '../lib/publicSeatStore'
 import { getSounds, setSounds } from '../lib/soundRegistry'
+import { SUIT_NAMES } from '../constants/suits'
 
 const GameContext = createContext(null)
 // Chat traffic (messages, table bubbles, typing pings) changes at keystroke
@@ -50,6 +51,8 @@ function primeAudioEl(a) {
   } catch { /* ignore */ }
 }
 
+const sameCard = (a, b) => a.rank === b.rank && a.suit === b.suit
+
 const TRICK_DISPLAY_MS = 1300   // how long a completed trick stays on the table
 const TRICK_ANIMATION_MS = 600  // how long the "fly to winner" animation runs
 
@@ -89,11 +92,16 @@ export function GameProvider({ children }) {
   const [finalResults, setFinalResults]         = useState(null)
 
   const [toasts, setToasts]                     = useState([])
-  const [disconnectedPlayer, setDisconnectedPlayer] = useState(null)
+  // Names of seated players who dropped and haven't come back yet (shown
+  // after a short grace period, see player-disconnected).
+  const [disconnectedPlayers, setDisconnectedPlayers] = useState([])
+  const disconnectTimers = useRef({})   // name -> grace timer
   // True from the moment our own socket goes offline until it reconnects
   // AND the server confirms re-attachment (room-joined { reconnected: true }).
   // Drives the self-disconnect banner.
   const [reconnecting, setReconnecting] = useState(false)
+  const reconnectingRef = useRef(false)
+  const setReconnectingBoth = (v) => { reconnectingRef.current = v; setReconnecting(v) }
   const [selectedDiscards, setSelectedDiscards] = useState([])
 
   // Chat
@@ -105,6 +113,10 @@ export function GameProvider({ children }) {
   const [typingSeats, setTypingSeats] = useState({})    // seat -> true
   const typingTimers    = useRef({})
   const typingSentAtRef = useRef(0)
+  // Object URLs of the voice clips we hold, revoked when they leave the chat.
+  const voiceUrlsRef = useRef(new Set())
+  // Chat typed while offline, sent once the server has us back in our seat.
+  const chatQueueRef = useRef([])
 
   // ── Public quick-match room (homepage) ──────────────────────────────────
   // Live snapshot of the shared homepage table, broadcast to every socket.
@@ -165,6 +177,9 @@ export function GameProvider({ children }) {
   // The tournament we're entered in, so a reconnect can rejoin it too.
   const tournamentCodeRef = useRef('')
   const hadDisconnectRef = useRef(false)
+  // Set by a reconnect: the next snapshot is the whole truth, including that
+  // no quit vote is running (snapshots don't carry one).
+  const snapshotAfterRejoinRef = useRef(false)
   // Mirrors `appPhase` for the mount-only socket effect (which can't see the
   // state variable). Used to keep background resyncs to screens that
   // actually have a table to resync.
@@ -206,7 +221,11 @@ export function GameProvider({ children }) {
     const actorSeat = gamePhase === 'playing' ? currentTurn : leaderSeat
     if (actorSeat === null || actorSeat === undefined || actorSeat === mySeat) return
     const t = setTimeout(() => {
-      socketRef.current?.emit('request-state')
+      // Nothing to gain while hidden or offline: the visibility and
+      // reconnect paths resync on their own when we're back.
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      if (!socketRef.current?.connected || reconnectingRef.current) return
+      socketRef.current.emit('request-state')
     }, 9000)
     return () => clearTimeout(t)
   }, [gamePhase, currentTurn, leaderSeat, mySeat])
@@ -242,6 +261,82 @@ export function GameProvider({ children }) {
   const clearGameOverTimer = () => {
     clearTimeout(gameOverTimerRef.current)
     gameOverTimerRef.current = null
+  }
+
+  const seatName = (seat, list = playersRef.current) =>
+    (list || []).find(p => p.seat === seat)?.name || `მოთამაშე ${seat}`
+
+  // A message (or sound label) over a seat's avatar for `ms`.
+  const showBubble = (seat, bubble, ms) => {
+    setChatBubbles(prev => ({ ...prev, [seat]: bubble }))
+    if (bubbleTimers.current[seat]) clearTimeout(bubbleTimers.current[seat])
+    bubbleTimers.current[seat] = setTimeout(() => {
+      delete bubbleTimers.current[seat]
+      setChatBubbles(prev => {
+        const next = { ...prev }; delete next[seat]; return next
+      })
+    }, ms)
+  }
+
+  // A fresh hand: no trick on the table, nothing in flight.
+  const resetTrickState = () => {
+    setCurrentTrick([])
+    setLedSuit(null)
+    setTrumpSuit(null)
+    setLastTrickResult(null)
+    setLastCenterCards([])
+    setTrickAnimation(null)
+    setSelectedDiscards([])
+    setPlayPendingBoth(false)
+    clearTrickTimers()
+  }
+
+  const clearDisconnected = (name) => {
+    if (name === undefined) {
+      Object.values(disconnectTimers.current).forEach(clearTimeout)
+      disconnectTimers.current = {}
+      setDisconnectedPlayers([])
+      return
+    }
+    clearTimeout(disconnectTimers.current[name])
+    delete disconnectTimers.current[name]
+    setDisconnectedPlayers(prev => (prev.includes(name) ? prev.filter(n => n !== name) : prev))
+  }
+
+  // Everything that belongs to one table and must not follow us to the next:
+  // its chat (voice clips included), bubbles, typing dots, the "player
+  // disconnected" banner, a quit vote, the last trick and discard picks.
+  const resetRoomScopedState = () => {
+    voicePlayer.stop()
+    voiceUrlsRef.current.forEach(url => URL.revokeObjectURL(url))
+    voiceUrlsRef.current.clear()
+    chatQueueRef.current = []
+    setChatMessages([])
+    Object.values(bubbleTimers.current).forEach(clearTimeout)
+    bubbleTimers.current = {}
+    setChatBubbles({})
+    Object.values(typingTimers.current).forEach(clearTimeout)
+    typingTimers.current = {}
+    setTypingSeats({})
+    clearDisconnected()
+    setQuitProposal(null)
+    setLastTrickResult(null)
+    setSelectedDiscards([])
+  }
+
+  // True when an emit would reach the server in our seat. socket.io buffers
+  // emits made while offline and flushes them BEFORE our rejoin, so the
+  // server sees a socket with no seat and refuses them.
+  const canSend = () => !!socketRef.current?.connected && !reconnectingRef.current
+  const offlineToast = () => addToast('კავშირი აღდგება — სცადე ცოტა ხანში.', 'warning')
+
+  // Results belong to the room they were played in.
+  const forgetResults = () => setFinalResults(null)
+
+  const flushChatQueue = () => {
+    const queued = chatQueueRef.current
+    chatQueueRef.current = []
+    queued.forEach(message => socketRef.current?.emit('chat-message', { message }))
   }
 
   // One reusable <audio> per clip, keyed by wire id. They have to be
@@ -299,29 +394,35 @@ export function GameProvider({ children }) {
     return () => { cancelled = true }
   }, [syncAudioPool])
 
+  // Prime every element inside a user gesture so later socket-driven
+  // .play() calls are allowed by the autoplay policy (see primeAudioEl).
+  // Each element is primed separately, because iOS needs exactly that.
+  // Strictly once per session — no retry loop to interleave with itself.
+  // The flag lets clips that arrive later (catalogue fetch resolving after
+  // the click) prime themselves as they're created.
+  //
+  // Priming downloads the whole clip library (about 1.2 MB), so it waits for
+  // a gesture that leads to a table — sitting down, creating, joining or
+  // watching one (the actions below call this) — rather than the first tap
+  // anywhere on the homepage.
+  const unlockAudio = useCallback(() => {
+    if (audioUnlockedRef.current || typeof window === 'undefined') return
+    audioUnlockedRef.current = true
+    Object.values(audioElsRef.current || {}).forEach(primeAudioEl)
+  }, [])
+
+  // Already at a table without one of those clicks (a refresh mid-game, a
+  // tournament seating us): the first tap anywhere unlocks it.
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    let unlocked = false
-    const unlock = () => {
-      if (unlocked) return
-      unlocked = true
-      // Prime every element inside this user gesture so later socket-driven
-      // .play() calls are allowed by the autoplay policy (see primeAudioEl).
-      // Strictly once per session — no retry loop to interleave with itself.
-      // The flag lets clips that arrive later (catalogue fetch resolving
-      // after the first click) prime themselves as they're created.
-      audioUnlockedRef.current = true
-      Object.values(audioElsRef.current || {}).forEach(primeAudioEl)
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown',     unlock)
-    }
-    window.addEventListener('pointerdown', unlock, { once: false })
-    window.addEventListener('keydown',     unlock, { once: false })
+    if (typeof window === 'undefined' || appPhase === 'lobby' || audioUnlockedRef.current) return
+    const unlock = () => unlockAudio()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown',     unlock, { once: true })
     return () => {
       window.removeEventListener('pointerdown', unlock)
       window.removeEventListener('keydown',     unlock)
     }
-  }, [])
+  }, [appPhase, unlockAudio])
 
   useEffect(() => {
     // Use socket.io's default transport flow: connect via long-polling first
@@ -344,7 +445,10 @@ export function GameProvider({ children }) {
       reconnectionDelay: 600,
       reconnectionDelayMax: 5000,
       randomizationFactor: 0.5,
-      timeout: 8000,
+      // Generous: a sleeping Render instance takes up to ~30 s to boot, and a
+      // shorter timeout aborted and restarted the handshake meanwhile. The
+      // lobby says the server is waking up after a few seconds.
+      timeout: 25000,
     })
     socketRef.current = socket
 
@@ -370,7 +474,21 @@ export function GameProvider({ children }) {
       // and a fresh `game-state` snapshot). Without this, the table looks
       // frozen on the previous tick and the user has to refresh.
       if (hadDisconnectRef.current && (roomCodeRef.current || tournamentCodeRef.current)) {
-        if (roomCodeRef.current) {
+        const watching = spectatingRef.current
+        if (watching) {
+          // Watching, not seated: ask to watch the same table again
+          // (spectate-started ends the reconnect).
+          if (watching.tournamentId) {
+            socket.emit('tournament-spectate', { roomCode: roomCodeRef.current, ...identity() })
+          } else {
+            socket.emit('watch-game', { roomCode: roomCodeRef.current, ...identity() })
+          }
+        } else if (publicSeatRef.current !== null && roomCodeRef.current) {
+          // A homepage quick-match seat. `join-room` would land us in a
+          // private-style WaitingRoom; rejoin-public keeps us on the homepage
+          // (and falls through to the in-game reconnect if it has started).
+          socket.emit('rejoin-public', { roomCode: roomCodeRef.current, ...identity() })
+        } else if (roomCodeRef.current) {
           socket.emit('join-room', { roomCode: roomCodeRef.current, ...identity() })
         }
         // The tournament keeps sending roster/bracket updates — and seats the
@@ -391,7 +509,7 @@ export function GameProvider({ children }) {
           const saved = readSeatMarker()
           setResumableSeat(saved)
         }
-        setReconnecting(false)
+        setReconnectingBoth(false)
       }
     })
     socket.on('disconnect', () => {
@@ -401,11 +519,13 @@ export function GameProvider({ children }) {
       // shouldn't pop the banner.
       if (roomCodeRef.current || tournamentCodeRef.current) {
         hadDisconnectRef.current = true
-        setReconnecting(true)
+        setReconnectingBoth(true)
       }
     })
 
     socket.on('room-created', ({ roomCode: code, seat, mode }) => {
+      resetRoomScopedState()
+      forgetResults()
       setRoomCode(code)
       roomCodeRef.current = code
       setMySeat(seat)
@@ -417,6 +537,11 @@ export function GameProvider({ children }) {
 
     socket.on('room-joined', ({ roomCode: code, seat, reconnected, status, mode, tournament: tournamentTag, startedAt }) => {
       clearGameOverTimer()
+      // A different table (not our own seat coming back): start clean.
+      if (!reconnected || code !== roomCodeRef.current) {
+        resetRoomScopedState()
+        forgetResults()
+      }
       setRoomCode(code)
       roomCodeRef.current = code
       setMySeat(seat)
@@ -435,8 +560,10 @@ export function GameProvider({ children }) {
         // (never the table), and live games rehydrate via the follow-up
         // `game-state` snapshot.
         setAppPhase(status === 'waiting' ? 'waiting' : status === 'finished' ? 'gameover' : 'game')
+        snapshotAfterRejoinRef.current = true
         hadDisconnectRef.current = false
-        setReconnecting(false)
+        setReconnectingBoth(false)
+        flushChatQueue()
       } else {
         setAppPhase('waiting')
       }
@@ -453,7 +580,7 @@ export function GameProvider({ children }) {
     socket.on('tournament-joined', (t) => {
       enterTournament(t)
       // A reconnect in a tournament lobby has no room-joined to wait for.
-      if (!roomCodeRef.current) { hadDisconnectRef.current = false; setReconnecting(false) }
+      if (!roomCodeRef.current) { hadDisconnectRef.current = false; setReconnectingBoth(false) }
     })
     socket.on('tournament-state',   (t) => { enterTournament(t) })
     socket.on('tournament-left',    ()  => { enterTournament(null) })
@@ -477,6 +604,16 @@ export function GameProvider({ children }) {
     // `hand` arrives empty and the canvas simply has nothing of ours to draw.
     socket.on('spectate-started', (payload) => {
       clearGameOverTimer()
+      // Re-watching the same table after a blip keeps its chat.
+      if (payload.roomCode !== roomCodeRef.current) {
+        resetRoomScopedState()
+        forgetResults()
+      }
+      if (hadDisconnectRef.current) {
+        hadDisconnectRef.current = false
+        setReconnectingBoth(false)
+        flushChatQueue()
+      }
       setSpectatingBoth(payload)
       if (payload.startedAt) setGameStartedAt(payload.startedAt)
       roomCodeRef.current = payload.roomCode
@@ -488,6 +625,7 @@ export function GameProvider({ children }) {
 
     socket.on('spectate-stopped', () => {
       clearGameOverTimer()
+      resetRoomScopedState()
       setSpectatingBoth(null)
       // Not our room: a reconnect must not try to join the table we watched.
       roomCodeRef.current = ''
@@ -497,7 +635,12 @@ export function GameProvider({ children }) {
     })
 
     socket.on('player-joined', ({ players: p }) => setPlayers(p))
-    socket.on('player-left',   ({ players: p }) => setPlayers(p))
+    // player-left's roster carries no photos or connection flags; keep the
+    // ones we already have for players who are still there.
+    socket.on('player-left',   ({ players: p }) => setPlayers(prev => (p || []).map(np => {
+      const old = prev.find(o => o.seat === np.seat && o.name === np.name)
+      return old ? { ...old, ...np } : np
+    })))
 
     // ── Quick-match tables (casual + championship) ─────────────────────
     socket.on('public-room', (view = {}) => {
@@ -515,15 +658,7 @@ export function GameProvider({ children }) {
       if (myTable) {
         // Still the same table — but if our seat is gone the server swept
         // us out (disconnect grace expired). Stand down locally.
-        if (!myTable.seats.some(s => s.seat === publicSeatRef.current)) {
-          setPublicSeatBoth(null)
-          setPublicSeatMode(null)
-          roomCodeRef.current = ''
-          setRoomCode('')
-          setMySeat(null); mySeatRef.current = null
-          setIsCreator(false)
-          clearSeatMarker()
-        }
+        if (!myTable.seats.some(s => s.seat === publicSeatRef.current)) standDownPublic()
       } else {
         // The quick-match lobby moved on — either our table filled and the
         // game is starting (game-started handles the transition; keep the
@@ -535,6 +670,11 @@ export function GameProvider({ children }) {
     })
 
     socket.on('public-seated', ({ roomCode: code, seat, mode }) => {
+      // Also the answer to rejoin-public after a blip.
+      if (hadDisconnectRef.current) {
+        hadDisconnectRef.current = false
+        setReconnectingBoth(false)
+      }
       setRoomCode(code)
       roomCodeRef.current = code
       setMySeat(seat)
@@ -549,7 +689,8 @@ export function GameProvider({ children }) {
       setResumableSeat(null)
     })
 
-    socket.on('public-unseated', () => {
+    // Off the homepage table: forget the seat and its room.
+    const standDownPublic = () => {
       setPublicSeatBoth(null)
       setPublicSeatMode(null)
       setRoomCode('')
@@ -558,17 +699,31 @@ export function GameProvider({ children }) {
       mySeatRef.current = null
       setIsCreator(false)
       clearSeatMarker()
-    })
+      resetRoomScopedState()
+    }
+
+    socket.on('public-unseated', standDownPublic)
 
     socket.on('public-rejoin-failed', () => {
+      // After a blip the seat we held is gone; from the lobby's rejoin button
+      // there was no seat to begin with.
+      if (publicSeatRef.current !== null) standDownPublic()
       setPublicSeatBoth(null)
       setPublicSeatMode(null)
       clearSeatMarker()
       setResumableSeat(null)
+      if (hadDisconnectRef.current) {
+        hadDisconnectRef.current = false
+        setReconnectingBoth(false)
+      }
     })
 
     socket.on('game-started', ({ round: r, leaderSeat: ls, players: p, startedAt }) => {
       clearGameOverTimer()
+      forgetResults()
+      snapshotAfterRejoinRef.current = false
+      // Everyone is at the table, whatever the banner said before.
+      clearDisconnected()
       setGameStartedAt(startedAt || Date.now())
       setRound(r)
       setLeaderSeat(ls)
@@ -598,15 +753,8 @@ export function GameProvider({ children }) {
       setLeaderSeat(ls)
       setRound(r)
       setCardCounts(counts)
-      setCurrentTrick([])
-      setLedSuit(null)
       setChosenGameType(null)
-      setTrumpSuit(null)
-      setLastTrickResult(null)
-      setLastCenterCards([])
-      setTrickAnimation(null)
-      setPlayPendingBoth(false)
-      clearTrickTimers()
+      resetTrickState()
       clearGameOverTimer()
     })
 
@@ -615,18 +763,11 @@ export function GameProvider({ children }) {
       setLeaderSeat(ls)
       setGamePhase(phase)
       setUsedTypes(ut)
-      setCurrentTrick([])
-      setLedSuit(null)
-      setLastTrickResult(null)
-      setLastCenterCards([])
-      setTrumpSuit(null)
-      setTrickAnimation(null)
       // Same defensive reset as hand-dealt — clears the play-in-flight lock
       // before the new round so nobody starts the round with their cards
       // still greyed out from a stale optimistic update.
-      setPlayPendingBoth(false)
+      resetTrickState()
       setQuitProposal(null)
-      clearTrickTimers()
     })
 
     socket.on('game-type-selected', ({ typeCode, leaderSeat: ls, phase, usedTypes: ut }) => {
@@ -634,14 +775,13 @@ export function GameProvider({ children }) {
       setLeaderSeat(ls)
       setGamePhase(phase)
       setUsedTypes(ut)
-      const leaderName = playersRef.current.find(p => p.seat === ls)?.name || `მოთამაშე ${ls}`
-      addToast(`${leaderName}-მ აირჩია — „${typeCode}“`, 'info')
+      addToast(`${seatName(ls)}-მ აირჩია — „${typeCode}“`, 'info')
     })
 
     socket.on('trump-selected', ({ trumpSuit: ts, phase }) => {
       setTrumpSuit(ts)
       setGamePhase(phase)
-      const label = ts ? { H: 'გული', D: 'აგური', S: 'ყვავი', C: 'ჯვარი' }[ts] : 'უკოზირო'
+      const label = ts ? SUIT_NAMES[ts] : 'უკოზირო'
       addToast(`კოზირი: ${label}`, 'info')
     })
 
@@ -665,12 +805,19 @@ export function GameProvider({ children }) {
     })
 
     socket.on('card-played', ({ seat, card, currentTrick: ct, currentTurn: turn, ledSuit: ls, cardCounts: cc }) => {
+      // The next trick has begun. If the last one's show-and-clear timers
+      // are still pending (a throttled tab), they'd wipe this lead card and
+      // reset the turn — drop them, the server's values below are newer.
+      if (trickTimers.current.length) {
+        clearTrickTimers()
+        setTrickAnimation(null)
+      }
       setCurrentTrick(ct)
       setCurrentTurn(turn)
       setLedSuit(ls)
       if (cc) setCardCounts(cc)
       if (seat === mySeatRef.current) {
-        setHand(prev => sortHand(prev.filter(c => !(c.rank === card.rank && c.suit === card.suit))))
+        setHand(prev => sortHand(prev.filter(c => !sameCard(c, card))))
         // Server acked our play — release the click-lock.
         setPlayPendingBoth(false)
       }
@@ -725,6 +872,7 @@ export function GameProvider({ children }) {
 
       setPlayPendingBoth(false)
       setQuitProposal(null)
+      setSelectedDiscards([])
 
       clearTrickTimers()
 
@@ -734,10 +882,10 @@ export function GameProvider({ children }) {
         setCurrentTrick([])
         setLedSuit(null)
         setTrickAnimation(null)
-        setGamePhase('round_end')
+        // The last round goes straight to the results (game-over follows).
+        if (!isGameOver) setGamePhase('round_end')
         if (typeof quitBySeat === 'number') {
-          const quitterName = playersRef.current.find(p => p.seat === quitBySeat)?.name || `მოთამაშე ${quitBySeat}`
-          addToast(`${quitterName}-მ დათმო ხელი.`, 'warning')
+          addToast(`${seatName(quitBySeat)}-მ დათმო ხელი.`, 'warning')
         }
         return
       }
@@ -751,10 +899,14 @@ export function GameProvider({ children }) {
         setLedSuit(null)
         setTrickAnimation(null)
       }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS))
-      trickTimers.current.push(setTimeout(() => {
-        setGamePhase('round_end')
-        if (!isGameOver) addToast(`ხელი ${r} დასრულდა.`, 'success')
-      }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS))
+      // No round summary after the last round: game-over moves us to the
+      // results, and a summary flashing in between offered a dead button.
+      if (!isGameOver) {
+        trickTimers.current.push(setTimeout(() => {
+          setGamePhase('round_end')
+          addToast(`ხელი ${r} დასრულდა.`, 'success')
+        }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS))
+      }
     })
 
     socket.on('game-over', ({ finalScores, winner, winners, isTie, mode, players: p, roundDetails: rd, surrenderedBySeat, abandonedSeats }) => {
@@ -762,7 +914,10 @@ export function GameProvider({ children }) {
       // game-over screen can always render from `winners`.
       const winnersList = Array.isArray(winners) && winners.length ? winners : (winner ? [winner] : [])
       const tie = !!isTie && winnersList.length > 1
-      setFinalResults({ finalScores, winner, winners: winnersList, isTie: tie, mode, players: p, roundDetails: rd })
+      setFinalResults({
+        finalScores, winner, winners: winnersList, isTie: tie, mode, players: p, roundDetails: rd,
+        roomCode: roomCodeRef.current,
+      })
       if (rd) setRoundDetails(rd)
       setGamePhase('game_over')
       setQuitProposal(null)
@@ -781,11 +936,10 @@ export function GameProvider({ children }) {
       }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS + 200)
       const winnerLabel = winnersList.map(w => w.name).join(' და ')
       if (Array.isArray(abandonedSeats) && abandonedSeats.length) {
-        const gone = abandonedSeats.map(s => (p || []).find(pl => pl.seat === s)?.name || `მოთამაშე ${s}`).join(' და ')
+        const gone = abandonedSeats.map(s => seatName(s, p)).join(' და ')
         addToast(`${gone} წავიდა — თამაში დასრულდა, ${winnerLabel} იმარჯვებს!`, 'success')
       } else if (typeof surrenderedBySeat === 'number') {
-        const surrenderName = (p || []).find(pl => pl.seat === surrenderedBySeat)?.name || `მოთამაშე ${surrenderedBySeat}`
-        addToast(`${surrenderName} დანებდა — ${winnerLabel} იმარჯვებს!`, 'success')
+        addToast(`${seatName(surrenderedBySeat, p)} დანებდა — ${winnerLabel} იმარჯვებს!`, 'success')
       } else if (tie) {
         addToast(`ფრეა! გამარჯვებულები: ${winnerLabel} 🤝`, 'success')
       } else {
@@ -821,13 +975,7 @@ export function GameProvider({ children }) {
       // changes what shows on the table.
       const target = typeof targetSeat === 'number' ? targetSeat : bySeat
       const label = getSounds().find(s => s.id === soundId)?.label || soundId
-      setChatBubbles(prev => ({ ...prev, [target]: { message: label, name: '', avatar: null } }))
-      if (bubbleTimers.current[target]) clearTimeout(bubbleTimers.current[target])
-      bubbleTimers.current[target] = setTimeout(() => {
-        setChatBubbles(prev => {
-          const next = { ...prev }; delete next[target]; return next
-        })
-      }, 2500)
+      showBubble(target, { message: label, name: '', avatar: null }, 2500)
     })
 
     // ── Quit-round / surrender votes ────────────────────────────────────
@@ -875,8 +1023,12 @@ export function GameProvider({ children }) {
         if (!msg || !msg.audio) return
         const blob = new Blob([msg.audio], { type: msg.mime || 'audio/webm' })
         const url = URL.createObjectURL(blob)
+        voiceUrlsRef.current.add(url)
         const entry = {
           type: 'voice',
+          // The id lets players react to a clip like to any message.
+          id: msg.id,
+          spectator: !!msg.spectator,
           url,
           duration: msg.duration || 0,
           seat: msg.seat,
@@ -893,20 +1045,13 @@ export function GameProvider({ children }) {
             // Never yank the blob out from under a clip that's mid-play.
             if (m.type === 'voice' && m.url && voicePlayer.playingUrl() !== m.url) {
               URL.revokeObjectURL(m.url)
+              voiceUrlsRef.current.delete(m.url)
             }
           })
           return next.slice(-50)
         })
         // Flash a mic bubble above the sender's avatar on the table.
-        setChatBubbles(prev => ({ ...prev, [msg.seat]: { message: '🎤 ხმოვანი' } }))
-        if (bubbleTimers.current[msg.seat]) clearTimeout(bubbleTimers.current[msg.seat])
-        bubbleTimers.current[msg.seat] = setTimeout(() => {
-          setChatBubbles(prev => {
-            const next = { ...prev }
-            delete next[msg.seat]
-            return next
-          })
-        }, 4000)
+        showBubble(msg.seat, { message: '🎤 ხმოვანი' }, 4000)
       } catch { /* malformed clip — ignore */ }
     })
 
@@ -944,36 +1089,31 @@ export function GameProvider({ children }) {
         const next = { ...prev }; delete next[msg.seat]; return next
       })
       // Show bubble above the sender's avatar for ~5 seconds
-      setChatBubbles(prev => ({ ...prev, [msg.seat]: msg }))
-      if (bubbleTimers.current[msg.seat]) clearTimeout(bubbleTimers.current[msg.seat])
-      bubbleTimers.current[msg.seat] = setTimeout(() => {
-        setChatBubbles(prev => {
-          const next = { ...prev }
-          delete next[msg.seat]
-          return next
-        })
-      }, 5000)
+      showBubble(msg.seat, msg, 5000)
     })
 
     // Brief network blips happen all the time on mobile; suppress the
     // disconnect banner for a few seconds so a fast auto-rejoin (which
     // socket.io-client does for free) goes unnoticed.
-    let disconnectGraceTimer = null
+    // One timer per player, so two drops close together are both shown and
+    // one coming back doesn't hide the other.
     socket.on('player-disconnected', ({ playerName, players: p }) => {
       if (p) setPlayers(p)
-      if (disconnectGraceTimer) clearTimeout(disconnectGraceTimer)
-      disconnectGraceTimer = setTimeout(() => {
-        setDisconnectedPlayer(playerName)
+      if (!playerName) return
+      clearTimeout(disconnectTimers.current[playerName])
+      disconnectTimers.current[playerName] = setTimeout(() => {
+        delete disconnectTimers.current[playerName]
+        setDisconnectedPlayers(prev => (prev.includes(playerName) ? prev : [...prev, playerName]))
         addToast(`${playerName} გაითიშა…`, 'warning')
       }, 5000)
     })
 
-    socket.on('player-reconnected', ({ players: p }) => {
+    socket.on('player-reconnected', ({ playerName, players: p }) => {
       // No toast here — if the rejoin happens inside the grace window the
       // user never saw a drop in the first place, and a stray "reconnected"
       // banner would just confuse them.
-      if (disconnectGraceTimer) { clearTimeout(disconnectGraceTimer); disconnectGraceTimer = null }
-      setDisconnectedPlayer(null)
+      if (playerName) clearDisconnected(playerName)
+      else clearDisconnected()
       if (p) setPlayers(p)
     })
 
@@ -986,7 +1126,9 @@ export function GameProvider({ children }) {
       // (e.g. a refresh on the results screen).
       if (state.phase === 'game_over') {
         setFinalResults(prev => {
-          if (prev) return prev
+          // Keep what game-over gave us for this room; results from an
+          // earlier game (a missed game-over) are rebuilt from the snapshot.
+          if (prev && prev.roomCode === roomCodeRef.current) return prev
           const fs = state.cumulativeScores || {}
           const best = Math.max(...[0, 1, 2].map(s => fs[s] ?? -Infinity))
           const winnersList = [0, 1, 2]
@@ -1003,6 +1145,7 @@ export function GameProvider({ children }) {
             isTie: winnersList.length > 1,
             players: state.players || [],
             roundDetails: state.roundDetails || [],
+            roomCode: roomCodeRef.current,
           }
         })
         setAppPhase('gameover')
@@ -1014,7 +1157,8 @@ export function GameProvider({ children }) {
       if (state.phase)                         setGamePhase(state.phase)
       if (state.round)                         setRound(state.round)
       if (state.leaderSeat !== undefined)      setLeaderSeat(state.leaderSeat)
-      if (state.chosenGameType)                setChosenGameType(state.chosenGameType)
+      // By key, not truthiness: a null in the snapshot clears the old value.
+      if ('chosenGameType' in state)           setChosenGameType(state.chosenGameType ?? null)
       if (state.trumpSuit !== undefined)       setTrumpSuit(state.trumpSuit)
       if (state.usedTypes)                     setUsedTypes(state.usedTypes)
       if (state.cardCounts)                    setCardCounts(state.cardCounts)
@@ -1024,7 +1168,13 @@ export function GameProvider({ children }) {
       if (state.ledSuit !== undefined)         setLedSuit(state.ledSuit)
       if (state.currentTurn !== undefined)     setCurrentTurn(state.currentTurn)
       if (state.cumulativeScores)              setCumulativeScores(state.cumulativeScores)
-      if (state.lastTrick)                     setLastTrickResult(state.lastTrick)
+      if ('lastTrick' in state)                setLastTrickResult(state.lastTrick ?? null)
+      // Snapshots don't carry a quit vote. After a reconnect that means none
+      // is running (any we showed is stale); a routine resync leaves a live
+      // vote alone.
+      if ('quitProposal' in state)             setQuitProposal(state.quitProposal ?? null)
+      else if (snapshotAfterRejoinRef.current) setQuitProposal(null)
+      snapshotAfterRejoinRef.current = false
       if (state.roundScores) {
         setRoundScores(
           state.roundScores.map(rs => ({ round: rs.round, scores: rs.scores, gameType: rs.gameType }))
@@ -1037,6 +1187,7 @@ export function GameProvider({ children }) {
       // an optimism we don't need anymore.
       setPlayPendingBoth(false)
       setTrickAnimation(null)
+      setSelectedDiscards([])
       clearTrickTimers()
       // Force the canvas to repaint the rehydrated state. The setX calls above
       // queue a React re-render → PhaserGame re-emits state-update; we fire
@@ -1051,7 +1202,7 @@ export function GameProvider({ children }) {
       }
     })
 
-    socket.on('error', ({ message, code }) => {
+    socket.on('error', ({ message, code, limit }) => {
       // If a play was in flight and got rejected, the client may have
       // optimistically removed a card — re-sync hand state from the server
       // so the player sees the correct deck again. Always release the lock.
@@ -1062,6 +1213,18 @@ export function GameProvider({ children }) {
       // Still in the lobby without a seat: a join was refused, so forget the
       // room code joinRoom stashed, or a later blip would rejoin it.
       if (appPhaseRef.current === 'lobby' && publicSeatRef.current === null) roomCodeRef.current = ''
+      // Re-watching after a blip failed (the game ended meanwhile): there is
+      // nothing to go back to, so return to the lobby.
+      if (spectatingRef.current && reconnectingRef.current) {
+        hadDisconnectRef.current = false
+        setReconnectingBoth(false)
+        setSpectatingBoth(null)
+        roomCodeRef.current = ''
+        setRoomCode('')
+        setHand([])
+        resetRoomScopedState()
+        setAppPhase('lobby')
+      }
       if (code === 'AUTH') {
         // Our profile session is gone (PIN changed, profile removed): the
         // lobby asks us to pick the profile again.
@@ -1070,7 +1233,9 @@ export function GameProvider({ children }) {
         return
       }
       if (code === 'CHAMPIONSHIP_LIMIT') {
-        addToast('დღის ლიმიტი ამოიწურა — 8 ლიგის თამაში დღეში. აირჩიე კლასიკური თამაში.', 'error')
+        // The server's number, from the payload or its message.
+        const max = Number(limit) || Number(/\((\d+)/.exec(message || '')?.[1]) || 8
+        addToast(`დღის ლიმიტი ამოიწურა — ${max} ლიგის თამაში დღეში. აირჩიე კლასიკური თამაში.`, 'error')
         return
       }
       addToast(message, 'error')
@@ -1121,15 +1286,18 @@ export function GameProvider({ children }) {
   // Triggered from the Play Again button on the game-over screen. The new
   // room keeps the identity of the seat we held.
   const requestRematch = useCallback(() => {
+    unlockAudio()
     socketRef.current?.emit('request-rematch')
   }, [])
 
   const createRoom = useCallback((name, mode = 'public') => {
+    unlockAudio()
     setMe(name)
     socketRef.current?.emit('create-room', { ...identity(name), mode })
   }, [])
 
   const joinRoom = useCallback((code, name) => {
+    unlockAudio()
     setMe(name)
     // Pre-stash the room code too — the very first join is the only place
     // we know it before the server's `room-joined` round-trip lands, and
@@ -1142,6 +1310,11 @@ export function GameProvider({ children }) {
   const startGame      = useCallback(() => { socketRef.current?.emit('start-game') }, [])
   const sendChat       = useCallback((message) => {
     if (!message || !message.trim()) return
+    // Offline: hold it until we're back in our seat (see flushChatQueue).
+    if (!canSend()) {
+      chatQueueRef.current = [...chatQueueRef.current.slice(-9), message.trim()]
+      return
+    }
     socketRef.current?.emit('chat-message', { message: message.trim() })
   }, [])
   // Ship a recorded clip to the room. 400 KB matches the server's hard cap.
@@ -1175,11 +1348,18 @@ export function GameProvider({ children }) {
     typingSentAtRef.current = now
     socketRef.current?.emit('chat-typing')
   }, [])
-  const proposeQuit    = useCallback((kind) => { socketRef.current?.emit('propose-quit', { kind }) }, [])
-  const voteQuit       = useCallback((accept) => { socketRef.current?.emit('vote-quit', { accept }) }, [])
+  const proposeQuit    = useCallback((kind) => {
+    if (!canSend()) return offlineToast()
+    socketRef.current?.emit('propose-quit', { kind })
+  }, [])
+  const voteQuit       = useCallback((accept) => {
+    if (!canSend()) return offlineToast()
+    socketRef.current?.emit('vote-quit', { accept })
+  }, [])
 
   // ── public quick-match actions ──────────────────────────────────────────
   const sitPublic = useCallback((name, emoji = null, mode = 'public') => {
+    unlockAudio()
     setMe(name)
     socketRef.current?.emit('sit-public', { ...identity(name), emoji, mode })
   }, [])
@@ -1192,6 +1372,7 @@ export function GameProvider({ children }) {
   const resumeSeat = useCallback(() => {
     const saved = readSeatMarker()
     if (!saved) { setResumableSeat(null); return }
+    unlockAudio()
     setMe(saved.name)
     socketRef.current?.emit('rejoin-public', { roomCode: saved.roomCode, ...identity(saved.name) })
     setResumableSeat(null)
@@ -1199,11 +1380,13 @@ export function GameProvider({ children }) {
 
   // ── tournament actions ──────────────────────────────────────────────────
   const createTournament = useCallback((name, size) => {
+    unlockAudio()
     setMe(name)
     socketRef.current?.emit('tournament-create', { ...identity(name), size })
   }, [])
 
   const joinTournament = useCallback((code, name) => {
+    unlockAudio()
     setMe(name)
     socketRef.current?.emit('tournament-join', {
       code: String(code || '').toUpperCase(), ...identity(name),
@@ -1221,6 +1404,7 @@ export function GameProvider({ children }) {
   const refreshOverview  = useCallback(() => { socketRef.current?.emit('tournament-overview') }, [])
 
   const spectateTable = useCallback((roomCode) => {
+    unlockAudio()
     socketRef.current?.emit('tournament-spectate', { roomCode, ...identity() })
   }, [])
 
@@ -1246,6 +1430,7 @@ export function GameProvider({ children }) {
   const watchGame = useCallback((roomCode, name) => {
     const who = String(name || myNameRef.current || '').trim()
     if (!who) return
+    unlockAudio()
     setMe(who)
     socketRef.current?.emit('watch-game', { roomCode, ...identity(who) })
   }, [])
@@ -1255,21 +1440,34 @@ export function GameProvider({ children }) {
     setResumableSeat(null)
   }, [])
   const setPublicEmoji = useCallback((emoji) => { socketRef.current?.emit('set-public-emoji', { emoji }) }, [])
-  const selectGameType = useCallback((typeCode) => { socketRef.current?.emit('select-game-type', { typeCode }) }, [])
-  const selectTrump    = useCallback((suit) => { socketRef.current?.emit('select-trump', { suit }) }, [])
+  // The table actions are refused while offline instead of being buffered
+  // (see canSend); the reconnect banner is up and the hand is locked then.
+  const selectGameType = useCallback((typeCode) => {
+    if (!canSend()) return offlineToast()
+    socketRef.current.emit('select-game-type', { typeCode })
+  }, [])
+  const selectTrump    = useCallback((suit) => {
+    if (!canSend()) return offlineToast()
+    socketRef.current.emit('select-trump', { suit })
+  }, [])
   const discardCards   = useCallback((cards) => {
-    socketRef.current?.emit('discard-cards', { cards })
+    if (!canSend()) return offlineToast()
+    socketRef.current.emit('discard-cards', { cards })
     setSelectedDiscards([])
   }, [])
 
   const playCard = useCallback((card) => {
     if (playPendingRef.current) return
+    if (!canSend()) return offlineToast()
     setPlayPendingBoth(true)
-    setHand(prev => sortHand(prev.filter(c => !(c.rank === card.rank && c.suit === card.suit))))
-    socketRef.current?.emit('play-card', { card })
+    setHand(prev => sortHand(prev.filter(c => !sameCard(c, card))))
+    socketRef.current.emit('play-card', { card })
   }, [])
 
-  const nextRound = useCallback(() => { socketRef.current?.emit('next-round') }, [])
+  const nextRound = useCallback(() => {
+    if (!canSend()) return offlineToast()
+    socketRef.current.emit('next-round')
+  }, [])
 
   const leaveRoom = useCallback(() => {
     socketRef.current?.emit('leave-room')
@@ -1286,16 +1484,20 @@ export function GameProvider({ children }) {
     setRoomMode('public')
     setGameStartedAt(null)
     clearSeatMarker()
+    resetRoomScopedState()
+    forgetResults()
   }, [])
 
   const toggleDiscard = useCallback((card) => {
     setSelectedDiscards(prev => {
-      const exists = prev.find(c => c.rank === card.rank && c.suit === card.suit)
-      if (exists) return prev.filter(c => !(c.rank === card.rank && c.suit === card.suit))
+      if (prev.some(c => sameCard(c, card))) return prev.filter(c => !sameCard(c, card))
       if (prev.length >= 2) return prev
       return [...prev, card]
     })
   }, [])
+
+  // The banner names everyone who is still away.
+  const disconnectedPlayer = disconnectedPlayers.length ? disconnectedPlayers.join(' და ') : null
 
   // Both context values are memoized so a provider re-render only invalidates
   // consumers whose slice actually changed. All the callbacks below are

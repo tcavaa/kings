@@ -9,6 +9,7 @@ import {
 } from "lucide-react-online";
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
+import { SUIT_SYMBOLS, SUIT_NAMES } from "../../constants/suits";
 import GameTimer from "./GameTimer";
 // Shown in the contract chip before a contract exists — neutral wording,
 // since it's usually someone else who's choosing.
@@ -19,8 +20,6 @@ const PHASES = {
   playing: "თამაში მიმდინარეობს",
   round_end: "რაუნდი დასრულდა",
 };
-const SUITS = { H: "♥ გული", D: "♦ აგური", S: "♠ ყვავი", C: "♣ ჯვარი" };
-const SUIT_SYMBOL = { H: "♥", D: "♦", S: "♠", C: "♣" };
 function TopBar({
   onToggleMenu,
   onToggleScores,
@@ -93,7 +92,7 @@ function TopBar({
             className="k-contract"
             title={
               trumpSuit
-                ? `${type?.name} · კოზირი: ${SUITS[trumpSuit]}`
+                ? `${type?.name} · კოზირი: ${SUIT_SYMBOLS[trumpSuit]} ${SUIT_NAMES[trumpSuit]}`
                 : type?.name || PHASES[gamePhase]
             }
           >
@@ -101,8 +100,8 @@ function TopBar({
             <span>{type?.name || PHASES[gamePhase] || "კინგი"}</span>
             {trumpSuit ? (
               <em className={`k-trump-chip suit-${trumpSuit}`}>
-                {SUIT_SYMBOL[trumpSuit]}
-                <small>{SUITS[trumpSuit].slice(2)}</small>
+                {SUIT_SYMBOLS[trumpSuit]}
+                <small>{SUIT_NAMES[trumpSuit]}</small>
               </em>
             ) : chosenGameType?.startsWith("P") &&
               ["playing", "discard", "round_end"].includes(gamePhase) ? (

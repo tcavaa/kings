@@ -25,7 +25,7 @@ import { API_BASE } from './api'
  * HTML just fails silently, which is exactly what "the new buttons make no
  * sound" looked like.
  */
-const resolveUrl = (u) => (u.startsWith('/api/') ? `${API_BASE}${u}` : u)
+export const resolveUrl = (u) => (u.startsWith('/api/') ? `${API_BASE}${u}` : u)
 
 // Normalised entry: { id, label, glyph, color, url }.
 const withUrls = (list) => list.map(s => ({

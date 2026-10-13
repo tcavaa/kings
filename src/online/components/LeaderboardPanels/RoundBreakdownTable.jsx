@@ -1,6 +1,15 @@
 import { getGameType } from "../../constants/gameTypes";
-const SUITS = { H: "♥", D: "♦", S: "♠", C: "♣" };
-export default function RoundBreakdownTable({ details, playerList }) {
+import { SUIT_SYMBOLS as SUITS } from "../../constants/suits";
+/**
+ * One row per round: type, trump and each player's score. `showLeader` adds
+ * the round's leader (the results screen shows it). Rows may be full round
+ * details or bare round scores; missing fields show as "—".
+ */
+export default function RoundBreakdownTable({
+  details,
+  playerList,
+  showLeader = false,
+}) {
   if (!details.length)
     return (
       <p className="k-data-empty">
@@ -20,6 +29,7 @@ export default function RoundBreakdownTable({ details, playerList }) {
           <thead>
             <tr>
               <th>რაუნდი / ტიპი</th>
+              {showLeader && <th>წამყვანი</th>}
               <th>კოზირი</th>
               {playerList.map((p) => (
                 <th key={p.seat}>{p.name}</th>
@@ -33,6 +43,12 @@ export default function RoundBreakdownTable({ details, playerList }) {
                   {String(d.round).padStart(2, "0")}
                   <small>{getGameType(d.gameType)?.name || d.gameType}</small>
                 </th>
+                {showLeader && (
+                  <td>
+                    {playerList.find((p) => p.seat === d.leaderSeat)?.name ??
+                      "—"}
+                  </td>
+                )}
                 <td>{SUITS[d.trumpSuit] || "—"}</td>
                 {playerList.map((p) => {
                   const v = d.scores?.[p.seat] ?? 0;

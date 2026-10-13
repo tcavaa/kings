@@ -11,6 +11,7 @@ import { verifyPin } from "../lib/profiles";
  *   profile  — the profile object being authenticated
  *   onSuccess({ profile, pin }) — called once the server returns ok:true
  *   onCancel()             — user dismissed the modal
+ *   onGone()               — the profile was deleted (on another device)
  *   check(id, pin)         — the verify call (default: verify and sign in)
  *   hint                   — the line under the name
  */
@@ -18,6 +19,7 @@ export default function PinPromptModal({
   profile,
   onSuccess,
   onCancel,
+  onGone,
   check = verifyPin,
   hint = "შეიყვანე შენი 4-ციფრიანი კოდი შესასვლელად.",
 }) {
@@ -72,6 +74,13 @@ export default function PinPromptModal({
       const r = await check(profile.id, pin);
       if (r.ok) {
         onSuccess?.({ profile, pin });
+        return;
+      }
+      if (r.reason === "not_found") {
+        // No PIN will ever work: say so and let the lobby drop it.
+        setError("პროფილი აღარ არსებობს.");
+        setPin("");
+        setTimeout(() => onGone?.(), 1200);
         return;
       }
       setError(r.reason === "locked"
@@ -159,9 +168,9 @@ export default function PinPromptModal({
 
         <input
           ref={inputRef}
-          type="text"
+          type="password"
           inputMode="numeric"
-          autoComplete="one-time-code"
+          autoComplete="off"
           maxLength={4}
           value={pin}
           onChange={onChange}
