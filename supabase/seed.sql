@@ -1,6 +1,6 @@
 -- Built-in reaction clips, for a FRESH database only (local dev, a new
 -- project). Production got its catalogue — including every uploaded clip —
--- from the MySQL import (scripts/import-mysql-dump.mjs), so this is a no-op
+-- from the one-off MySQL import, so this is a no-op
 -- there: like the MySQL seed it only runs while the table is empty, so a
 -- clip an admin deletes from /admin never comes back.
 insert into public.sounds (id, label, glyph, color, source, sort_order)

@@ -107,13 +107,18 @@ function buildRow({ id, playedAt, slots, rounds, finals, winnerSeats, durationSe
   };
 }
 
+// The sheet's own id makes the game id, so saving the same sheet twice (a
+// retry after a lost response) stores one game. "sheet-" + id fits the
+// 64-character column.
+const SHEET_ID_RE = /^[A-Za-z0-9_-]{8,58}$/;
+
 /**
  * A game ჩაწერა just finished: `players` are the sheet's columns ({ id }),
  * `rounds` its round records keyed by those ids. resolve(id) gives the
  * player's profile ({ id, name }) or null. Names come from the profiles,
  * totals from the rounds — the same arithmetic the sheet showed.
  */
-function fromScoreSheet({ players, rounds, durationSeconds } = {}, resolve) {
+function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, resolve) {
   if (!Array.isArray(players) || players.length < 3 || players.length > 4) {
     throw invalid('A game needs 3 or 4 players.');
   }
@@ -129,6 +134,7 @@ function fromScoreSheet({ players, rounds, durationSeconds } = {}, resolve) {
   if (new Set(slots.map((s) => s.profileId)).size !== slots.length) throw invalid('Players must be distinct.');
   if (!Array.isArray(rounds) || rounds.length > 36) throw invalid('Invalid rounds.');
   const idSet = new Set(ids);
+  const played = new Set();   // each leader plays each type once
   const isPoints = (v) => Number.isInteger(v) && Math.abs(v) <= 1000;
   const isUnits = (v) => Number.isInteger(v) && v >= 0 && v <= 10;
   for (const r of rounds) {
@@ -141,6 +147,9 @@ function fromScoreSheet({ players, rounds, durationSeconds } = {}, resolve) {
       throw invalid('Invalid round counts.');
     }
     if (r.singleTargetPlayerId != null && !idSet.has(r.singleTargetPlayerId)) throw invalid('Invalid round target.');
+    const pair = `${r.leaderPlayerId}:${r.gameTypeCode}`;
+    if (played.has(pair)) throw invalid('A leader played the same game type twice.');
+    played.add(pair);
   }
   const clean = rounds.map((r) => ({
     scores: r.scores,
@@ -154,7 +163,7 @@ function fromScoreSheet({ players, rounds, durationSeconds } = {}, resolve) {
   const duration = Number.isInteger(durationSeconds) && durationSeconds >= 0 && durationSeconds < 86400
     ? durationSeconds : undefined;
   return buildRow({
-    id: crypto.randomUUID(),
+    id: typeof sheetId === 'string' && SHEET_ID_RE.test(sheetId) ? `sheet-${sheetId}` : crypto.randomUUID(),
     playedAt: undefined,
     slots,
     rounds: clean,

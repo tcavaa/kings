@@ -88,17 +88,18 @@ function client(clientKey) {
 
   // ── a PIN-protected name needs the profile's session ──────────────────────
   const profileId = `p_idsmoke_${Date.now()}`;
-  await store.upsertProfile({ id: profileId, name: 'იდ-პინი', pin: '4321' });
+  const pinName = `იდ-პინი-${profileId.slice(-6)}`;   // unique, so the test can re-run
+  await store.upsertProfile({ id: profileId, name: pinName, pin: '4321' });
   const token = await store.createProfileSession(profileId);
 
   const impostor = await client(key('imp'));
-  impostor.emit('create-room', { playerName: 'იდ-პინი', mode: 'public' });
+  impostor.emit('create-room', { playerName: pinName, mode: 'public' });
   await sleep(300);
   check('a PIN-protected name without a session is refused',
     impostor.errors.some((e) => e.code === 'AUTH') && !impostor.joined, JSON.stringify(impostor.errors));
 
   const forged = await client(key('forged'));
-  forged.emit('create-room', { playerName: 'იდ-პინი', profileToken: 'not-a-real-token-at-all', mode: 'public' });
+  forged.emit('create-room', { playerName: pinName, profileToken: 'not-a-real-token-at-all', mode: 'public' });
   await sleep(300);
   check('a made-up session is refused', forged.errors.some((e) => e.code === 'AUTH') && !forged.joined);
 
@@ -108,7 +109,7 @@ function client(clientKey) {
   const ownerRoom = owner.joined?.roomCode;
   check('the session holder plays as the profile', !!ownerRoom);
   const seatedAs = owner.events.find((e) => e.event === 'player-joined')?.payload.players[0];
-  check('under the profile\'s own name, whatever was typed', seatedAs?.name === 'იდ-პინი', JSON.stringify(seatedAs));
+  check('under the profile\'s own name, whatever was typed', seatedAs?.name === pinName, JSON.stringify(seatedAs));
 
   // Another device of the same profile may take the seat back.
   const ownerPhone = await client(key('owner-phone'));
@@ -151,6 +152,26 @@ function client(clientKey) {
   await sleep(500);
   check('a mid-bracket rejoin seats them back at their table',
     back2.joined?.reconnected === true && back2.joined.tournament?.code === code, JSON.stringify(back2.joined));
+
+  // ── one table at a time ───────────────────────────────────────────────────
+  const sitter = await client(key('sitter'));
+  sitter.emit('sit-public', { playerName: 'იდ-მჯდომი', mode: 'public' });
+  await sleep(300);
+  sitter.emit('tournament-create', { playerName: 'იდ-მჯდომი', size: 6 });
+  await sleep(300);
+  check('a seated player can\'t open a tournament',
+    sitter.errors.some((e) => /leave it first/.test(e.message)) && !sitter.tournament, JSON.stringify(sitter.errors));
+
+  const entrant = await client(key('entrant'));
+  entrant.emit('tournament-create', { playerName: 'იდ-შემსვლელი', size: 6 });
+  await sleep(300);
+  check('the entrant is in a tournament lobby', !!entrant.tournament);
+  entrant.emit('sit-public', { playerName: 'იდ-შემსვლელი', mode: 'public' });
+  entrant.emit('create-room', { playerName: 'იდ-შემსვლელი', mode: 'public' });
+  await sleep(400);
+  check('a tournament entrant can\'t sit or open a room',
+    entrant.errors.filter((e) => /tournament/.test(e.message)).length === 2 && !entrant.joined,
+    JSON.stringify(entrant.errors));
 
   console.log(`\n${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);

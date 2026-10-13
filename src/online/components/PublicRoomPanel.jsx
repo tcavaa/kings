@@ -14,13 +14,16 @@ export default function PublicRoomPanel({ active, quota, onNeedProfile }) {
     sitPublic,
     standPublic,
     setPublicEmoji,
+    tournament,
   } = useGame();
   const table = publicRoom?.[MODE] || { seats: [] };
   const seats = table.seats || [];
   const seated = publicSeat !== null;
   const here = seated && publicSeatMode === MODE;
   const quotaSpent = quota != null && quota.remaining <= 0;
-  const canSit = connected && !seated && !quotaSpent && seats.length < 3;
+  // One table at a time: not while entered in a tournament.
+  const inTournament = !!tournament && tournament.status !== "done";
+  const canSit = connected && !seated && !inTournament && !quotaSpent && seats.length < 3;
   const join = () =>
     active
       ? canSit && sitPublic(active.name, null, MODE)

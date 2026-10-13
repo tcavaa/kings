@@ -108,3 +108,18 @@ test("King Online games read as ჩაწერა rows with the same player ids
   assert.equal(detail.rounds[2].singleTargetPlayerId, "p_1");
   assert.equal(detail.rounds[2].leaderPlayerId, "p_3");
 });
+
+test("the sheet's own id is the game id, so a retried save stores one game", () => {
+  const first = fromScoreSheet({ ...sheet, sheetId: "a1b2c3d4-e5f6" }, resolve);
+  const retry = fromScoreSheet({ ...sheet, sheetId: "a1b2c3d4-e5f6" }, resolve);
+  assert.equal(first.id, "sheet-a1b2c3d4-e5f6");
+  assert.equal(retry.id, first.id);
+  // A missing or malformed sheet id still saves, under a fresh id.
+  assert.notEqual(fromScoreSheet(sheet, resolve).id, fromScoreSheet(sheet, resolve).id);
+  assert.match(fromScoreSheet({ ...sheet, sheetId: "bad id!" }, resolve).id, /^[0-9a-f-]{36}$/);
+});
+
+test("a leader can't play the same game type twice", () => {
+  const twice = [...rounds, { ...rounds[0], singleTargetPlayerId: "p_3", scores: { p_1: 0, p_2: 0, p_3: -40, p_4: 0 } }];
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: twice }, resolve), /same game type twice/);
+});

@@ -573,7 +573,8 @@ async function saveScoreSheetGame(body) {
     INSERT INTO finished_games
       (id, type, played_at, winner_name, winner_seat, winner_score, is_championship, payload)
     VALUES (${row.id}, 'live', now(), ${String(row.winner.name).slice(0, 64)}, ${row.winner.seat},
-            ${row.winner.score}, ${row.isChampionship}, ${JSON.stringify(row.payload)})`;
+            ${row.winner.score}, ${row.isChampionship}, ${JSON.stringify(row.payload)})
+    ON CONFLICT (id) DO NOTHING`;
   return getGame(row.id);
 }
 

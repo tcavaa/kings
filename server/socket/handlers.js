@@ -204,12 +204,53 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
 
   function emitError(message, code) { socket.emit('error', { message, code }); }
   const fail = (err) => emitError(err.message, err.code);
+
+  // One table at a time per socket: a homepage seat and a tournament entry
+  // would both point this socket's room mapping at different games, and one
+  // of the two tables would stall.
+
+  /** The waiting or running room this socket sits at, if any. */
+  function _tableOf() {
+    const mapping = gameManager.getMappingBySocketId(socketId);
+    const room = mapping && gameManager.getRoom(mapping.roomCode);
+    return room && (room.status === 'waiting' || room.status === 'playing') ? room : null;
+  }
+
+  /**
+   * The tournament that may still seat this socket: any stage up to the end
+   * of the semifinals (finalists are only known then), and the final for
+   * the finalists.
+   */
+  function _tournamentOf() {
+    const t = tournamentManager?.findBySocket(socketId);
+    if (!t || t.status !== 'final') return t || null;
+    const entry = t.players.find((p) => p.id === socketId);
+    const final = gameManager.getRoom(t.finalRoomCode);
+    return final && final.status === 'playing' && final.players.some((p) => ownsSeat(p, entry)) ? t : null;
+  }
+
+  /** Refuse a new table while the socket is in a tournament (its own tables excepted). */
+  function _assertNoTournament(roomCode) {
+    const t = _tournamentOf();
+    if (t && !(roomCode && gameManager.getRoom(roomCode)?.tournamentId === t.id)) {
+      throw new Error('You are in a tournament — leave it first.');
+    }
+  }
+
+  /** Refuse a tournament while the socket sits at another table. */
+  function _assertNoTable(tournamentId) {
+    const room = _tableOf();
+    if (room && !(tournamentId && room.tournamentId === tournamentId)) {
+      throw new Error('You are at a table — leave it first.');
+    }
+  }
   function emitChampionshipLimit() { emitError(CHAMPIONSHIP_LIMIT_MESSAGE, 'CHAMPIONSHIP_LIMIT'); }
 
   // ─── create-room ─────────────────────────────────────────────────────────
   socket.on('create-room', async (payload = {}) => {
     try {
       const me = await _identify(socket, payload);
+      _assertNoTournament();
       const roomMode = payload.mode === 'championship' ? 'championship' : 'public';
       if (roomMode === 'championship' && await _championshipBlocked(me.name)) {
         return emitChampionshipLimit();
@@ -242,6 +283,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (!gameManager.getRoom(rc)) {
         await gameManager.tryLoadFromDB(rc);
       }
+      _assertNoTournament(rc);
 
       // Championship rooms enforce the daily quota on genuinely NEW sit-downs
       // only — a reconnect (same name already seated) must never be blocked,
@@ -323,6 +365,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   socket.on('sit-public', async (payload = {}) => {
     try {
       const me = await _identify(socket, payload);
+      _assertNoTournament();
       const tableMode = payload.mode === 'championship' ? 'championship' : 'public';
       // Quota applies to fresh sit-downs only; re-taking your own seat after
       // a refresh must always work.
@@ -977,6 +1020,8 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
     try {
       const rc = String(payload.roomCode || '').toUpperCase();
       const me = await _identify(socket, payload);
+      _assertNoTournament();
+      _assertNoTable();
       const room = gameManager.getRoom(rc);
       if (!room) return emitError('That table is no longer available.');
       if (room.status !== 'playing' || !room.gameState) {
@@ -1046,6 +1091,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
     try {
       if (!tournamentManager) return emitError('Tournaments are unavailable.');
       const me = await _identify(socket, payload);
+      _assertNoTable();
       const t = tournamentManager.create(socketId, me, payload.size);
       socket.join(t.id);
       socket.emit('tournament-joined', tournamentManager.lobbyView(t));
@@ -1060,6 +1106,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
     try {
       if (!tournamentManager) return emitError('Tournaments are unavailable.');
       const me = await _identify(socket, payload);
+      _assertNoTable(tournamentManager.findByCode(payload.code)?.id);
       const { tournament: t, rejoined } = tournamentManager.join(payload.code, socketId, me);
       socket.join(t.id);
       socket.emit('tournament-joined', tournamentManager.lobbyView(t));
