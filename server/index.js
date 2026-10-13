@@ -75,7 +75,12 @@ async function restore() {
   catch (err) { console.warn('[server] tournament hydrateAll failed:', err.message); }
 }
 
-restore().finally(() => {
+// A database that doesn't answer mustn't keep the server down: after
+// RESTORE_WAIT_MS it starts anyway and the restore finishes in the background.
+const RESTORE_WAIT_MS = 15 * 1000;
+const restoreWait = new Promise((resolve) => setTimeout(resolve, RESTORE_WAIT_MS).unref());
+
+Promise.race([restore(), restoreWait]).finally(() => {
   server.listen(PORT, () => {
     console.log(`[server] King Card Game server listening on port ${PORT}`);
     console.log(`[server] CORS origin(s): ${RAW_CORS_ORIGIN}`);
