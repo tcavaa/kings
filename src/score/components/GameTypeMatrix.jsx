@@ -8,7 +8,7 @@ export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlaye
     <div className="card matrix" style={{ '--player-count': players.length }}>
       <h2>Game Types Availability</h2>
       <div className="matrix-grid">
-        <div className="matrix-header sticky">
+        <div className="matrix-header">
           <div className="cell type-col">Type</div>
           {players.map((p, idx) => (
             <div

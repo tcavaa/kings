@@ -73,6 +73,9 @@ function App() {
   // Apply dark mode class to body
   useEffect(() => {
     document.body.classList.toggle('dark', darkMode)
+    // The phone's status/address bar follows the theme too.
+    document.querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', darkMode ? '#0d1117' : '#f4f4f6')
     writeStorage('king-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
 
