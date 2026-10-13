@@ -4,120 +4,90 @@
 // 6-player bracket, drives both semifinal tables to a finish via the surrender
 // vote, and checks that exactly three finalists end up at one final table.
 //
-// Run: PORT=3402 node tournament/socket.smoke.js
+// Run: DATABASE_URL=postgres://localhost/kings_test PORT=3402 node tournament/socket.smoke.js
 
-process.env.PORT = process.env.PORT || '3402';
-require('../index.js');
+const { startServer, connectClient, waitFor, check, summary, run } = require('../test/harness');
 
-const { io } = require('socket.io-client');
-
-const URL = `http://localhost:${process.env.PORT}`;
-let passed = 0, failed = 0;
-const check = (name, cond, extra = '') => {
-  if (cond) { passed += 1; console.log(`  ok  ${name}`); }
-  else { failed += 1; console.error(`FAIL  ${name} ${extra}`); }
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const URL = startServer(3402);
 
 /** A client that records everything it is told. */
 function client(name) {
-  return new Promise((resolve) => {
-    const s = io(URL, { transports: ['websocket'], forceNew: true });
-    s.playerName = name;
-    s.events = [];
-    s.rooms = [];
-    s.tournament = null;
-    s.overview = null;
-    s.finalInfo = null;
-    s.complete = null;
-    s.gotHand = null;
-
-    s.onAny((event, payload) => s.events.push({ event, payload }));
-    s.on('room-joined', (p) => { s.rooms.push(p); s.seat = p.seat; s.roomCode = p.roomCode; });
-    s.on('hand-dealt', (p) => { s.gotHand = p; });
-    s.on('tournament-joined', (p) => { s.tournament = p; });
-    s.on('tournament-state', (p) => { s.tournament = p; });
-    s.on('tournament-overview', (p) => { s.overview = p; });
-    s.on('tournament-final', (p) => { s.finalInfo = p; });
-    s.on('tournament-complete', (p) => { s.complete = p; });
-    s.on('connect', () => resolve(s));
+  return connectClient(URL, { name }).then((s) => {
+    s.on('room-joined', (p) => { s.seat = p.seat; s.roomCode = p.roomCode; });
+    return s;
   });
 }
+const tournamentOf = (s) => s.last('tournament-state') || s.last('tournament-joined');
 
 /** Surrender a table: proposer plus both opponents accept. */
 async function surrender(clientsAtTable) {
   const [proposer, ...others] = clientsAtTable;
   proposer.emit('propose-quit', { kind: 'game' });
-  await sleep(250);
+  await waitFor(() => others.every((o) => o.last('quit-proposal')?.kind === 'game'));
   for (const o of others) o.emit('vote-quit', { accept: true });
-  await sleep(700);
+  await waitFor(() => clientsAtTable.every((c) => c.last('game-over')));
 }
 
-(async () => {
+run(async () => {
   const names = ['ტურ-1', 'ტურ-2', 'ტურ-3', 'ტურ-4', 'ტურ-5', 'ტურ-6'];
   const cs = [];
   for (const n of names) cs.push(await client(n));
 
   // ── lobby ───────────────────────────────────────────────────────────────
   cs[0].emit('tournament-create', { playerName: names[0], size: 6 });
-  await sleep(400);
-  const code = cs[0].tournament?.code;
+  await waitFor(() => tournamentOf(cs[0]));
+  const code = tournamentOf(cs[0])?.code;
   check('creating opens a lobby', !!code);
-  check('lobby reports its size', cs[0].tournament?.size === 6);
-  check('creator is seated', cs[0].tournament?.players?.length === 1);
+  check('lobby reports its size', tournamentOf(cs[0])?.size === 6);
+  check('creator is seated', tournamentOf(cs[0])?.players?.length === 1);
 
-  let badSize = null;
   const stray = await client('bad');
-  stray.on('error', (e) => { badSize = e.message; });
   stray.emit('tournament-create', { playerName: 'bad', size: 7 });
-  await sleep(300);
-  check('a 7-player tournament is refused', !!badSize, `got ${badSize}`);
+  check('a 7-player tournament is refused', await waitFor(() => stray.errors.length), JSON.stringify(stray.errors));
   stray.close();
 
   for (let i = 1; i < 5; i++) {
     cs[i].emit('tournament-join', { code, playerName: names[i] });
-    await sleep(200);
+    await waitFor(() => tournamentOf(cs[0])?.players?.length === i + 1);
   }
-  check('five seats filled, not yet started', cs[0].tournament?.players?.length === 5);
-  check('still in lobby', cs[0].tournament?.status === 'lobby');
+  check('five seats filled, not yet started', tournamentOf(cs[0])?.players?.length === 5);
+  check('still in lobby', tournamentOf(cs[0])?.status === 'lobby');
 
   // The sixth entrant triggers the draw.
   cs[5].emit('tournament-join', { code, playerName: names[5] });
-  await sleep(1200);
+  await waitFor(() => cs.every((c) => c.last('hand-dealt')));
 
   // ── semifinal ───────────────────────────────────────────────────────────
   const seated = cs.filter((c) => c.roomCode);
   check('all six were seated at a table', seated.length === 6, `got ${seated.length}`);
-  check('every player was dealt a hand', cs.every((c) => c.gotHand?.hand?.length > 0));
+  check('every player was dealt a hand', cs.every((c) => c.last('hand-dealt')?.hand?.length > 0));
 
   const tableCodes = [...new Set(cs.map((c) => c.roomCode))];
   check('split into exactly 2 tables', tableCodes.length === 2, `got ${tableCodes.length}`);
   const sizes = tableCodes.map((rc) => cs.filter((c) => c.roomCode === rc).length);
   check('3 players per table', sizes.every((n) => n === 3), JSON.stringify(sizes));
 
-  const ov = cs[0].overview;
+  await waitFor(() => cs[0].last('tournament-overview')?.tables?.every((t) => t.roomCode));
+  const ov = cs[0].last('tournament-overview');
   check('overview lists both tables', ov?.tables?.length === 2);
   check('overview reports a round', typeof ov?.tables?.[0]?.round === 'number');
   check('overview carries live scores',
     Array.isArray(ov?.tables?.[0]?.players) && ov.tables[0].players.length === 3);
 
-  // Bracket seats must not be rematchable.
-  let rematchErr = null;
-  cs[0].on('error', (e) => { rematchErr = e.message; });
-
   // ── drive both tables to a finish ───────────────────────────────────────
   for (const rc of tableCodes) {
     await surrender(cs.filter((c) => c.roomCode === rc));
   }
-  await sleep(1500);
+  await waitFor(() => cs.some((c) => c.last('tournament-final')));
 
   // ── final ───────────────────────────────────────────────────────────────
-  const withFinal = cs.filter((c) => c.finalInfo);
+  const withFinal = cs.filter((c) => c.last('tournament-final'));
   check('a final was announced', withFinal.length > 0);
-  const finalists = withFinal[0]?.finalInfo?.finalists || [];
+  const finalInfo = withFinal[0]?.last('tournament-final') || {};
+  const finalists = finalInfo.finalists || [];
   check('exactly three finalists', finalists.length === 3, JSON.stringify(finalists.map((f) => f.name)));
 
-  const standings = withFinal[0]?.finalInfo?.standings || [];
+  const standings = finalInfo.standings || [];
   check('standings rank all six entrants', standings.length === 6, `got ${standings.length}`);
   check('exactly three are marked advanced',
     standings.filter((s) => s.advanced).length === 3);
@@ -125,7 +95,8 @@ async function surrender(clientsAtTable) {
     standings.filter((s) => s.wildcard).length <= 1);
 
   // The three finalists must have been moved into one shared new room.
-  const finalRoom = withFinal[0].finalInfo.roomCode;
+  const finalRoom = finalInfo.roomCode;
+  await waitFor(() => cs.filter((c) => c.roomCode === finalRoom).length === 3);
   const atFinal = cs.filter((c) => c.roomCode === finalRoom);
   check('three players moved to the final table', atFinal.length === 3, `got ${atFinal.length}`);
   check('the final table is not a semifinal table', !tableCodes.includes(finalRoom));
@@ -133,29 +104,35 @@ async function surrender(clientsAtTable) {
     atFinal.map((c) => c.playerName).sort().join(',') ===
     finalists.map((f) => f.name).sort().join(','));
   check('finalists were dealt fresh hands',
-    atFinal.every((c) => c.gotHand?.hand?.length > 0));
+    atFinal.every((c) => c.last('hand-dealt')?.hand?.length > 0));
 
+  // The overview of a finished semifinal keeps its result.
+  const semi = cs[0].last('tournament-overview')?.tables?.[0];
+  check('a finished semifinal keeps its players and scores in the overview',
+    semi?.players?.length === 3 && semi.players.every((p) => p.seat !== null), JSON.stringify(semi?.players));
+
+  // Bracket seats must not be rematchable.
+  const errorsBefore = cs[0].errors.length;
   cs[0].emit('request-rematch', { playerName: names[0] });
-  await sleep(400);
-  check('rematch is refused inside a tournament', !!rematchErr, `got ${rematchErr}`);
+  check('rematch is refused inside a tournament', await waitFor(() => cs[0].errors.length > errorsBefore),
+    JSON.stringify(cs[0].errors));
 
   // ── finish the final ────────────────────────────────────────────────────
   await surrender(atFinal);
-  await sleep(1200);
-  const done = cs.find((c) => c.complete);
-  check('tournament reports a winner', !!done?.complete?.winners?.length);
-  check('every entrant sees the tournament as finished', cs.every((c) => c.tournament?.status === 'done'),
-    JSON.stringify(cs.map((c) => c.tournament?.status)));
-  const again = cs[0].events.length;
+  await waitFor(() => cs.some((c) => c.last('tournament-complete')));
+  const done = cs.find((c) => c.last('tournament-complete'));
+  check('tournament reports a winner', !!done?.last('tournament-complete')?.winners?.length);
+  check('every entrant sees the tournament as finished',
+    await waitFor(() => cs.every((c) => tournamentOf(c)?.status === 'done')),
+    JSON.stringify(cs.map((c) => tournamentOf(c)?.status)));
+  const final = cs[0].last('tournament-overview')?.final;
+  check('the overview keeps the final\'s result', final?.players?.length === 3 && final.winners?.length > 0,
+    JSON.stringify(final));
+  const joins = cs[0].all('tournament-joined').length;
   cs[0].emit('tournament-create', { playerName: names[0], size: 6 });
-  await sleep(400);
   check('an entrant can start a new tournament afterwards',
-    cs[0].events.slice(again).some((e) => e.event === 'tournament-joined'));
+    await waitFor(() => cs[0].all('tournament-joined').length > joins));
 
-  console.log(`\n${passed} passed, ${failed} failed`);
   cs.forEach((c) => c.close());
-  process.exit(failed ? 1 : 0);
-})().catch((err) => {
-  console.error('smoke test threw:', err);
-  process.exit(1);
+  summary();
 });

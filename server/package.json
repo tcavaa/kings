@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "node tournament/bracket.test.js",
-    "smoke": "node socket/lobby.smoke.js && node socket/chat.smoke.js && node socket/spectator-evict.smoke.js && node socket/identity.smoke.js && node socket/abandon.smoke.js && node tournament/socket.smoke.js && node tournament/nine.smoke.js && node tournament/spectate.smoke.js"
+    "test": "node --test tournament/bracket.test.js",
+    "smoke": "node socket/lobby.smoke.js && node socket/chat.smoke.js && node socket/spectator-evict.smoke.js && node socket/identity.smoke.js && node socket/abandon.smoke.js && node socket/fullgame.smoke.js && node tournament/socket.smoke.js && node tournament/nine.smoke.js && node tournament/spectate.smoke.js && node tournament/restore.smoke.js"
   },
   "engines": {
     "node": ">=20"

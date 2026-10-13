@@ -14,10 +14,12 @@
 const path = require('path');
 const crypto = require('crypto');
 
-// ── deterministic Math.random (mulberry32) — installed before the server loads.
-// Only the game's own code (room codes, shuffles) draws from the seeded
-// stream; anything else (database drivers jitter their connection lifetimes
-// with Math.random) gets the real one, so a driver can't shift the deal.
+// ── deterministic randomness (mulberry32). The server deals and draws room
+// codes from lib/util's secure source, which a test may replace with a seeded
+// one. Older builds (SERVER_DIR) used Math.random, so that is seeded too — but
+// only for calls from the game's own code (room codes, shuffles); anything
+// else (database drivers jitter their connection lifetimes with Math.random)
+// gets the real one, so a driver can't shift the deal.
 let seed = Number(process.env.SEED || 7) >>> 0;
 const seeded = () => {
   seed = (seed + 0x6D2B79F5) >>> 0;
@@ -36,6 +38,8 @@ Math.random = function random() {
 
 process.env.PORT = process.env.PORT || '3530';
 const SERVER_DIR = path.resolve(process.env.SERVER_DIR || path.join(__dirname, '..'));
+require('../test/harness').useTestDatabase();
+try { require(path.join(SERVER_DIR, 'lib', 'util.js')).setRandomSource(seeded); } catch { /* an older build */ }
 require(path.join(SERVER_DIR, 'index.js'));
 const store = require(path.join(SERVER_DIR, 'db', 'store.js'));
 const GameState = require(path.join(SERVER_DIR, 'game', 'GameState.js'));
@@ -74,7 +78,11 @@ function bot(name) {
       'cards-discarded', 'card-played', 'trick-complete', 'round-complete', 'round-started', 'hand-updated']) {
       s.on(ev, () => s.emit('request-state'));
     }
-    s.on('game-state', (st) => act(b, st));
+    s.on('game-state', (st) => {
+      // The leader picks trump in the Pluses without seeing the prikup.
+      if (st.phase === 'trump_selection' && st.leaderSeat === b.seat && st.centerCards.length) b.sawPrikup = true;
+      act(b, st);
+    });
     s.on('connect', () => resolve(b));
   });
 }
@@ -136,6 +144,7 @@ function act(b, st) {
   while (!(a.over && c2.over && c3.over) && Date.now() - started < 120000) await sleep(50);
   check('game reached game-over for all three', !!(a.over && c2.over && c3.over));
   check('27 rounds completed', a.rounds === 27, `${a.rounds}`);
+  check('the leader never saw the prikup while picking trump', [a, c2, c3].every((b) => !b.sawPrikup));
   check('no bot move was rejected', [a, c2, c3].every((b) => b.errors.length === 0),
     JSON.stringify([a.errors, c2.errors, c3.errors]));
   const over = a.over || {};

@@ -20,6 +20,7 @@
 
 const crypto = require('crypto');
 const { ALL_TYPE_CODES: GAME_TYPES } = require('../game/constants');
+const { badRequest: invalid } = require('../lib/httpError');
 
 const TAKEN_FIELD = {
   Q: 'queensTaken', J: 'jacksTaken', H: 'heartsTaken',
@@ -27,10 +28,36 @@ const TAKEN_FIELD = {
 };
 const SEP = ' & ';
 
-function invalid(message) {
-  const err = new Error(message);
-  err.status = 400;
-  return err;
+// How ჩაწერა scores a round (src/score/constants/gameTypes.js and
+// computeScoresForRound in src/score/utils/scoring.js): a 'single' type costs
+// its target the points, a 'count' type pays every player per unit taken,
+// and the units handed out always add up to the type's total.
+const SHEET_SCORING = {
+  K:  { kind: 'single', points: -40 },
+  Q:  { kind: 'count', perUnit: -10, units: 4 },
+  J:  { kind: 'count', perUnit: -10, units: 4 },
+  H:  { kind: 'count', perUnit: -5, units: 8 },
+  L2: { kind: 'count', perUnit: -20, units: 2 },
+  T:  { kind: 'count', perUnit: -4, units: 10 },
+  P1: { kind: 'count', perUnit: 8, units: 10 },
+  P2: { kind: 'count', perUnit: 8, units: 10 },
+  P3: { kind: 'count', perUnit: 8, units: 10 },
+};
+
+/** A round's scores per player id, worked out from what the sheet recorded. */
+function scoresForRound(round, ids) {
+  const rule = SHEET_SCORING[round.gameTypeCode];
+  const scores = {};
+  if (rule.kind === 'single') {
+    if (round.singleTargetPlayerId == null) throw invalid('Invalid round target.');
+    for (const id of ids) scores[id] = id === round.singleTargetPlayerId ? rule.points : 0;
+    return scores;
+  }
+  const counts = round.countsByPlayerId || {};
+  const handedOut = ids.reduce((sum, id) => sum + (counts[id] || 0), 0);
+  if (handedOut !== rule.units) throw invalid('Invalid round counts.');
+  for (const id of ids) scores[id] = (counts[id] || 0) * rule.perUnit;
+  return scores;
 }
 
 /** { [playerId]: v } → { [seat]: v } (null stays null). */
@@ -132,7 +159,10 @@ function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, reso
     return { id, name: profile.name, profileId: profile.id };
   });
   if (new Set(slots.map((s) => s.profileId)).size !== slots.length) throw invalid('Players must be distinct.');
-  if (!Array.isArray(rounds) || rounds.length > 36) throw invalid('Invalid rounds.');
+  // A finished sheet: every player led every game type once.
+  if (!Array.isArray(rounds) || rounds.length !== ids.length * GAME_TYPES.length) {
+    throw invalid('The game is not finished: every player leads every game type once.');
+  }
   const idSet = new Set(ids);
   const played = new Set();   // each leader plays each type once
   const isPoints = (v) => Number.isInteger(v) && Math.abs(v) <= 1000;
@@ -150,9 +180,15 @@ function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, reso
     const pair = `${r.leaderPlayerId}:${r.gameTypeCode}`;
     if (played.has(pair)) throw invalid('A leader played the same game type twice.');
     played.add(pair);
+    // The totals and winners come from the scores, so they must be the ones
+    // the recorded cards give.
+    const expected = scoresForRound(r, ids);
+    if (ids.some((id) => (r.scores[id] || 0) !== expected[id])) {
+      throw invalid('Round scores do not match the recorded cards.');
+    }
   }
   const clean = rounds.map((r) => ({
-    scores: r.scores,
+    scores: scoresForRound(r, ids),
     gameTypeCode: r.gameTypeCode,
     leaderPlayerId: r.leaderPlayerId,
     countsByPlayerId: r.countsByPlayerId ?? null,

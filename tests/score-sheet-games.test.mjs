@@ -5,9 +5,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { liveGameToLegacy, onlineGameToLegacy } from "../src/score/lib/gameShapes.js";
+import { GAME_TYPES } from "../src/score/constants/gameTypes.js";
+import { computeScoresForRound } from "../src/score/utils/scoring.js";
 
 const require = createRequire(import.meta.url);
 const { fromScoreSheet, fromLegacyRows } = require("../server/games/scoreSheet.js");
+// The store's own row → API shape, so a change there is caught here too.
+const { rowToGame } = require("../server/db/store.js");
 
 const profiles = new Map([
   ["p_1", { id: "p_1", name: "Ana" }],
@@ -16,30 +20,61 @@ const profiles = new Map([
   ["p_4", { id: "p_4", name: "Dato" }],
 ]);
 const resolve = (id) => profiles.get(id) || null;
-const rounds = [
-  { leaderPlayerId: "p_1", gameTypeCode: "K", countsByPlayerId: null, singleTargetPlayerId: "p_2",
-    scores: { p_1: 0, p_2: -40, p_3: 0, p_4: 0 } },
-  { leaderPlayerId: "p_2", gameTypeCode: "L2", countsByPlayerId: { p_3: 1, p_4: 1 }, singleTargetPlayerId: null,
-    scores: { p_1: 0, p_2: 0, p_3: -20, p_4: -20 } },
-  { leaderPlayerId: "p_3", gameTypeCode: "P1", countsByPlayerId: { p_1: 6, p_2: 0, p_3: 4 }, singleTargetPlayerId: null,
-    scores: { p_1: 48, p_2: 0, p_3: 32, p_4: 0 } },
-];
-const sheet = { players: ["p_1", "p_2", "p_3", "p_4"].map((id) => ({ id })), rounds, durationSeconds: 1800 };
 
-// What the store's rowToGame hands the API for a stored row.
-const asServed = (row) => ({
-  id: row.id, type: row.type, playedAt: "2026-10-12T18:00:00.000Z",
-  winners: row.payload.winners, players: row.payload.players, roundDetails: row.payload.roundDetails,
-  ...(row.payload.durationSeconds != null && { durationSeconds: row.payload.durationSeconds }),
-  ...(row.payload.legacy && { legacy: row.payload.legacy }),
-});
+/** A round as ჩაწერა records it, scored by ჩაწერა's own code. */
+function round(ids, leaderPlayerId, gameTypeCode, countsByPlayerId, singleTargetPlayerId = null) {
+  const type = GAME_TYPES.find((t) => t.code === gameTypeCode);
+  const players = ids.map((id) => ({ id }));
+  return {
+    leaderPlayerId, gameTypeCode, countsByPlayerId, singleTargetPlayerId,
+    scores: computeScoresForRound(type, players, countsByPlayerId, singleTargetPlayerId),
+  };
+}
+
+/**
+ * A finished sheet: every player leads every type once. `first` rounds come
+ * first; the rest send every penalty to `loser` and split the Pluses' ten
+ * tricks between `split`.
+ */
+function fullSheet(ids, first, { loser, split }) {
+  const rounds = [...first];
+  const done = new Set(first.map((r) => `${r.leaderPlayerId}:${r.gameTypeCode}`));
+  for (const leader of ids) {
+    for (const type of GAME_TYPES) {
+      if (done.has(`${leader}:${type.code}`)) continue;
+      if (type.kind === "single") rounds.push(round(ids, leader, type.code, null, loser));
+      else if (type.pointsPerUnit > 0) rounds.push(round(ids, leader, type.code, { [split[0]]: 5, [split[1]]: 5 }));
+      else rounds.push(round(ids, leader, type.code, { [loser]: type.totalUnits }));
+    }
+  }
+  return { players: ids.map((id) => ({ id })), rounds, durationSeconds: 1800 };
+}
+
+const ids = ["p_1", "p_2", "p_3", "p_4"];
+const opening = [
+  round(ids, "p_1", "K", null, "p_2"),
+  round(ids, "p_2", "L2", { p_3: 1, p_4: 1 }),
+  round(ids, "p_3", "P1", { p_1: 6, p_2: 0, p_3: 4 }),
+];
+const sheet = fullSheet(ids, opening, { loser: "p_4", split: ["p_1", "p_3"] });
+const totals = ids.map((id) => sheet.rounds.reduce((sum, r) => sum + r.scores[id], 0));
+
+// What the API serves for a stored row.
+const asServed = (row) => rowToGame(
+  { id: row.id, type: row.type, played_at: new Date("2026-10-12T18:00:00.000Z"),
+    winner_name: row.winner.name, winner_seat: row.winner.seat, winner_score: row.winner.score,
+    is_championship: row.isChampionship },
+  { ok: true, value: row.payload },
+);
 
 test("a finished score sheet is stored the way King Online stores its games", () => {
   const row = fromScoreSheet(sheet, resolve);
   assert.equal(row.type, "live");
+  assert.equal(row.payload.roundDetails.length, 36);
   assert.deepEqual(row.payload.players.map((p) => [p.seat, p.name, p.score, p.profileId]),
-    [[0, "Ana", 48, "p_1"], [1, "Beka", -40, "p_2"], [2, "Gio", 12, "p_3"], [3, "Dato", -20, "p_4"]]);
-  assert.deepEqual(row.payload.winners, [{ seat: 0, name: "Ana", score: 48 }]);
+    [[0, "Ana", totals[0], "p_1"], [1, "Beka", totals[1], "p_2"], [2, "Gio", totals[2], "p_3"], [3, "Dato", totals[3], "p_4"]]);
+  const best = Math.max(...totals);
+  assert.deepEqual(row.payload.winners.map((w) => w.score), totals.filter((t) => t === best));
   const [k, l2, p1] = row.payload.roundDetails;
   assert.equal(k.kingOfHeartsTakenBy, 1);
   assert.deepEqual(l2.trickWinners, [2, 3]);
@@ -49,31 +84,43 @@ test("a finished score sheet is stored the way King Online stores its games", ()
 });
 
 test("ჩაწერა reads its own game back unchanged", () => {
-  const { result, detail } = liveGameToLegacy(asServed(fromScoreSheet(sheet, resolve)));
-  assert.equal(result.winner_name, "Ana");
-  assert.deepEqual(result.participants, [
-    { name: "Ana", score: 48 }, { name: "Beka", score: -40 }, { name: "Gio", score: 12 }, { name: "Dato", score: -20 },
-  ]);
+  const served = asServed(fromScoreSheet(sheet, resolve));
+  assert.equal(served.playedAt, "2026-10-12T18:00:00.000Z");
+  const { result, detail } = liveGameToLegacy(served);
+  assert.deepEqual(result.participants, ids.map((id, i) => ({ name: profiles.get(id).name, score: totals[i] })));
   assert.equal(result.duration_seconds, 1800);
-  assert.deepEqual(detail.players, ["p_1", "p_2", "p_3", "p_4"].map((id) => ({ id, name: profiles.get(id).name })));
-  assert.deepEqual(detail.rounds, rounds.map(({ leaderPlayerId, gameTypeCode, countsByPlayerId, singleTargetPlayerId, scores }) =>
+  assert.deepEqual(detail.players, ids.map((id) => ({ id, name: profiles.get(id).name })));
+  assert.deepEqual(detail.rounds, sheet.rounds.map(({ leaderPlayerId, gameTypeCode, countsByPlayerId, singleTargetPlayerId, scores }) =>
     ({ scores, gameTypeCode, leaderPlayerId, countsByPlayerId, singleTargetPlayerId })));
 });
 
 test("ties crown every top scorer", () => {
-  const tie = { players: sheet.players.slice(0, 3), rounds: [
-    { leaderPlayerId: "p_1", gameTypeCode: "Q", countsByPlayerId: { p_3: 4 }, singleTargetPlayerId: null, scores: { p_1: 0, p_2: 0, p_3: -40 } },
-  ] };
-  const row = fromScoreSheet(tie, resolve);
+  const three = ["p_1", "p_2", "p_3"];
+  const row = fromScoreSheet(fullSheet(three, [], { loser: "p_3", split: ["p_1", "p_2"] }), resolve);
   assert.equal(row.payload.isTie, true);
   assert.deepEqual(liveGameToLegacy(asServed(row)).result.winner_name, "Ana & Beka");
 });
 
 test("bad sheets are refused", () => {
-  assert.throws(() => fromScoreSheet({ players: sheet.players.slice(0, 2), rounds }, resolve), /3 or 4 players/);
+  const withRound = (i, r) => ({ ...sheet, rounds: sheet.rounds.map((x, j) => (j === i ? r : x)) });
+  assert.throws(() => fromScoreSheet({ ...sheet, players: sheet.players.slice(0, 2) }, resolve), /3 or 4 players/);
   assert.throws(() => fromScoreSheet({ ...sheet, players: [...sheet.players.slice(0, 3), { id: "p_9" }] }, resolve), /Unknown player/);
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [{ ...rounds[0], gameTypeCode: "X" }] }, resolve), /Invalid round/);
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [{ ...rounds[0], scores: { p_1: "a" } }] }, resolve), /scores/);
+  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], gameTypeCode: "X" }), resolve), /Invalid round/);
+  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], scores: { p_1: "a" } }), resolve), /scores/);
+});
+
+test("only a finished sheet can be saved", () => {
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [] }, resolve), /not finished/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: sheet.rounds.slice(0, 35) }, resolve), /not finished/);
+});
+
+test("scores must be the ones the recorded cards give", () => {
+  const forged = sheet.rounds.map((r, i) => (i === 0 ? { ...r, scores: { ...r.scores, p_1: 1000 } } : r));
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: forged }, resolve), /do not match/);
+  const short = sheet.rounds.map((r, i) => (i === 1 ? round(ids, "p_2", "L2", { p_3: 1 }) : r));
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: short }, resolve), /counts/);
+  const noTarget = sheet.rounds.map((r, i) => (i === 0 ? { ...r, singleTargetPlayerId: null } : r));
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: noTarget }, resolve), /target/);
 });
 
 test("old ჩაწერა rows import with online names, keeping unlinked players by name", () => {
@@ -120,6 +167,6 @@ test("the sheet's own id is the game id, so a retried save stores one game", () 
 });
 
 test("a leader can't play the same game type twice", () => {
-  const twice = [...rounds, { ...rounds[0], singleTargetPlayerId: "p_3", scores: { p_1: 0, p_2: 0, p_3: -40, p_4: 0 } }];
+  const twice = sheet.rounds.map((r, i) => (i === sheet.rounds.length - 1 ? opening[0] : r));
   assert.throws(() => fromScoreSheet({ ...sheet, rounds: twice }, resolve), /same game type twice/);
 });

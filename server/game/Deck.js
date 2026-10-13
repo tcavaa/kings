@@ -1,6 +1,7 @@
 'use strict';
 
 const { RANKS, SUITS, CARDS_PER_PLAYER, CENTER_CARD_COUNT } = require('./constants');
+const { randomInt } = require('../lib/util');
 
 /**
  * Creates a full 32-card deck.
@@ -17,13 +18,13 @@ function createDeck() {
 }
 
 /**
- * Fisher-Yates in-place shuffle.
+ * Fisher-Yates in-place shuffle, from the secure generator (see lib/util).
  * @param {Array} deck
  * @returns {Array} same array, shuffled
  */
 function shuffle(deck) {
   for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randomInt(i + 1);
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;

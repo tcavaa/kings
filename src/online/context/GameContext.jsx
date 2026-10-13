@@ -610,11 +610,16 @@ export function GameProvider({ children }) {
       clearGameOverTimer()
     })
 
-    socket.on('round-started', ({ round: r, leaderSeat: ls, phase, usedTypes: ut }) => {
+    socket.on('round-started', ({ round: r, leaderSeat: ls, phase, usedTypes: ut, cardCounts: cc }) => {
       setRound(r)
       setLeaderSeat(ls)
       setGamePhase(phase)
       setUsedTypes(ut)
+      // Watchers get no `hand-dealt`, so the new round's reset happens here
+      // too (players get the same again from `hand-dealt` right after).
+      if (cc) setCardCounts(cc)
+      setChosenGameType(null)
+      setCenterCards([])
       setCurrentTrick([])
       setLedSuit(null)
       setLastTrickResult(null)
