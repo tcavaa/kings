@@ -1,0 +1,200 @@
+/* Waiting room — a physical seating plan and an invitation ticket. */
+.k-wait-page {
+  background: #eeefe5;
+  color: #171919;
+  min-height: 100dvh;
+  padding: 0 6vw;
+  color-scheme: light;
+}
+.k-wait-nav {
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #17191920;
+  gap: 20px;
+}
+.k-wait-nav > span:last-child {
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.k-wait-nav .k-link {
+  font-size: 10px;
+}
+.k-wait-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.1fr;
+  gap: 60px;
+  max-width: 1240px;
+  margin: auto;
+  padding: 80px 0;
+}
+.k-wait-copy h1 {
+  font-size: clamp(30px, 3.4vw, 50px);
+  letter-spacing: -2px;
+  line-height: 1.4;
+  margin: 22px 0;
+}
+.k-wait-copy h1 em {
+  font-style: normal;
+  color: #74815e;
+}
+.k-wait-copy > p {
+  font-size: 12px;
+  color: #74815e;
+  line-height: 1.9;
+}
+.k-invite-ticket {
+  margin: 32px 0;
+  padding: 23px 25px;
+  background: #e0e5cd;
+  border-left: 3px solid #171919;
+  position: relative;
+}
+.k-invite-ticket > span {
+  font-size: 10px;
+  color: #697455;
+}
+.k-invite-ticket > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0;
+}
+.k-invite-ticket strong {
+  font-size: 34px;
+  font-weight: 500;
+  letter-spacing: 5px;
+}
+.k-invite-ticket small {
+  font-size: 9px;
+  color: #697455;
+}
+.k-wait-copy > .k-button {
+  background: #171919;
+  color: #d7fa52;
+  width: 100%;
+}
+.k-wait-table {
+  position: relative;
+  min-height: 520px;
+  background: #222921;
+  overflow: hidden;
+  color: #e9efdc;
+}
+.k-table-edition {
+  position: absolute;
+  top: 25px;
+  left: 25px;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: #9ba78c;
+}
+.k-oval {
+  position: absolute;
+  left: 13%;
+  right: 13%;
+  top: 24%;
+  bottom: 22%;
+  border: 1px solid #8f9e6d66;
+  border-radius: 50%;
+  background: #2f3928;
+  box-shadow:
+    0 0 0 12px #ffffff03,
+    0 0 0 13px #ffffff0c;
+  display: grid;
+  place-items: center;
+}
+.k-oval > span {
+  font-size: 40px;
+  letter-spacing: -3px;
+  font-weight: 700;
+  color: #71855b;
+}
+.k-oval small {
+  display: block;
+  font-size: 7px;
+  letter-spacing: 1.5px;
+  font-weight: 400;
+  margin-top: 8px;
+}
+.k-wait-seat {
+  position: absolute;
+  text-align: center;
+  width: 140px;
+  transform: translateX(-50%);
+}
+.k-wait-seat > div {
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed #7d8b6c;
+  border-radius: 50%;
+  margin: auto;
+  background: #222921;
+  color: #8d9d78;
+}
+.k-wait-seat.filled > div {
+  border: 2px solid #d7fa52;
+}
+.k-wait-seat strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 12px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.k-wait-seat small {
+  display: block;
+  font-size: 9px;
+  color: #9aa78c;
+  margin-top: 5px;
+}
+.k-wait-seat.seat-0 {
+  left: 50%;
+  top: 59%;
+}
+.k-wait-seat.seat-1 {
+  left: 23%;
+  top: 17%;
+}
+.k-wait-seat.seat-2 {
+  left: 77%;
+  top: 17%;
+}
+.k-seat-progress {
+  position: absolute;
+  bottom: 23px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  align-items: center;
+}
+.k-seat-progress i {
+  width: 20px;
+  height: 3px;
+  background: #6b765b;
+}
+.k-seat-progress i.filled {
+  background: #d7fa52;
+}
+.k-seat-progress span {
+  font-size: 8px;
+  margin-left: 12px;
+  color: #b3bda4;
+}
+.k-wait-footer {
+  border-top: 1px solid #17191920;
+  padding: 25px 0;
+  font-size: 8px;
+  letter-spacing: 1px;
+  display: flex;
+  justify-content: space-between;
+  color: #6a775a;
+}

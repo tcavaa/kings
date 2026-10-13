@@ -1,0 +1,40 @@
+/* Public player profiles and the complete achievement collection. */
+.k-player-link { display: inline-flex; align-items: center; gap: 12px; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; padding: 4px; border-radius: 4px; }
+.k-player-link:hover strong, .k-player-link:hover h2 { text-decoration: underline; text-underline-offset: 5px; }
+.k-player-link:focus-visible, .k-profile-back:focus-visible { outline: 2px solid currentColor; outline-offset: 5px; }
+.k-feature-profile { flex-direction: column; align-items: flex-start; }
+.k-feature-profile h2 { display: flex; align-items: center; gap: 12px; }
+.k-achievement.is-locked { background: #1b1f1c; }
+.k-achievement.is-locked .k-achievement-art { filter: grayscale(1); opacity: .32; }
+.k-achievement.is-locked strong { color: #a5aaa5; }
+.k-achievement.is-locked p { color: #949b94; }
+.k-achievement-status { display: block; margin-top: 10px; font-size: 9px; letter-spacing: .03em; color: #d7fa52; }
+.k-achievement.is-locked .k-achievement-status { color: #949b94; }
+.k-profile-back { display: inline-flex; align-items: center; gap: 10px; background: none; border: 0; border-bottom: 1px solid #a4a89e; padding: 12px 0; margin-bottom: 28px; color: inherit; cursor: pointer; }
+.k-profile-identity { display: flex; align-items: center; gap: 24px; padding: 32px; background: #20251f; color: #eff1e8; }
+.k-profile-identity h2 { font-size: clamp(28px, 4vw, 52px); overflow-wrap: anywhere; margin: 10px 0; scroll-margin-top: 28px; }
+.k-profile-identity p { color: #a5b295; font-size: 12px; }
+.k-profile-rank { margin-left: auto; font-size: 48px; font-weight: 300; color: #d7fa52; }
+.k-profile-rank small { display: block; font-size: 10px; color: #a5b295; }
+.k-profile-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); margin: 0 0 32px; border: 1px solid #bec2b6; }
+.k-profile-stats > div { padding: 24px 16px; border-right: 1px solid #bec2b6; }
+.k-profile-stats > div:last-child { border: 0; }
+.k-profile-stats dt { font-size: 11px; color: #626b5b; }
+.k-profile-stats dd { font-size: 30px; margin: 12px 0 0; font-variant-numeric: tabular-nums; }
+.k-profile-history { margin-top: 40px; }
+.k-profile-history > header { margin-bottom: 20px; }
+.k-profile-history h2 { font-size: 24px; margin: 10px 0; }
+.k-profile-history header p { font-size: 12px; color: #626b5b; }
+@media (max-width: 800px) {
+  .k-profile-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .k-profile-stats > div { border-bottom: 1px solid #bec2b6; }
+  .k-profile-identity { padding: 24px 16px; gap: 16px; flex-wrap: wrap; }
+  .k-profile-rank { font-size: 28px; }
+}
+@media (max-width: 480px) {
+  .k-profile-identity .k-avatar { width: 64px !important; height: 64px !important; }
+  .k-profile-identity > div { min-width: 0; flex: 1; }
+  .k-profile-rank { width: 100%; margin-left: 80px; }
+  .k-profile-stats > div { padding: 18px 10px; }
+  .k-profile-stats dd { font-size: 24px; }
+}

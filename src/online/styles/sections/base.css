@@ -1,0 +1,229 @@
+/* KING 02 — paper, ink, electric citron. One system; no theme layers. */
+:root {
+  font-family: Inter, "Noto Sans Georgian", sans-serif;
+  color: #f2f2ed;
+  background: #171919;
+  --paper: #f0f0e9;
+  --black: #171919;
+  --acid: #d7fa52;
+  color-scheme: dark;
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  max-width: 100%;
+}
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+button,
+a,
+input {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #8fa723;
+  outline-offset: 4px;
+}
+input {
+  min-width: 0;
+}
+::selection {
+  background: #d7fa52;
+  color: #171919;
+}
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-thumb {
+  background: #78817660;
+}
+.font-western,
+.font-typewriter,
+.font-handwritten {
+  font-family: Inter, "Noto Sans Georgian", sans-serif;
+  letter-spacing: 0;
+}
+.h-screen-dvh {
+  height: 100vh;
+  height: 100dvh;
+}
+.safe-area-pad {
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+/* Compatibility primitives used by game drawers and statistics. */
+.saloon-bg,
+.lobby-bg,
+.leather-bg,
+.parchment-bg {
+  background: #171919;
+  min-height: 100dvh;
+  color: #f2f2ed;
+  box-shadow: none;
+}
+.western-panel,
+.parchment-panel {
+  background: #242826;
+  border: 1px solid #ffffff18;
+  border-radius: 3px;
+  box-shadow: none;
+  color: #f2f2ed;
+}
+.western-pill,
+.pin-key {
+  background: #2c312d;
+  border: 1px solid #ffffff18;
+  border-radius: 3px;
+  color: #f2f2ed;
+  box-shadow: none;
+}
+.casino-input {
+  width: 100%;
+  background: #191d1a;
+  border: 0;
+  border-bottom: 1px solid #71776a;
+  border-radius: 0;
+  padding: 13px 12px;
+  min-height: 46px;
+  color: #f2f2ed;
+  outline-offset: 2px;
+}
+.casino-input::placeholder {
+  color: #929a90;
+}
+.casino-btn-primary,
+.casino-btn-gold {
+  background: var(--acid);
+  color: #171919;
+  border: 0;
+  border-radius: 2px !important;
+  box-shadow: none;
+  text-shadow: none;
+  min-height: 44px;
+  letter-spacing: 0;
+  font-weight: 600;
+}
+.casino-btn-primary:hover:not(:disabled),
+.casino-btn-gold:hover:not(:disabled) {
+  background: #e6ff91;
+}
+.casino-btn-secondary {
+  background: transparent;
+  border: 1px solid #9aa28c66;
+  color: #f2f2ed;
+  min-height: 40px;
+  border-radius: 2px !important;
+}
+.western-divider {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #9ba690;
+}
+.western-divider::before,
+.western-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: #ffffff18;
+}
+.western-backdrop {
+  background: #080c0bd9;
+  backdrop-filter: blur(8px);
+}
+.bg-amber-glow {
+  background: #d7fa5215;
+}
+.text-cream,
+.text-ink {
+  color: #f2f2ed;
+}
+.text-cream-soft {
+  color: #c0c8ba;
+}
+.text-cream-dim {
+  color: #97a28e;
+}
+.text-amber,
+.text-amber-dim {
+  color: #d7fa52;
+}
+.score-pos-soft {
+  color: #b9e47a;
+}
+.score-neg-soft {
+  color: #f2a097;
+}
+.disconnect-banner {
+  background: #5c302c;
+  color: #fff;
+  border: 1px solid #df8d7c;
+}
+#phaser-container canvas {
+  display: block;
+}
+@keyframes toastIn {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.toast-enter {
+  animation: toastIn 0.2s ease-out;
+}
+@keyframes pinShake {
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+.pin-shake {
+  animation: pinShake 0.25s ease;
+}
+.parade-pulse,
+.trump-sparkle {
+  animation: none;
+}
