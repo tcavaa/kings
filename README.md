@@ -59,7 +59,6 @@ server/                 Socket.IO game server (Render) — game/socket/tournamen
 lib/api/http.js         request/response plumbing for the API routes
 supabase/migrations/    King Online schema for Postgres
 supabase/seed.sql       built-in sound clips (fresh databases only)
-scripts/import-mysql-dump.mjs   one-off import of the cPanel phpMyAdmin dump
 render.yaml             Render blueprint for the game server
 ```
 
@@ -155,17 +154,8 @@ used to write from the browser) and adds `profile_sessions` and
 - Seasons (name, theme, ending one) and the player list are managed in
   `/admin`; King Score only reads them.
 
-Importing the cPanel dump (one transaction, then every row is read back and
-compared with the dump):
-
-```bash
-npm run db:import-mysql -- /path/to/rretroca_king.sql            # empty tables
-npm run db:import-mysql -- /path/to/rretroca_king.sql --replace  # overwrite
-```
-
-DATETIMEs in the dump are Tbilisi wall-clock time (the cPanel server's zone —
-the epoch timestamps inside the game/profile ids confirm it) and are converted
-to exact instants. `durak_live_games` is skipped.
+King Online's data came from the cPanel MySQL dump through a one-off import
+script (removed once the import was done; see git history).
 
 The store keeps a per-process mirror of `finished_games` and `profiles`,
 checked against row versions (`xmin`) before every read, so the multi-MB

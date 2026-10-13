@@ -21,9 +21,11 @@ export default function GameTypeSelector({
     return GAME_TYPES.filter((t) => !usedSet.has(t.code))
   }, [activePlayer.id, usedTypesByPlayer])
 
+  // Only a type the current leader still has: after an Undo hands the lead
+  // back, a type picked for the next leader must not carry over.
   const selectedType = useMemo(
-    () => GAME_TYPES.find((t) => t.code === selectedTypeCode) || null,
-    [selectedTypeCode]
+    () => availableTypesForActive.find((t) => t.code === selectedTypeCode) || null,
+    [selectedTypeCode, availableTypesForActive]
   )
 
   useEffect(() => {

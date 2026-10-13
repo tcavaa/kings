@@ -197,10 +197,12 @@ function App() {
     : null
 
   // The server works out totals and winners from the rounds, the same way the
-  // sheet does. A game that fails to save stays on screen to retry.
+  // sheet does. A game that fails to save stays on screen to retry; the sheet
+  // id makes a retry after a lost response store it only once.
   const saveGameToDB = useCallback(async (playersList, roundsList, gameDuration = null) => {
     try {
       await saveGame({
+        sheetId,
         players: playersList.map((p) => ({ id: p.id })),
         rounds: roundsList,
         durationSeconds: gameDuration ?? undefined,
@@ -210,7 +212,7 @@ function App() {
       window.alert(`The game could not be saved (${err.message}). It is still here — try again.`)
       return false
     }
-  }, [])
+  }, [sheetId])
 
   const handleComplete = useCallback(async () => {
     if (!players) return
@@ -352,6 +354,8 @@ function App() {
               currentChampion={currentChampion}
             />
             <GameTypeSelector
+              // A new round (or an undone one) starts with a clean form.
+              key={rounds.length}
               players={players}
               activePlayerIndex={activePlayerIndex}
               usedTypesByPlayer={usedTypesByPlayer}

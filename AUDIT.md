@@ -113,18 +113,6 @@ Two loads can both miss the in-memory check. The first player joins copy A. The 
 
 *Found by 4 auditors.*
 
-### B5. Retrying a failed score-sheet save records the game twice · Medium
-**Where:** [server/games/scoreSheet.js:157](server/games/scoreSheet.js:157), [server/db/store.js:481](server/db/store.js:481), [src/score/App.jsx:199](src/score/App.jsx:199)
-**Problem:** Every `POST /api/games/live` gets a fresh `crypto.randomUUID()` and a plain INSERT with no conflict key. If the insert commits but the response is lost (flaky phone network, function timeout), the app shows "could not be saved … try again". The user taps Complete again, and the same table game is stored a second time, doubling its wins, season points and lifetime stats.
-**Fix:**
-- Send the existing `sheetId` in the `saveGame` body.
-- In `fromScoreSheet`, use the id `sheet-${sheetId}` when it matches `SHEET_ID_RE`, and fall back to a random UUID otherwise.
-- Change the insert to `ON CONFLICT (id) DO NOTHING` and return `getGame(row.id)`.
-
-Rematch already starts a new `sheetId`, so the next game gets a fresh id.
-
-*Found by 3 auditors.*
-
 ### B7. A socket never leaves its previous room, so old-room events corrupt the current table and finished rooms leak · Medium
 **Where:** [server/socket/handlers.js:1355](server/socket/handlers.js:1355), [server/game/GameManager.js:352](server/game/GameManager.js:352), [server/game/GameManager.js:412](server/game/GameManager.js:412), [server/game/GameManager.js:588](server/game/GameManager.js:588)
 **Problem:** `createRoom` and `joinRoom` overwrite `socketRoomMap` without touching the old room. That covers `sitPublic`, `requestRematch` and the tournament draw too. The socket stays in the old socket.io channel, and its old player row stays `connected:true` forever.
@@ -178,16 +166,6 @@ If a lobby fills while an entrant is offline, `_openTable` seats them under the 
 
 *Found by 2 auditors.*
 
-### B13. `db:import-mysql --replace` would now wipe all ჩაწერა history · Medium
-**Where:** [scripts/import-mysql-dump.mjs:223](scripts/import-mysql-dump.mjs:223), [README.md:148](README.md:148), [package.json:13](package.json:13)
-**Problem:** The script header says it only touches King Online's tables. Since migration 20261012160000, though, `finished_games` also holds every ჩაწერა game (`type='live'`), and `profiles` is the player list shared by both apps. Running the `--replace` command documented in the README TRUNCATEs `profiles` and `finished_games` with no filter. No foreign key blocks it, so all table-game history and every score-app player would be deleted with no way back. Without `--replace` the script now always refuses (the tables aren't empty), and `--verify-only` always reports a mismatch.
-**Fix:** The one-off import is done, so delete the script, the `package.json` entry and the README section (around lines 145-153). If the script has to stay:
-- limit the delete to `type='online'` rows and the ids in the dump;
-- count only those rows in the non-empty guard;
-- update the header comment.
-
-*Found by 2 auditors.*
-
 ### B14. Spectators evicted when an empty room's grace window expires aren't told · Medium
 **Where:** [server/game/GameManager.js:591](server/game/GameManager.js:591)
 **Problem:** When everyone at a table drops and the 90 s grace window expires, `armRoomGrace` deletes the room and evicts its watchers silently: they get no `spectate-stopped` and sit on a frozen table. (Watchers evicted at game over now also leave the room's socket channel.)
@@ -228,43 +206,6 @@ Players get `hand-dealt` right after `round-started`, so these resets are harmle
 
 ## Bugs — King Online & King Score clients (incl. CSS)
 The serious King Online bugs (game-over timer, tournament reconnects, the leaderboard hiding the game, stale room codes) are fixed. What's left in `GameContext.jsx` is state that still isn't tied to a room (`finalResults`, chat, `selectedDiscards`) and a few reconnect edge cases. King Score's bugs are mostly data-integrity edge cases: duplicate saves, a season race, invalid rounds getting saved, and a failed load that stays cached. The CSS bugs are mostly poor contrast inside the cream in-game sheets.
-
-### C5. Retrying a failed King Score save can store the same game twice · Medium
-**Where:** [src/score/App.jsx:199](src/score/App.jsx:199), [server/games/scoreSheet.js:157](server/games/scoreSheet.js:157), [server/db/store.js:481](server/db/store.js:481)
-**Problem:** Every POST to `/api/games/live` gets a fresh `crypto.randomUUID()`, and the INSERT has no conflict guard. The only unique key includes `played_at = now()`, so it never matches on a retry.
-
-If the insert commits but the response is lost (mobile network, function timeout), the app shows "could not be saved — try again", and the retry inserts a second copy. Wins, achievements and the season champion then count the game twice, and there is no API to delete a game.
-**Fix:**
-- In `saveGameToDB`, send the sheet's `sheetId` as `id` through `saveGame` (gameData.js:76).
-- In `fromScoreSheet`, use that id when it is well-formed (`[A-Za-z0-9_-]`, at most 64 characters).
-- Add `ON CONFLICT (id) DO NOTHING` to the INSERT, so a retry returns the game that is already stored.
-
-### C7. Undo with a type selected lets a leader play the same type twice · Medium
-**Where:** [src/score/components/GameTypeSelector.jsx:25](src/score/components/GameTypeSelector.jsx:25), [src/score/App.jsx:65](src/score/App.jsx:65)
-**Problem:** GameTypeSelector keeps `selectedTypeCode` and the counts in local state and stays mounted across rounds. `selectedType` is looked up in all of `GAME_TYPES`, not in the types the active leader has left.
-
-Example: leader B selects Q, then someone taps Undo, which hands the lead back to A, who already played Q. The Q button disappears, but the count inputs stay and End Round still works. A is recorded leading Q twice and never plays one of the types. The server does not check the schedule, so the bad game is saved permanently.
-**Fix:**
-- Look up `selectedType` in `availableTypesForActive`, and add that to the memo deps.
-- Reset the selection, counts and target when `activePlayer.id` or `usedTypesByPlayer` changes. Simpler: give the selector `key={rounds.length}` in App.jsx.
-- Backstop on the server, in `fromScoreSheet`: reject a duplicate `leaderPlayerId:gameTypeCode` pair.
-
-### C8. A player can hold a homepage seat and a tournament entry at once, and the two tables collide · Medium
-**Where:** [src/online/components/Tournament/TournamentPanel.jsx:35](src/online/components/Tournament/TournamentPanel.jsx:35), [src/online/components/PublicRoomPanel.jsx:26](src/online/components/PublicRoomPanel.jsx:26), [server/socket/handlers.js:1027](server/socket/handlers.js:1027), [server/socket/handlers.js:277](server/socket/handlers.js:277)
-**Problem:** Nothing stops one socket from being in both places:
-- TournamentPanel's `canAct` ignores `publicSeat`.
-- PublicRoomPanel's `canSit` ignores `tournament`.
-- On the server, neither the `tournament-create`/`tournament-join` handlers nor `sit-public` check for the other.
-
-Example: a player sits at the championship table, then joins a 6-player tournament. If both fill, `createRoom`/`joinRoom` overwrites `socketRoomMap` for that socket. One of the two tables then has a seat whose events go to the other room, and it stalls for the two other people at it. Watching a game from LiveTables while waiting in a tournament lobby collides the same way.
-**Fix:**
-- **Server (the real guard):**
-  - In `tournament-create` and `tournament-join`, refuse when the socket's mapping points at a waiting or playing room.
-  - In `sit-public`, `create-room` and `join-room`, refuse when `tournamentManager.findBySocket(socketId)` returns a tournament that isn't finished. Still allow `join-room` to the player's own tournament table.
-- **Client:**
-  - `canAct = connected && !!active && publicSeat === null`.
-  - Add `&& !(tournament?.status === 'lobby')` to `canSit`.
-  - In LiveTables, pass `waitingAtTable={publicSeat !== null || !!tournament}`.
 
 ### C9. After a tournament starts or ends, the lobby's tournament panel is stuck · Medium
 **Where:** [src/online/components/Tournament/TournamentPanel.jsx:37](src/online/components/Tournament/TournamentPanel.jsx:37), [src/online/context/GameContext.jsx:451](src/online/context/GameContext.jsx:451), [server/socket/handlers.js:1394](server/socket/handlers.js:1394)

@@ -82,7 +82,8 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
  * empty "live" section on the page.
  */
 export default function LiveTables({ active, onNeedProfile }) {
-  const { liveGames, connected, publicSeat, watchGame } = useGame();
+  const { liveGames, connected, publicSeat, tournament, watchGame } = useGame();
+  const busy = publicSeat !== null || (!!tournament && tournament.status !== "done");
   if (!liveGames.length) return null;
 
   const watch = (roomCode) => watchGame(roomCode, active.name);
@@ -103,7 +104,7 @@ export default function LiveTables({ active, onNeedProfile }) {
             game={g}
             active={active}
             connected={connected}
-            waitingAtTable={publicSeat !== null}
+            waitingAtTable={busy}
             onWatch={watch}
             onNeedProfile={onNeedProfile}
           />

@@ -66,11 +66,11 @@ function reloadGameData() {
   return promise
 }
 
-export async function saveGame({ players, rounds, durationSeconds }) {
+export async function saveGame({ sheetId, players, rounds, durationSeconds }) {
   await request('/api/games/live', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ players, rounds, durationSeconds }),
+    body: JSON.stringify({ sheetId, players, rounds, durationSeconds }),
   })
   reloadGameData().catch(() => {})
 }

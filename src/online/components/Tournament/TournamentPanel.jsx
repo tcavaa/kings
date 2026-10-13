@@ -15,6 +15,7 @@ const SIZES = [6, 9];
 export default function TournamentPanel({ active, onNeedProfile }) {
   const {
     connected,
+    publicSeat,
     tournament,
     tournamentList,
     createTournament,
@@ -32,7 +33,8 @@ export default function TournamentPanel({ active, onNeedProfile }) {
     if (connected) refreshTournaments();
   }, [connected, tournament, refreshTournaments]);
 
-  const canAct = connected && !!active;
+  // One table at a time: not while sitting at the homepage table.
+  const canAct = connected && !!active && publicSeat === null;
 
   if (tournament)
     return (
