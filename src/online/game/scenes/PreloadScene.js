@@ -1,4 +1,5 @@
-import Phaser from "phaser";
+import Phaser from "../phaser.js";
+import { AVATAR_PX, bakeAvatar } from "../lib/AvatarTextureCache.js";
 
 export class PreloadScene extends Phaser.Scene {
   constructor() {
@@ -7,9 +8,9 @@ export class PreloadScene extends Phaser.Scene {
 
   preload() {
     this.load.image("card-back-raw", "/art/card-back.webp");
-    this.load.svg("avatar-default", "/art/player-mark.svg", {
-      width: 128,
-      height: 128,
+    this.load.svg("avatar-default-raw", "/art/player-mark.svg", {
+      width: AVATAR_PX,
+      height: AVATAR_PX,
     });
   }
 
@@ -38,6 +39,18 @@ export class PreloadScene extends Phaser.Scene {
       ctx.drawImage(src, 0, 0, W, H);
       if (this.textures.exists("card-back")) this.textures.remove("card-back");
       this.textures.addCanvas("card-back", canvas);
+    }
+
+    // The default player mark, cut to the same rounded square as photos.
+    const mark = this.textures.get("avatar-default-raw")?.source?.[0]?.image;
+    if (mark && (mark.naturalWidth || mark.width)) {
+      if (this.textures.exists("avatar-default")) this.textures.remove("avatar-default");
+      this.textures.addCanvas("avatar-default", bakeAvatar(mark));
+    }
+
+    // Only the baked copies are drawn; drop the downloaded originals.
+    for (const key of ["card-back-raw", "avatar-default-raw"]) {
+      if (this.textures.exists(key)) this.textures.remove(key);
     }
 
     this.scene.start("GameScene");
