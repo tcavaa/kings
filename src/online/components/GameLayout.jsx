@@ -1,5 +1,5 @@
 import "../styles/game-light.css";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Swords, Eye } from "lucide-react-online";
 import { useGame, useChat } from "../context/GameContext";
 import { EventBus } from "../game/EventBus";
@@ -28,7 +28,8 @@ import { useWakeLock } from "../hooks/useWakeLock";
  * file under `Hud/`; this component is intentionally thin glue.
  */
 export default function GameLayout() {
-  useEffect(() => {
+  // Before paint, so the first frame already has the light game styles.
+  useLayoutEffect(() => {
     document.body.classList.add("king-light-game");
     return () => document.body.classList.remove("king-light-game");
   }, []);
@@ -225,7 +226,6 @@ export default function GameLayout() {
     // indicator / rounded-corner regions.
     <div
       className={`k-game-screen ${canSpeak ? "has-sounds" : ""} fixed top-0 left-0 right-0 h-screen-dvh overflow-hidden safe-area-pad`}
-      style={{ background: "#0b1615" }}
     >
       <PhaserGame gameState={gameState} onCardPlay={handleCardPlay} />
 
@@ -310,10 +310,7 @@ export default function GameLayout() {
         >
           <p
             className="k-table-quote font-handwritten text-xs leading-snug"
-            style={{
-              color: "#c4cfbf",
-              textShadow: "0 2px 8px rgba(0,0,0,0.4)",
-            }}
+            style={{ textShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
           >
             „{roundQuote.text}“
           </p>

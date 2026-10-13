@@ -3,7 +3,7 @@ body.king-light-game {
   --game-ink: #173e32;
 }
 body.king-light-game .k-game-screen {
-  background: #dceae1 !important;
+  background: #dceae1;
   color: var(--game-ink);
 }
 /* The Phaser canvas repaints every frame, so a blur behind a modal or sheet
@@ -103,7 +103,7 @@ body.king-light-game .k-game-connection i.on {
   background: #079b67;
 }
 body.king-light-game .k-table-quote {
-  color: #416451 !important;
+  color: #416451;
 }
 body.king-light-game .k-game-quote > p:last-child {
   color: #58705e !important;

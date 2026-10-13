@@ -4,15 +4,10 @@ import { SuitLabel } from "./Icons";
 import ModalShell from "./ModalShell";
 import PlayingCard from "./ui/PlayingCard";
 import { SUIT_SYMBOLS } from "../constants/suits";
+// The server's own discard rule, so the dialog can't drift from it.
+import { canDiscard } from "../../../server/game/rules.js";
 
 const cardKey = (c) => `${c.rank}-${c.suit}`;
-
-function isCardRestricted(card, gameType) {
-  if (gameType === "K" || gameType === "H") return card.suit === "H";
-  if (gameType === "Q") return card.rank === "Q";
-  if (gameType === "J") return card.rank === "J";
-  return false;
-}
 
 function MiniCard({ card, selected, restricted, onClick, isCenter }) {
   return (
@@ -84,7 +79,7 @@ export default function DiscardSelector() {
               key={cardKey(card)}
               card={card}
               selected={isSelected(card)}
-              restricted={isCardRestricted(card, chosenGameType)}
+              restricted={!canDiscard(chosenGameType, card)}
               onClick={toggleDiscard}
               isCenter={centerKeys.has(cardKey(card))}
             />
