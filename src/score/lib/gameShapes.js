@@ -1,7 +1,7 @@
 // Every game — recorded here ("live") or played in King Online ("online") —
 // comes from the shared games table in King Online's shape. ჩაწერა's screens
 // were built on its own two rows per game:
-//   result  { id, played_at, winner_name, participants: [{ name, score }], duration_seconds? }
+//   result  { id, played_at, winner_name, winners: [name], participants: [{ name, score }], duration_seconds? }
 //   detail  { game_result_id, played_at, players: [{ id, name }],
 //             rounds: [{ scores, gameTypeCode, leaderPlayerId, countsByPlayerId, singleTargetPlayerId }] }
 // so both kinds are turned back into those. Player ids are profile ids, the
@@ -17,15 +17,26 @@ const bySeatToIds = (obj, idAtSeat) => obj == null
   ? null
   : Object.fromEntries(Object.entries(obj).map(([seat, v]) => [idAtSeat(Number(seat)), v]))
 
-/** A game saved by ჩაწერა, as its own result/detail rows. */
-export function liveGameToLegacy(game) {
+const guestId = name => `guest:${name}`
+
+/**
+ * A game saved by ჩაწერა, as its own result/detail rows. A seat keeps its
+ * saved profile id only while that profile still exists (`knownIds`);
+ * otherwise it is found by name with `idOfName`, the way King Online's games
+ * are, so a removed player's games don't keep a dead id and a name added
+ * again is one person, not two.
+ */
+export function liveGameToLegacy(game, { knownIds = null, idOfName = guestId } = {}) {
   const ps = [...game.players].sort((a, b) => a.seat - b.seat)
-  const idAt = seat => ps[seat].profileId || `guest:${ps[seat].name}`
+  const ids = ps.map(p => (p.profileId && (!knownIds || knownIds.has(p.profileId)) ? p.profileId : idOfName(p.name)))
+  const idAt = seat => ids[seat]
   const order = game.legacy?.participantsOrder ?? ps.map(p => p.seat)
+  const winners = game.winners.map(w => ps[w.seat].name)
   const result = {
     id: game.id,
     played_at: game.playedAt,
-    winner_name: joinWinnerNames(game.winners.map(w => ps[w.seat].name)),
+    winner_name: joinWinnerNames(winners),
+    winners,
     participants: order.map(seat => ({ name: ps[seat].name, score: ps[seat].score })),
     type: 'live',
   }
@@ -61,6 +72,7 @@ export function onlineGameToLegacy(game, idOfName) {
     id: game.id,
     played_at: game.playedAt,
     winner_name: joinWinnerNames(winners),
+    winners,
     participants: (game.players || []).map(p => ({ name: p.name, score: p.score })),
     type: 'online',
   }

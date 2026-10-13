@@ -1,16 +1,19 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import { GAME_TYPES } from '../constants/gameTypes'
 import { computeScoresForRound } from '../utils/scoring'
+import { countsSum, normalizeCount, validateRound } from '../utils/rounds'
 import { TYPE_BTN_DECOR } from '../utils/decorations'
 
+// The chosen type lives in App, so a tap on the availability matrix and a
+// tap here pick the same thing.
 export default function GameTypeSelector({
   players,
   activePlayerIndex,
   usedTypesByPlayer,
-  preselectedCode,
+  selectedTypeCode,
+  onSelectType,
   onRoundComplete,
 }) {
-  const [selectedTypeCode, setSelectedTypeCode] = useState(null)
   const [countsByPlayerId, setCountsByPlayerId] = useState({})
   const [singleTargetPlayerId, setSingleTargetPlayerId] = useState(null)
 
@@ -28,34 +31,15 @@ export default function GameTypeSelector({
     [selectedTypeCode, availableTypesForActive]
   )
 
-  useEffect(() => {
-    if (!preselectedCode) return
-    const usedSet = usedTypesByPlayer[activePlayer.id] || new Set()
-    if (!usedSet.has(preselectedCode)) setSelectedTypeCode(preselectedCode)
-  }, [preselectedCode, activePlayer.id, usedTypesByPlayer])
+  const sumCounts = useMemo(() => countsSum(countsByPlayerId), [countsByPlayerId])
 
-  const sumCounts = useMemo(
-    () => Object.values(countsByPlayerId).reduce((a, b) => a + (Number(b) || 0), 0),
-    [countsByPlayerId]
+  const validationMessage = useMemo(
+    () => validateRound(selectedType, countsByPlayerId, singleTargetPlayerId),
+    [selectedType, countsByPlayerId, singleTargetPlayerId]
   )
 
-  const validationMessage = useMemo(() => {
-    if (!selectedType) return 'Choose a game type'
-    if (selectedType.kind === 'count') {
-      if (sumCounts !== selectedType.totalUnits) {
-        return `Distribute exactly ${selectedType.totalUnits} ${selectedType.unitLabel || 'units'} across players`
-      }
-      return ''
-    }
-    if (selectedType.kind === 'single') {
-      if (!singleTargetPlayerId) return 'Select the player who took it'
-      return ''
-    }
-    return ''
-  }, [selectedType, sumCounts, singleTargetPlayerId])
-
   function handleCountChange(playerId, value) {
-    setCountsByPlayerId((prev) => ({ ...prev, [playerId]: Math.max(0, Number(value || 0)) }))
+    setCountsByPlayerId((prev) => ({ ...prev, [playerId]: normalizeCount(value) }))
   }
 
   function computeScores() {
@@ -73,7 +57,6 @@ export default function GameTypeSelector({
       scores,
     }
     onRoundComplete(roundRecord)
-    setSelectedTypeCode(null)
     setCountsByPlayerId({})
     setSingleTargetPlayerId(null)
   }
@@ -94,7 +77,7 @@ export default function GameTypeSelector({
           <button
             key={t.code}
             className={selectedTypeCode === t.code ? 'type-btn selected' : 'type-btn'}
-            onClick={() => setSelectedTypeCode(t.code)}
+            onClick={() => onSelectType(t.code)}
             type="button"
             data-decor={TYPE_BTN_DECOR[t.code]}
           >
@@ -107,7 +90,7 @@ export default function GameTypeSelector({
         <div className="inputs">
           <h3>Distribute {selectedType.totalUnits} {selectedType.unitLabel || 'units'}</h3>
           <div className="inputs-grid">
-            {players.map((p) => (
+            {players.map((p, i) => (
               <label key={p.id} className="input-row">
                 <span>{p.name}</span>
                 <div className="stepper">
@@ -115,10 +98,11 @@ export default function GameTypeSelector({
                   <input
                   type="number"
                   min="0"
+                  step="1"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   className="num-input"
-                  ref={firstInputRef}
+                  ref={i === 0 ? firstInputRef : undefined}
                   value={countsByPlayerId[p.id] ?? ''}
                   onChange={(e) => handleCountChange(p.id, e.target.value)}
                 />

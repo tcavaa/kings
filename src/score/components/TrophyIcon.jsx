@@ -1,9 +1,9 @@
-export default function TrophyIcon({ size = 20, color = '#d4a017', className = '' }) {
+export default function TrophyIcon({ size = 20, color = '#d4a017', className = '', style }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24"
       fill="none" className={className}
-      style={{ display: 'inline-block', flexShrink: 0 }}
+      style={{ display: 'inline-block', flexShrink: 0, ...style }}
     >
       {/* Crown — 5 points */}
       <path

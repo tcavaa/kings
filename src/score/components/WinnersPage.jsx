@@ -1,47 +1,51 @@
 import { useMemo, useState } from 'react'
 import { Globe, Trophy, Crown, Handshake, Timer } from 'lucide-react'
 import { formatDuration } from '../utils/time'
-import { useGameResults } from '../hooks/useGameResults'
-import { useAllGameDetails } from '../hooks/useAllGameDetails'
-import { usePlayers } from '../hooks/usePlayers'
-import { useOnlineGames } from '../hooks/useOnlineData'
+import { useGameData } from '../lib/gameData'
+import { usePaged } from '../hooks/usePaged'
 import GameDetailPage from './GameDetailPage'
 import OnlineHistoryTab from './OnlineHistoryTab'
 import SeasonChampionsTab from './SeasonChampionsTab'
+import ShowMore from './ShowMore'
 import { computePerGameAchievements, ACHIEVEMENT_DEFS } from '../utils/achievements'
 import { winnerNamesOf, isWinnerOf, isTieResult } from '../utils/winners'
 
+const NONE = []
+
+// { [playerName]: uniqueAchievementCodes[] } for one game's detail row.
+function achievementsByName(detail) {
+  if (!detail?.players || !detail.rounds) return {}
+  const achs = computePerGameAchievements(detail.players, detail.rounds)
+  const byName = {}
+  detail.players.forEach(p => {
+    const codes = [...new Set(achs[p.id] || [])]
+    if (codes.length) byName[p.name] = codes
+  })
+  return byName
+}
+
 export default function WinnersPage({ seasons }) {
-  const { results, loading: resultsLoading } = useGameResults()
-  const { details, loading: detailsLoading } = useAllGameDetails()
-  const { players: supabasePlayers } = usePlayers()
-  const { games: onlineGames } = useOnlineGames()
+  const { data, loading } = useGameData()
+  const results = data?.live.results ?? NONE
+  const details = data?.live.details ?? NONE
 
   const [subView, setSubView]           = useState('list')      // 'list' | 'detail'
   const [historyTab, setHistoryTab]     = useState('local')     // 'local' | 'online' | 'seasons'
   const [selectedResultId, setSelectedResultId] = useState(null)
 
-  const loading = resultsLoading || detailsLoading
+  const detailById = useMemo(() => new Map(details.map(d => [d.game_result_id, d])), [details])
+  const { visible, remaining, showMore } = usePaged(results)
 
-  // { [game_result_id]: { [playerName]: uniqueAchievementCodes[] } }
+  // Achievements of the games on screen only (each one replays the game).
   const gameAchievementsMap = useMemo(() => {
     const map = {}
-    details.forEach(detail => {
-      if (!detail.players || !detail.rounds) return
-      const achs = computePerGameAchievements(detail.players, detail.rounds)
-      const byName = {}
-      detail.players.forEach(p => {
-        const codes = [...new Set(achs[p.id] || [])]
-        if (codes.length) byName[p.name] = codes
-      })
-      if (Object.keys(byName).length) map[detail.game_result_id] = byName
-    })
+    visible.forEach(r => { map[r.id] = achievementsByName(detailById.get(r.id)) })
     return map
-  }, [details])
+  }, [visible, detailById])
 
   if (subView === 'detail') {
     const result = results.find(r => r.id === selectedResultId)
-    const detail = details.find(d => d.game_result_id === selectedResultId)
+    const detail = detailById.get(selectedResultId)
     if (!detail) {
       return (
         <div className="card">
@@ -87,9 +91,10 @@ export default function WinnersPage({ seasons }) {
         ) : results.length === 0 ? (
           <p style={{ color: 'var(--muted)' }}>No games recorded yet.</p>
         ) : (
+          <>
           <div className="history-list">
-            {results.map(r => {
-              const hasDetail = details.some(d => d.game_result_id === r.id)
+            {visible.map(r => {
+              const hasDetail = detailById.has(r.id)
               const playerAchs = gameAchievementsMap[r.id] || {}
               const sorted = [...(r.participants || [])].sort((a, b) => b.score - a.score)
               return (
@@ -147,19 +152,15 @@ export default function WinnersPage({ seasons }) {
               )
             })}
           </div>
+          <ShowMore remaining={remaining} onClick={showMore} />
+          </>
         )
       )}
 
       {historyTab === 'online' && <OnlineHistoryTab />}
 
       {historyTab === 'seasons' && (
-        <SeasonChampionsTab
-          seasons={seasons}
-          allDetails={details}
-          allResults={results}
-          allOnlineGames={onlineGames}
-          supabasePlayers={supabasePlayers}
-        />
+        <SeasonChampionsTab seasons={seasons} data={data} loading={loading} />
       )}
 
     </div>

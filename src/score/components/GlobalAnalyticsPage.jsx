@@ -5,20 +5,20 @@ import {
 } from 'recharts'
 import { Swords, Medal } from 'lucide-react'
 import { computeGlobalStats, getGlobalAwards, TYPE_ROWS, computeKingMatrix, computeTypeEfficiency } from '../utils/analytics'
-import { CardTypeIcon, AwardIcon } from '../utils/gameIcons'
+import { CardTypeIcon } from '../utils/gameIcons'
+import { useChartTheme } from '../utils/chartTheme'
 import ComparePlayersPage from './ComparePlayersPage'
+import AwardsGrid from './AwardsGrid'
+import HeatMatrix from './HeatMatrix'
+import { PLAYER_COLORS as COLORS } from '../constants/colors'
 
-import { PLAYER_COLORS as COLORS } from '../App'
 const TYPE_CODES = ['K', 'Q', 'J', 'H', 'L2', 'T', 'P1', 'P2', 'P3']
-
-function getCssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-}
 
 // details/results: the season's games of the type picked in `filter` — King
 // Online's and the ones recorded here are counted the same way, per player.
 export default function GlobalAnalyticsPage({ details, results, filter = null, onBack }) {
   const [view, setView] = useState('main') // 'main' | 'compare'
+  const chart = useChartTheme()
   // Players taken off the player list (no King Online name) keep their old
   // games, under `guest:` ids, but aren't listed or ranked any more.
   const playerMap = useMemo(() => Object.fromEntries(
@@ -46,11 +46,12 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
 
   const effPlayers = useMemo(() => Object.keys(typeEfficiency).filter(n => !guestNames.has(n)).sort(), [typeEfficiency, guestNames])
 
-  // Bar chart: total units collected per card type per player
+  // Bar chart: total units collected per card type per player (one series
+  // per player, by position, so equal names don't merge)
   const unitBarData = useMemo(() => {
     return TYPE_ROWS.map(tr => {
       const point = { type: tr.label }
-      players.forEach(p => { point[p.name] = p[tr.code] || 0 })
+      players.forEach((p, i) => { point[`s${i}`] = p[tr.code] || 0 })
       return point
     })
   }, [players])
@@ -168,16 +169,7 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
       {/* Hall of Fame */}
       <div className="card">
         <h2>Hall of Fame</h2>
-        <div className="awards-grid">
-          {awards.map((a, i) => (
-            <div key={i} className="award-card">
-              <div className="award-icon"><AwardIcon name={a.icon} /></div>
-              <div className="award-title">{a.title}</div>
-              <div className="award-player">{a.player}</div>
-              <div className="award-value">{a.value}</div>
-            </div>
-          ))}
-        </div>
+        <AwardsGrid awards={awards} />
       </div>
 
       {/* Total Cards Collected chart */}
@@ -188,13 +180,13 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
         </p>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={unitBarData} margin={{ top: 8, right: 16, left: 0, bottom: 70 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--grid-stroke')} />
-            <XAxis dataKey="type" tick={{ fontSize: 11, fill: getCssVar('--muted') }} angle={-35} textAnchor="end" interval={0} />
-            <YAxis tick={{ fontSize: 11, fill: getCssVar('--muted') }} width={40} allowDecimals={false} />
-            <Tooltip contentStyle={{ background: getCssVar('--tooltip-bg'), border: `2px solid ${getCssVar('--text')}`, borderRadius: 8, fontSize: 13 }} />
+            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+            <XAxis dataKey="type" tick={chart.tick} angle={-35} textAnchor="end" interval={0} />
+            <YAxis tick={chart.tick} width={40} allowDecimals={false} />
+            <Tooltip contentStyle={chart.tooltipStyle} />
             <Legend wrapperStyle={{ fontSize: 13, paddingTop: 16 }} />
             {players.map((p, i) => (
-              <Bar key={p.id} dataKey={p.name} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
+              <Bar key={p.id} dataKey={`s${i}`} name={p.name} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -205,14 +197,11 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
         <h2>Average Score per Game</h2>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={avgScoreData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={getCssVar('--grid-stroke')} />
-            <XAxis dataKey="name" tick={{ fontSize: 12, fill: getCssVar('--muted') }} />
-            <YAxis tick={{ fontSize: 11, fill: getCssVar('--muted') }} width={44} />
-            <ReferenceLine y={0} stroke={getCssVar('--text')} strokeDasharray="4 2" />
-            <Tooltip
-              contentStyle={{ background: getCssVar('--tooltip-bg'), border: `2px solid ${getCssVar('--text')}`, borderRadius: 8, fontSize: 13 }}
-              formatter={v => [v, 'Avg Score']}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
+            <XAxis dataKey="name" tick={{ ...chart.tick, fontSize: 12 }} />
+            <YAxis tick={chart.tick} width={44} />
+            <ReferenceLine y={0} stroke={chart.text} strokeDasharray="4 2" />
+            <Tooltip contentStyle={chart.tooltipStyle} formatter={v => [v, 'Avg Score']} />
             <Bar dataKey="avg" name="Avg Score" radius={[3, 3, 0, 0]}>
               {avgScoreData.map((entry, i) => (
                 <Cell key={i} fill={entry.avg >= 0 ? '#059669' : '#dc2626'} />
@@ -229,41 +218,12 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
           <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
             How many times each player sent the King to another player (across all games).
           </p>
-          <div style={{ overflowX: 'auto' }}>
-            <div className="king-matrix">
-              <div className="km-row km-header">
-                <div className="km-cell km-label">Dealer ↓ / Target →</div>
-                {kingTargets.map(t => (
-                  <div key={t} className="km-cell km-col-header">{t}</div>
-                ))}
-              </div>
-              {kingLeaders.map(leader => {
-                const row = kingMatrix[leader] || {}
-                const maxInRow = Math.max(0, ...Object.values(row))
-                return (
-                  <div key={leader} className="km-row">
-                    <div className="km-cell km-row-header">{leader}</div>
-                    {kingTargets.map(target => {
-                      const count = row[target] || 0
-                      const isSelf = leader === target
-                      let heatClass = 'heat-0'
-                      if (!isSelf && maxInRow > 0) {
-                        const ratio = count / maxInRow
-                        if (ratio >= 0.75) heatClass = 'heat-3'
-                        else if (ratio >= 0.5) heatClass = 'heat-2'
-                        else if (ratio >= 0.25) heatClass = 'heat-1'
-                      }
-                      return (
-                        <div key={target} className={`km-cell km-data ${isSelf ? 'km-self' : heatClass}`}>
-                          {isSelf ? '—' : count || 0}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <HeatMatrix
+            corner="Dealer ↓ / Target →"
+            rows={kingLeaders.map(n => ({ key: n, label: n }))}
+            cols={kingTargets.map(n => ({ key: n, label: n }))}
+            countOf={(leader, target) => kingMatrix[leader]?.[target]}
+          />
         </div>
       )}
 
