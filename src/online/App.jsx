@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { GameProvider, useGame } from './context/GameContext'
 import Lobby        from './components/Lobby'
 import WaitingRoom  from './components/WaitingRoom'
@@ -69,6 +69,11 @@ function ToastContainer() {
 function AppInner() {
   const { appPhase } = useGame()
   const [view, setView] = useState('main') // 'main' | 'leaderboard'
+  // A table can start while the leaderboard is open (a quick-match seat
+  // filling, a tournament draw or final) — show it.
+  useEffect(() => {
+    if (appPhase === 'game' || appPhase === 'waiting') setView('main')
+  }, [appPhase])
 
   return (
     <div className="min-h-screen text-ink"

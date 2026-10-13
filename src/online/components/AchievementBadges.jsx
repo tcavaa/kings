@@ -57,20 +57,13 @@ function Emblem({ code, def }) {
     </span>
   );
 }
-export default function AchievementBadges({
-  achievements,
-  variant = "full",
-  size,
-  showLocked = false,
-}) {
+export default function AchievementBadges({ achievements, showLocked = false }) {
   const entries = Object.keys(ACHIEVEMENT_DEFS)
     .map((code) => [code, achievements?.[code] || 0])
     .filter(([, count]) => showLocked || count > 0);
   if (!entries.length) return null;
   return (
-    <div
-      className={`k-achievements ${variant === "inline" ? "is-inline" : ""}`}
-    >
+    <div className="k-achievements">
       {entries.map(([code, count]) => {
         const def = ACHIEVEMENT_DEFS[code];
         return (
@@ -79,32 +72,18 @@ export default function AchievementBadges({
             className={`k-achievement ${count > 0 ? "is-earned" : "is-locked"}`}
             title={`${def.label}: ${def.desc}${count > 1 ? ` (×${count})` : ""}`}
           >
-            <div
-              className="k-achievement-art"
-              style={
-                variant === "inline"
-                  ? {
-                      width: Math.max(24, size || 24),
-                      height: Math.max(24, size || 24),
-                    }
-                  : undefined
-              }
-            >
+            <div className="k-achievement-art">
               <Emblem code={code} def={def} />
             </div>
-            {variant === "inline" ? (
-              <span className="sr-only">{def.label}</span>
-            ) : (
-              <div>
-                <strong>{def.label}</strong>
-                <p>{def.desc}</p>
-                {showLocked && (
-                  <span className="k-achievement-status">
-                    {count > 0 ? "მოპოვებულია" : "ჯერ მოსაპოვებელია"}
-                  </span>
-                )}
-              </div>
-            )}
+            <div>
+              <strong>{def.label}</strong>
+              <p>{def.desc}</p>
+              {showLocked && (
+                <span className="k-achievement-status">
+                  {count > 0 ? "მოპოვებულია" : "ჯერ მოსაპოვებელია"}
+                </span>
+              )}
+            </div>
             {count > 1 && (
               <small className="k-achievement-count">×{count}</small>
             )}

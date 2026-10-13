@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { getSql } = require('./connection');
 const { fromScoreSheet } = require('../games/scoreSheet');
+const { ALL_TYPE_CODES: GAME_TYPE_CODES } = require('../game/constants');
 
 // Every DATETIME the MySQL build wrote was wall-clock time on the cPanel box
 // (Asia/Tbilisi), and the championship "calendar day" was that box's day.
@@ -105,7 +106,7 @@ function createMirror({ fetchMarks, fetchRows, makeEntry }) {
 const profileMirror = createMirror({
   fetchMarks: () => db()`SELECT id, xmin::text AS v FROM profiles`,
   fetchRows: (ids) => db()`
-    SELECT id, xmin::text AS v, name, avatar, device_key, pin_hash, created_at, updated_at
+    SELECT id, xmin::text AS v, name, avatar, pin_hash, created_at, updated_at
     FROM profiles WHERE id = ANY(${ids})`,
   makeEntry: (rows) => rows,
 });
@@ -123,9 +124,14 @@ async function getProfile(id) {
   return row ? rowToProfile(row) : null;
 }
 
-async function upsertProfile({ id, name, avatar, deviceKey, pin, currentPin }) {
-  if (!id) throw new Error('profile.id is required');
-  if (!name || !name.trim()) throw new Error('profile.name is required');
+/**
+ * Create or edit a profile. `avatar`: a data URL sets the photo, null removes
+ * it, undefined keeps it. `pin`: '1234' sets, null/'' clears, undefined keeps.
+ * Changing an existing profile's PIN logs every other device out of it.
+ */
+async function upsertProfile({ id, name, avatar, pin, currentPin }) {
+  if (!id || typeof id !== 'string' || id.length > 64) throw badRequest('profile.id is required');
+  if (!name || !name.trim()) throw badRequest('profile.name is required');
   const trimmed = name.trim().slice(0, 64);
 
   let nextPinHash; // undefined → leave alone, null → clear, string → set
@@ -139,28 +145,29 @@ async function upsertProfile({ id, name, avatar, deviceKey, pin, currentPin }) {
   }
 
   await db().begin(async (tx) => {
-    const existing = await tx`
-      SELECT device_key, pin_hash FROM profiles WHERE id = ${id} FOR UPDATE`;
+    const existing = await tx`SELECT pin_hash FROM profiles WHERE id = ${id} FOR UPDATE`;
     if (existing.length) assertPinOwner(existing[0].pin_hash, currentPin, id);
+    // Names identify players in every game, quota and seat, so one per person.
+    const [clash] = await tx`
+      SELECT 1 FROM profiles WHERE lower(name) = lower(${trimmed}) AND id <> ${id} LIMIT 1`;
+    if (clash) {
+      const err = new Error(`A player named "${trimmed}" already exists.`);
+      err.status = 409;
+      throw err;
+    }
 
     if (existing.length === 0) {
       await tx`
-        INSERT INTO profiles (id, name, avatar, device_key, pin_hash)
-        VALUES (${id}, ${trimmed}, ${avatar || null}, ${deviceKey || null},
-                ${nextPinHash === undefined ? null : nextPinHash})`;
-    } else if (nextPinHash === undefined) {
-      await tx`
-        UPDATE profiles
-           SET name = ${trimmed}, avatar = ${avatar || null},
-               device_key = COALESCE(device_key, ${deviceKey || null})
-         WHERE id = ${id}`;
-    } else {
-      await tx`
-        UPDATE profiles
-           SET name = ${trimmed}, avatar = ${avatar || null},
-               device_key = COALESCE(device_key, ${deviceKey || null}),
-               pin_hash = ${nextPinHash}
-         WHERE id = ${id}`;
+        INSERT INTO profiles (id, name, avatar, pin_hash)
+        VALUES (${id}, ${trimmed}, ${avatar || null}, ${nextPinHash || null})`;
+      return;
+    }
+    const sets = { name: trimmed };
+    if (avatar !== undefined) sets.avatar = avatar || null;
+    if (nextPinHash !== undefined) sets.pin_hash = nextPinHash;
+    await tx`UPDATE profiles SET ${tx(sets)} WHERE id = ${id}`;
+    if (nextPinHash !== undefined && nextPinHash !== existing[0].pin_hash) {
+      await tx`DELETE FROM profile_sessions WHERE profile_id = ${id}`;
     }
   });
 
@@ -220,29 +227,116 @@ async function createPlayer(name) {
   return { id: r.id, name: r.name, has_pin: false, created_at: r.created_at.toISOString() };
 }
 
+/** /admin: remove any player. Their games stay, under their name. */
 async function deletePlayer(id) {
-  const rows = await db()`SELECT pin_hash FROM profiles WHERE id = ${id}`;
-  if (!rows.length) return false;
-  if (rows[0].pin_hash) {
-    const err = new Error('This player has a King Online PIN — remove them in King Online.');
-    err.status = 403;
-    throw err;
+  const res = await db()`DELETE FROM profiles WHERE id = ${id}`;
+  return res.count > 0;
+}
+
+/** /admin: drop a player's PIN (they forgot it) and log out their devices. */
+async function clearPlayerPin(id) {
+  const res = await db()`UPDATE profiles SET pin_hash = NULL WHERE id = ${id}`;
+  await db()`DELETE FROM profile_sessions WHERE profile_id = ${id}`;
+  return res.count > 0;
+}
+
+// Profile photos are served from /api/profiles/:id/avatar rather than sent as
+// base64 everywhere. `v` changes whenever the photo does, so the response can
+// be cached forever.
+function avatarVersion(row) {
+  if (!row.avatar) return null;
+  if (row.avatarV === undefined) {
+    row.avatarV = crypto.createHash('md5').update(row.avatar).digest('hex').slice(0, 12);
   }
-  await db()`DELETE FROM profiles WHERE id = ${id}`;
-  return true;
+  return row.avatarV;
+}
+
+function avatarUrlOf(row) {
+  const v = avatarVersion(row);
+  return v ? `/api/profiles/${encodeURIComponent(row.id)}/avatar?v=${v}` : null;
+}
+
+/** `{ mime, buffer, version }` for a profile's photo, or null. */
+async function getProfileAvatar(id) {
+  await profileMirror.sync();
+  const row = profileMirror.entries.get(id);
+  const m = row?.avatar && /^data:(image\/[a-z]+);base64,(.+)$/.exec(row.avatar);
+  if (!m) return null;
+  return { mime: m[1], buffer: Buffer.from(m[2], 'base64'), version: avatarVersion(row) };
 }
 
 function rowToProfile(row) {
   return {
     id: row.id,
     name: row.name,
-    avatar: row.avatar || null,
-    device_key: row.device_key || null,
+    avatar: avatarUrlOf(row),
     pin_hash: row.pin_hash || null,
     has_pin: !!row.pin_hash,
     created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
     updated_at: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
   };
+}
+
+// ─── profile sessions ────────────────────────────────────────────────────────
+// A browser that picked a profile (with its PIN, when it has one) holds a
+// random token; the game server resolves it to the profile before letting a
+// socket play under that name. Only the token's sha256 is stored.
+
+const SESSION_IDLE_DAYS = 180;
+const tokenHash = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+
+async function createProfileSession(profileId) {
+  const token = crypto.randomBytes(24).toString('base64url');
+  await db()`
+    INSERT INTO profile_sessions (token_hash, profile_id) VALUES (${tokenHash(token)}, ${profileId})`;
+  return token;
+}
+
+/** The profile a session token belongs to, or null. */
+async function profileForSession(token) {
+  if (typeof token !== 'string' || token.length < 16 || token.length > 128) return null;
+  const rows = await db()`
+    UPDATE profile_sessions SET last_used_at = now()
+     WHERE token_hash = ${tokenHash(token)}
+       AND last_used_at > now() - make_interval(days => ${SESSION_IDLE_DAYS})
+    RETURNING profile_id`;
+  return rows.length ? getProfile(rows[0].profile_id) : null;
+}
+
+/** The profile using this name (case-insensitive), or null. */
+async function getProfileByName(name) {
+  const wanted = String(name || '').trim().toLowerCase();
+  if (!wanted) return null;
+  await profileMirror.sync();
+  for (const row of profileMirror.entries.values()) {
+    if (row.name.toLowerCase() === wanted) return rowToProfile(row);
+  }
+  return null;
+}
+
+// ─── rate limits ─────────────────────────────────────────────────────────────
+// Fixed-window failure counters for PIN and passcode guesses, in the database
+// because serverless instances share no memory.
+
+async function isRateLimited(key, max, windowSeconds) {
+  const rows = await db()`
+    SELECT hits FROM rate_limits
+     WHERE key = ${key} AND window_start > now() - make_interval(secs => ${windowSeconds})`;
+  return rows.length > 0 && rows[0].hits >= max;
+}
+
+async function recordFailure(key, windowSeconds) {
+  await db()`
+    INSERT INTO rate_limits (key, window_start, hits) VALUES (${key}, now(), 1)
+    ON CONFLICT (key) DO UPDATE SET
+      hits = CASE WHEN rate_limits.window_start > now() - make_interval(secs => ${windowSeconds})
+                  THEN rate_limits.hits + 1 ELSE 1 END,
+      window_start = CASE WHEN rate_limits.window_start > now() - make_interval(secs => ${windowSeconds})
+                          THEN rate_limits.window_start ELSE now() END`;
+  // Keep the table small: forget windows older than a day now and then.
+  if (Math.random() < 0.05) {
+    await db()`DELETE FROM rate_limits WHERE window_start < now() - interval '1 day'`;
+  }
 }
 
 // ─── finished games ──────────────────────────────────────────────────────────
@@ -404,8 +498,11 @@ async function getGame(id) {
   return rows.length ? rowToGame(rows[0], parsePayload(rows[0].payload)) : null;
 }
 
+/** A King Online game the game server just finished (its only writer). */
 async function saveFinishedGame(record) {
-  if (!record || !record.winner || !Array.isArray(record.players)) {
+  if (!record || !record.winner || !Array.isArray(record.players) || record.players.length !== 3
+      || record.players.some((p) => !p || typeof p.name !== 'string' || !p.name || p.name.length > 64
+        || !Number.isFinite(p.score))) {
     throw new Error('Invalid game record');
   }
   const id = record.id || `g_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -420,11 +517,7 @@ async function saveFinishedGame(record) {
     ? record.winners.map((w) => ({ seat: w.seat ?? 0, name: w.name, score: w.score ?? 0 }))
     : [{ seat: record.winner.seat ?? 0, name: record.winner.name, score: record.winner.score ?? 0 }];
 
-  // Records that don't carry the flag (older deployed clients) count as
-  // championship — that matches how every pre-flag game was treated.
-  const isChampionship = record.isChampionship === undefined
-    ? 1
-    : (record.isChampionship ? 1 : 0);
+  const isChampionship = record.isChampionship ? 1 : 0;
 
   const payload = JSON.stringify({
     players: record.players,
@@ -433,10 +526,8 @@ async function saveFinishedGame(record) {
     isTie: winners.length > 1,
   });
 
-  // INSERT IGNORE: whichever of the server / the three clients' backup saves
-  // lands first wins, the rest are no-ops. played_at is kept to whole seconds
-  // like the old DATETIME column, which is what the (winner, score, time)
-  // dedupe key relies on.
+  // ON CONFLICT DO NOTHING makes a retry after an unclear failure safe.
+  // played_at is kept to whole seconds like the old DATETIME column.
   await db()`
     INSERT INTO finished_games
       (id, played_at, winner_name, winner_seat, winner_score, is_championship, payload)
@@ -628,41 +719,6 @@ async function listLiveGames() {
 }
 
 /**
- * Aggregate King Online's finished games into a per-player leaderboard. Same shape
- * the client computes locally for the Hall of Fame view (wins, games
- * played, total cumulative score, best/worst single-game score), exposed
- * server-side so the score app doesn't have to fetch every game.
- *
- * Returned rows are sorted by wins desc, then total score desc.
- */
-async function getPublicLeaderboard(mode = 'all', type = 'online') {
-  const games = await listGamesWithoutAvatars(200, mode, type);
-  const tally = new Map();
-  for (const g of games) {
-    for (const p of g.players || []) {
-      const k = p.name;
-      const t = tally.get(k) || {
-        name: p.name,
-        gamesPlayed: 0,
-        wins: 0,
-        totalScore: 0,
-        bestScore: null,
-        worstScore: null,
-      };
-      t.gamesPlayed++;
-      // Tie-aware: every player in `winners` gets the win.
-      if ((g.winners || []).some((w) => w.name === p.name)) t.wins++;
-      t.totalScore += p.score || 0;
-      if (t.bestScore  === null || (p.score || 0) > t.bestScore)  t.bestScore  = p.score || 0;
-      if (t.worstScore === null || (p.score || 0) < t.worstScore) t.worstScore = p.score || 0;
-      tally.set(k, t);
-    }
-  }
-  return Array.from(tally.values())
-    .sort((a, b) => (b.wins - a.wins) || (b.totalScore - a.totalScore));
-}
-
-/**
  * Daily championship quota for one player name (server-local calendar day,
  * APP_TIMEZONE). A "played" game is a finished King Online championship game
  * the player participated in — surrendered games count too, so abandoning a
@@ -697,6 +753,12 @@ async function getChampionshipQuota(name) {
 
 // ─── seasons (King Score's, read by both apps) ───────────────────────────────
 
+// The current season is the one row with ended_at NULL. Setups older than that
+// row have none; their current season simply starts when the last one ended.
+// Seasons count every ჩაწერა game and King Online's championship games.
+
+const SEASON_THEMES = ['casual', 'summer', 'mountain', 'christmas'];
+
 async function listSeasons() {
   const rows = await db()`
     SELECT id, name, theme, started_at, ended_at, champion_name FROM seasons ORDER BY started_at DESC`;
@@ -704,21 +766,126 @@ async function listSeasons() {
   return rows.map((r) => ({ ...r, started_at: iso(r.started_at), ended_at: iso(r.ended_at) }));
 }
 
+async function currentSeason(sql = db()) {
+  const rows = await sql`SELECT id, name, theme, started_at, ended_at FROM seasons`;
+  const open = rows.find((r) => !r.ended_at) || null;
+  const lastEnded = rows.filter((r) => r.ended_at).sort((a, b) => b.ended_at - a.ended_at)[0];
+  const start = open?.started_at || lastEnded?.ended_at || new Date(0);
+  return { open, start: new Date(start) };
+}
+
+/** Wins per player since `start`, and the champion(s) ("A & B" on a tie). */
+async function seasonStandings(start) {
+  const startMs = start.getTime();
+  const wins = new Map();
+  let firstGameMs = null;
+  for (const e of await gameEntries('all', 'all')) {
+    if (e.playedAtMs <= startMs) continue;
+    if (e.type !== 'live' && e.is_championship !== 1) continue;
+    firstGameMs = firstGameMs === null ? e.playedAtMs : Math.min(firstGameMs, e.playedAtMs);
+    const parsed = barePayload(e);
+    const names = parsed.ok && Array.isArray(parsed.value.winners) && parsed.value.winners.length
+      ? parsed.value.winners.map((w) => w.name)
+      : [e.winner_name];
+    for (const name of new Set(names.filter(Boolean))) wins.set(name, (wins.get(name) || 0) + 1);
+  }
+  const table = [...wins].map(([name, count]) => ({ name, wins: count }))
+    .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
+  const best = table[0]?.wins;
+  const champion = table.length
+    ? table.filter((r) => r.wins === best).map((r) => r.name).sort().join(' & ')
+    : null;
+  return { table, champion, firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
+}
+
+/** /admin: what ending the season now would record. */
+async function previewSeasonEnd() {
+  const { open, start } = await currentSeason();
+  const { table, champion } = await seasonStandings(start);
+  return { season: open, startedAt: start.toISOString(), champion, table };
+}
+
+function seasonFields({ name, theme }) {
+  const cleanName = String(name ?? '').trim();
+  if (!cleanName || cleanName.length > 40) throw badRequest('Season name must be 1-40 characters.');
+  if (!SEASON_THEMES.includes(theme)) throw badRequest('Unknown season theme.');
+  return { name: cleanName, theme };
+}
+
+/** /admin: close the current season with its champion and open the next one. */
+async function endSeason({ name, theme }) {
+  const next = seasonFields({ name, theme });
+  return db().begin(async (tx) => {
+    // One season end at a time; a second click waits and then finds no games.
+    await tx`LOCK TABLE seasons IN SHARE ROW EXCLUSIVE MODE`;
+    const { open, start } = await currentSeason(tx);
+    const { champion, firstGameAt } = await seasonStandings(start);
+    if (!champion) throw badRequest('No games in the current season yet.');
+    if (open) {
+      await tx`UPDATE seasons SET champion_name = ${champion}, ended_at = now() WHERE id = ${open.id}`;
+    } else {
+      await tx`
+        INSERT INTO seasons (champion_name, started_at, ended_at)
+        VALUES (${champion}, ${firstGameAt || start}, now())`;
+    }
+    await tx`INSERT INTO seasons (name, theme, started_at) VALUES (${next.name}, ${next.theme}, now())`;
+    return { champion };
+  });
+}
+
+/** /admin: rename or re-theme the current season. */
+async function updateCurrentSeason({ name, theme }) {
+  const fields = seasonFields({ name, theme });
+  const { open, start } = await currentSeason();
+  if (open) {
+    await db()`UPDATE seasons SET name = ${fields.name}, theme = ${fields.theme} WHERE id = ${open.id}`;
+  } else {
+    await db()`INSERT INTO seasons (name, theme, started_at) VALUES (${fields.name}, ${fields.theme}, ${start})`;
+  }
+}
+
 // ─── live score sheets: ჩაწერა games in progress, for others to follow ──────
 
 const LIVE_SHEET_HOURS = 3;
 const SHEET_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
+// Every viewer renders these rounds, so they are rebuilt field by field: one
+// malformed round must never reach a client.
+function sheetRound(r, ids) {
+  const plain = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  const keyedBy = (obj, ok) => plain(obj) && Object.entries(obj).every(([k, v]) => ids.has(k) && ok(v));
+  if (!plain(r) || !GAME_TYPE_CODES.includes(r.gameTypeCode) || !ids.has(r.leaderPlayerId)
+      || !keyedBy(r.scores, (v) => Number.isInteger(v) && Math.abs(v) <= 1000)) {
+    throw badRequest('Invalid score sheet round.');
+  }
+  const counts = r.countsByPlayerId ?? null;
+  if (counts !== null && !keyedBy(counts, (v) => Number.isInteger(v) && v >= 0 && v <= 10)) {
+    throw badRequest('Invalid score sheet round.');
+  }
+  const target = r.singleTargetPlayerId ?? null;
+  if (target !== null && !ids.has(target)) throw badRequest('Invalid score sheet round.');
+  return {
+    gameTypeCode: r.gameTypeCode,
+    leaderPlayerId: r.leaderPlayerId,
+    scores: { ...r.scores },
+    countsByPlayerId: counts && { ...counts },
+    singleTargetPlayerId: target,
+  };
+}
+
 function sheetState(state) {
   const players = Array.isArray(state?.players) ? state.players : null;
   const rounds = Array.isArray(state?.rounds) ? state.rounds : null;
   if (!players || players.length < 3 || players.length > 4 || !rounds || rounds.length > 36
-      || players.some((p) => !p || typeof p.id !== 'string' || typeof p.name !== 'string' || p.name.length > 64)) {
+      || players.some((p) => !p || typeof p.id !== 'string' || !p.id || p.id.length > 64
+        || typeof p.name !== 'string' || p.name.length > 64)) {
     throw badRequest('Invalid score sheet.');
   }
+  const ids = new Set(players.map((p) => p.id));
+  if (ids.size !== players.length) throw badRequest('Invalid score sheet.');
   const clean = {
-    players: players.map((p) => ({ id: p.id.slice(0, 64), name: p.name })),
-    rounds,
+    players: players.map((p) => ({ id: p.id, name: p.name })),
+    rounds: rounds.map((r) => sheetRound(r, ids)),
     activePlayerIndex: Number.isInteger(state.activePlayerIndex) ? state.activePlayerIndex : 0,
     startedAt: Number.isFinite(state.startedAt) ? state.startedAt : null,
     endedAt: Number.isFinite(state.endedAt) ? state.endedAt : null,
@@ -985,21 +1152,25 @@ async function deleteSound(id) {
 }
 
 module.exports = {
-  // profiles
-  listProfiles, getProfile, upsertProfile, deleteProfile, verifyProfilePin,
-  // the same profiles as ჩაწერა's player list
-  listPlayers, createPlayer, deletePlayer,
+  // profiles, their photos and sessions
+  listProfiles, getProfile, getProfileByName, upsertProfile, deleteProfile, verifyProfilePin,
+  getProfileAvatar, createProfileSession, profileForSession,
+  // the same profiles as ჩაწერა's player list (managed from /admin)
+  listPlayers, createPlayer, deletePlayer, clearPlayerPin,
   // finished games (King Online's and ჩაწერა's)
   listGames, listGamesWithoutAvatars, getGame, saveFinishedGame, saveScoreSheetGame,
   // stats
-  getLifetimeStats, getPublicLeaderboard,
+  getLifetimeStats,
   // championship daily quota
   getChampionshipQuota, CHAMPIONSHIP_DAILY_LIMIT,
-  // seasons, and ჩაწერა score sheets in progress
-  listSeasons, listLiveSheets, saveLiveSheet, deleteLiveSheet,
+  // seasons (managed from /admin), and ჩაწერა score sheets in progress
+  listSeasons, previewSeasonEnd, endSeason, updateCurrentSeason,
+  listLiveSheets, saveLiveSheet, deleteLiveSheet,
   // live games (mid-flight rooms persisted for crash/rejoin recovery)
   saveLiveGame, loadLiveGame, deleteLiveGame, listLiveGames, purgeStaleLiveGames,
   // reaction sounds (admin-managed)
-  listSounds, listSoundIds, getSound, getSoundAudio, createSound, updateSound, deleteSound,
+  listSounds, listSoundIds, getSoundAudio, createSound, updateSound, deleteSound,
   reorderSounds,
+  // guess limits for PINs and the admin passcode
+  isRateLimited, recordFailure,
 };

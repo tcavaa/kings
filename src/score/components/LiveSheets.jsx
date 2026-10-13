@@ -9,7 +9,7 @@ import GameProgress from './GameProgress'
 
 const totalsOf = (sheet) => {
   const totals = Object.fromEntries(sheet.players.map(p => [p.id, 0]))
-  sheet.rounds.forEach(r => sheet.players.forEach(p => { totals[p.id] += r.scores?.[p.id] || 0 }))
+  sheet.rounds.forEach(r => sheet.players.forEach(p => { totals[p.id] += r?.scores?.[p.id] || 0 }))
   return totals
 }
 

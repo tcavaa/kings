@@ -1,11 +1,10 @@
-// Leaderboard reads/writes go straight to the server (MySQL). No local
-// cache — the leaderboard is shared across everyone, so a per-device cache
-// would just hide newly-saved games until the user manually refreshes.
+// Leaderboard reads go straight to the server. No local cache — the
+// leaderboard is shared across everyone, so a per-device cache would just
+// hide newly-saved games until the user manually refreshes.
 
 import { api } from './api'
 
 export const listGames = (limit = 50) => api.listGames(limit)
-export const saveGame  = (record)     => api.saveGame(record)
 
 /**
  * Every winner of a game — ties produce several. Older records only carry

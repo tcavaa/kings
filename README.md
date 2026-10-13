@@ -5,7 +5,7 @@ score keeper for games played at a real table) in one project, on one
 database.
 
 - `/` — King Online: lobby, quick-match tables, private rooms, tournaments,
-  leaderboard, spectating, chat/voice/sound reactions, `/admin` sound manager.
+  leaderboard, spectating, chat/voice/sound reactions, `/admin` (sounds, seasons, players).
 - `/score` — King Score: score sheet, history, seasons, stats, achievements.
   Opened from King Online's **ჩაწერა** button (main nav + the lobby tile); its
   header links back to King Online. Games being scored right now show under
@@ -30,9 +30,7 @@ service `kings-game-server`).
  browser ──► Vercel (Next.js 16)          ──► Supabase Postgres (KINGS)
              ├ /            King Online UI      ├ profiles, finished_games,
              ├ /score       King Score UI       │ live_games, sounds  (both apps, via /api)
-             └ /api/*       REST API ───────────┤
-                                                └ seasons, live_sheets (King Score)
- browser ──► Supabase (anon key) ──────────────────┘
+             └ /api/*       REST API ───────────┘ seasons, live_sheets, profile_sessions
  browser ──► Render (Node, Socket.IO) ── game server ──► same Postgres
 ```
 
@@ -81,10 +79,8 @@ and lucide-react 1.25, as `recharts-online` / `lucide-react-online`.
 | Var | Required | |
 |---|---|---|
 | `DATABASE_URL` | yes | Supabase → Connect → Transaction pooler URI (`:6543`) |
-| `NEXT_PUBLIC_SUPABASE_URL` | yes | the score app's Supabase URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | the score app's anon key |
 | `NEXT_PUBLIC_SOCKET_URL` | yes | the Render URL, e.g. `https://kings-game-server.onrender.com` |
-| `ADMIN_PASSCODE` | no | `/admin` passcode (default `2282`) |
+| `ADMIN_PASSCODE` | yes | `/admin` passcode, 8+ characters; without it `/admin` stays locked |
 | `DB_POOL_MAX` | no | connections per function instance (default 5; 3 is plenty) |
 | `APP_TIMEZONE` | no | championship calendar day (default `Asia/Tbilisi`) |
 
@@ -139,6 +135,25 @@ timestamptz, MEDIUMTEXT → text). RLS is on with no policies and the client
 roles' grants are revoked: only `DATABASE_URL` (the `postgres` role) can read
 them, so PIN hashes never reach the public anon key. MySQL's
 `ON UPDATE CURRENT_TIMESTAMP` is reproduced with triggers.
+`20261013120000_lockdown.sql` does the same for `seasons` (which King Score
+used to write from the browser) and adds `profile_sessions` and
+`rate_limits`.
+
+## Who may play as whom
+
+- Picking a profile in the lobby (with its PIN, if it has one) gets a session
+  token from `/api/profiles/:id/verify-pin`. The game server only lets a
+  socket play under a PIN-protected name with that token, and takes the name
+  and photo from the profile.
+- Every browser also sends its own random key when its socket connects. A seat
+  (or tournament entry) can only be taken back by the same browser or the same
+  signed-in profile — a name alone is never enough.
+- Wrong PINs and admin passcodes are counted in `rate_limits`: 8 PIN guesses
+  per profile and 10 passcode guesses per IP per 15 minutes.
+- Profile photos are served from `/api/profiles/:id/avatar?v=…` (cached for
+  good), and only those links travel in sockets, snapshots and saved games.
+- Seasons (name, theme, ending one) and the player list are managed in
+  `/admin`; King Score only reads them.
 
 Importing the cPanel dump (one transaction, then every row is read back and
 compared with the dump):
@@ -179,11 +194,8 @@ always identical to a fresh query.
 - The score app's "More" tab has a link back to King Online (needed when it's
   installed as a home-screen app with no browser back button), and its
   manifest `start_url` is `/score`.
-- The score app reads online games from `/api/online/games` and
-  `/api/online/leaderboard` (same contract the public API had: championship
-  games only, avatars stripped) instead of `king.rretrocar.ge/api/public`.
 - Big game lists are streamed (Vercel's 4.5 MB limit only applies to buffered
   responses).
 - Players and games are shared between the apps (see **Database**); King
   Score reads and writes them through `/api/players` and `/api/games` instead
-  of Supabase directly (seasons still go straight to Supabase).
+  of Supabase directly. Seasons too, through `/api/seasons`.

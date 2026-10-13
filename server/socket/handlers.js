@@ -1,9 +1,51 @@
 'use strict';
 
 const store = require('../db/store');
+const { ownsSeat } = require('../game/GameManager');
 
 const playerView = (p) => ({ id: p.id, name: p.name, avatar: p.avatar || null, seat: p.seat });
 const playersView = (players = []) => players.map(playerView);
+
+// ─── identity ───────────────────────────────────────────────────────────────
+// Who a socket is playing as. With a profile session token (issued by the API
+// when the lobby picks a profile, PIN checked) it is that profile: its current
+// name and photo, and seats/entries are bound to its id. Without one, a typed
+// name is accepted only if no PIN-protected profile uses it. `ownerKey` is the
+// browser's own secret (handshake auth, see server/index.js), so a refresh can
+// take its seat back but nobody else can.
+
+const SESSION_CACHE_MS = 60 * 1000;
+const sessionCache = new Map();   // token -> { profile, at }
+
+function _identityError(message) {
+  const err = new Error(message);
+  err.code = 'AUTH';
+  return err;
+}
+
+async function _profileForToken(token) {
+  const hit = sessionCache.get(token);
+  if (hit && Date.now() - hit.at < SESSION_CACHE_MS) return hit.profile;
+  const profile = await store.profileForSession(token);
+  if (sessionCache.size > 5000) sessionCache.clear();
+  sessionCache.set(token, { profile, at: Date.now() });
+  return profile;
+}
+
+async function _identify(socket, { profileToken, playerName } = {}) {
+  const ownerKey = socket.data.ownerKey || null;
+  if (typeof profileToken === 'string' && profileToken) {
+    const profile = await _profileForToken(profileToken);
+    if (!profile) throw _identityError('Pick your profile again.');
+    return { name: profile.name, avatar: profile.avatar, profileId: profile.id, ownerKey };
+  }
+  const name = typeof playerName === 'string' ? playerName.trim().slice(0, 64) : '';
+  if (!name) throw new Error('playerName is required.');
+  // A database outage shouldn't stop play — the name just isn't checked then.
+  const profile = await store.getProfileByName(name).catch(() => null);
+  if (profile?.has_pin) throw _identityError('That profile has a PIN — pick it in the lobby.');
+  return { name: profile?.name || name, avatar: profile?.avatar || null, profileId: null, ownerKey };
+}
 
 /**
  * True when `playerName` has exhausted today's championship quota. Fails
@@ -161,21 +203,18 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   allowedSoundIds();
 
   function emitError(message, code) { socket.emit('error', { message, code }); }
+  const fail = (err) => emitError(err.message, err.code);
   function emitChampionshipLimit() { emitError(CHAMPIONSHIP_LIMIT_MESSAGE, 'CHAMPIONSHIP_LIMIT'); }
 
   // ─── create-room ─────────────────────────────────────────────────────────
-  socket.on('create-room', async ({ playerName, avatar, mode } = {}) => {
+  socket.on('create-room', async (payload = {}) => {
     try {
-      if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
-        return emitError('playerName is required.');
-      }
-      const roomMode = mode === 'championship' ? 'championship' : 'public';
-      if (roomMode === 'championship' && await _championshipBlocked(playerName.trim())) {
+      const me = await _identify(socket, payload);
+      const roomMode = payload.mode === 'championship' ? 'championship' : 'public';
+      if (roomMode === 'championship' && await _championshipBlocked(me.name)) {
         return emitChampionshipLimit();
       }
-      const { roomCode, seat } = gameManager.createRoom(
-        socketId, playerName.trim(), avatar || null, roomMode
-      );
+      const { roomCode, seat } = gameManager.createRoom(socketId, me, roomMode);
       socket.join(roomCode);
       const room = gameManager.getRoom(roomCode);
       socket.emit('room-created', { roomCode, seat, mode: roomMode });
@@ -185,15 +224,16 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         mode: room.mode,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
   // ─── join-room ────────────────────────────────────────────────────────────
-  socket.on('join-room', async ({ roomCode, playerName, avatar } = {}) => {
+  socket.on('join-room', async (payload = {}) => {
     try {
+      const { roomCode } = payload;
       if (!roomCode || typeof roomCode !== 'string') return emitError('roomCode is required.');
-      if (!playerName || typeof playerName !== 'string' || !playerName.trim()) return emitError('playerName is required.');
+      const me = await _identify(socket, payload);
 
       const rc = roomCode.toUpperCase();
       // If the room isn't currently in memory (e.g. server restarted while the
@@ -211,39 +251,18 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       // explicitly exempt from the daily allowance — entering a bracket must
       // never be refused because of, or count against, the 8-a-day cap.
       if (targetRoom && targetRoom.mode === 'championship' && !targetRoom.tournamentId) {
-        const alreadySeated = targetRoom.players.some(
-          (p) => p.name.toLowerCase() === playerName.trim().toLowerCase()
-        );
-        if (!alreadySeated && await _championshipBlocked(playerName.trim())) {
+        if (!gameManager.isSeated(targetRoom, me) && await _championshipBlocked(me.name)) {
           return emitChampionshipLimit();
         }
       }
 
-      const { seat, reconnected, status } = gameManager.joinRoom(rc, socketId, playerName.trim(), avatar || null);
+      const { seat, reconnected, status } = gameManager.joinRoom(rc, socketId, me);
       socket.join(rc);
       const joinedRoom = gameManager.getRoom(rc);
       const roomMode = joinedRoom?.mode || 'public';
 
       if (reconnected) {
-        // `status` tells the client which screen to land on — a lobby
-        // reconnect should stay on WaitingRoom, an in-game reconnect
-        // should rehydrate the table.
-        socket.emit('room-joined', {
-          roomCode: rc, seat, reconnected: true, status, mode: roomMode,
-          startedAt: joinedRoom?.startedAt || null,
-        });
-        const room = gameManager.getRoom(rc);
-        const state = gameManager.getStateForPlayer(rc, seat);
-        if (state) {
-          socket.emit('game-state', {
-            ...state,
-            players: playersView(room.players),
-          });
-        }
-        io.to(rc).emit('player-reconnected', {
-          playerName: playerName.trim(),
-          players: playersView(room.players),
-        });
+        _emitReconnected(rc, seat, me);
         return;
       }
 
@@ -257,9 +276,36 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         mode: roomMode,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
+
+  /**
+   * Back in an existing seat (a reconnect). `room-joined` tells the client
+   * which screen to land on; at a bracket table the tournament entry follows
+   * the new socket too, or the final would be seated on the dead one.
+   */
+  function _emitReconnected(rc, seat, me) {
+    const room = gameManager.getRoom(rc);
+    if (!room) return;
+    let tournamentTag = null;
+    if (room.tournamentId && tournamentManager) {
+      const t = tournamentManager.rebind(socketId, me);
+      if (t) {
+        socket.join(t.id);
+        tournamentTag = { id: t.id, code: t.code, stage: room.tournamentStage, table: room.tournamentTable };
+        socket.emit('tournament-state', tournamentManager.lobbyView(t));
+        socket.emit('tournament-overview', tournamentManager.overview(t));
+      }
+    }
+    socket.emit('room-joined', {
+      roomCode: rc, seat, reconnected: true, status: room.status, mode: room.mode || 'public',
+      startedAt: room.startedAt || null, tournament: tournamentTag,
+    });
+    const state = gameManager.getStateForPlayer(rc, seat);
+    if (state) socket.emit('game-state', { ...state, players: playersView(room.players) });
+    io.to(rc).emit('player-reconnected', { playerName: me.name, players: playersView(room.players) });
+  }
 
   // ─── public quick-match room ──────────────────────────────────────────────
 
@@ -274,25 +320,20 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   // 'championship' when requested). The sitter stays on the homepage — no
   // waiting-room redirect — until the 3rd seat fills, at which point the
   // game starts automatically for all three and the table's slot resets.
-  socket.on('sit-public', async ({ playerName, avatar, emoji, mode } = {}) => {
+  socket.on('sit-public', async (payload = {}) => {
     try {
-      if (!playerName || typeof playerName !== 'string' || !playerName.trim()) {
-        return emitError('playerName is required.');
-      }
-      const tableMode = mode === 'championship' ? 'championship' : 'public';
+      const me = await _identify(socket, payload);
+      const tableMode = payload.mode === 'championship' ? 'championship' : 'public';
       // Quota applies to fresh sit-downs only; re-taking your own seat after
       // a refresh must always work.
       if (tableMode === 'championship') {
         const waitingRoom = gameManager.quickMatchRoom(tableMode);
-        const alreadySeated = !!waitingRoom && waitingRoom.players.some(
-          (p) => p.name.toLowerCase() === playerName.trim().toLowerCase()
-        );
-        if (!alreadySeated && await _championshipBlocked(playerName.trim())) {
+        if (!gameManager.isSeated(waitingRoom, me) && await _championshipBlocked(me.name)) {
           return emitChampionshipLimit();
         }
       }
       const { roomCode, seat } = gameManager.sitPublic(
-        socketId, playerName.trim(), avatar || null, _sanitizeEmoji(emoji), tableMode
+        socketId, me, _sanitizeEmoji(payload.emoji), tableMode
       );
       socket.join(roomCode);
       socket.emit('public-seated', { roomCode, seat, mode: tableMode });
@@ -314,7 +355,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         io.emit('public-room', gameManager.publicRoomView());
       }
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -348,35 +389,22 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
     } catch (err) { /* no-op */ }
   });
 
-  // Refresh recovery: re-attach ONLY (never fresh-sit) using the room code +
-  // name the client stashed when it sat down. If the game has started in the
-  // meantime this falls through to the standard in-game reconnect flow.
-  socket.on('rejoin-public', ({ roomCode, playerName } = {}) => {
+  // Refresh recovery: re-attach ONLY (never fresh-sit) to the seat the
+  // client stashed when it sat down. If the game has started in the meantime
+  // this falls through to the standard in-game reconnect flow.
+  socket.on('rejoin-public', async (payload = {}) => {
     try {
-      if (!roomCode || !playerName || typeof playerName !== 'string') {
-        return socket.emit('public-rejoin-failed');
-      }
-      const rc = String(roomCode).toUpperCase();
+      const rc = String(payload.roomCode || '').toUpperCase();
       const room = gameManager.getRoom(rc);
-      const name = playerName.trim();
-      if (!room || !room.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
-        return socket.emit('public-rejoin-failed');
-      }
-      const { seat, status } = gameManager.joinRoom(rc, socketId, name, null);
+      const me = await _identify(socket, payload);
+      if (!room || !gameManager.isSeated(room, me)) return socket.emit('public-rejoin-failed');
+      const { seat, status } = gameManager.joinRoom(rc, socketId, me);
       socket.join(rc);
       if (status === 'waiting') {
         socket.emit('public-seated', { roomCode: rc, seat, mode: room.mode || 'public' });
         io.emit('public-room', gameManager.publicRoomView());
       } else {
-        socket.emit('room-joined', {
-          roomCode: rc, seat, reconnected: true, status, mode: room.mode || 'public',
-          startedAt: room.startedAt || null,
-        });
-        const state = gameManager.getStateForPlayer(rc, seat);
-        if (state) {
-          socket.emit('game-state', { ...state, players: playersView(room.players) });
-        }
-        io.to(rc).emit('player-reconnected', { playerName: name, players: playersView(room.players) });
+        _emitReconnected(rc, seat, me);
       }
     } catch (err) {
       socket.emit('public-rejoin-failed');
@@ -402,7 +430,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       _emitHandDealt(io, room, gameState, roomCode);
       _refreshLobby(io, gameManager);
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -434,7 +462,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       });
 
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -461,7 +489,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         lastCenterCards: gs.lastCenterCards,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -484,7 +512,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         leaderSeat: gs.leaderSeat,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -550,7 +578,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         _finishGame(io, room, roomCode, gameManager);
       }
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -572,7 +600,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       });
       _emitHandDealt(io, room, gameState, roomCode);
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -642,7 +670,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         acceptedSeats: [seat],
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -715,7 +743,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         _finishGame(io, room, roomCode, gameManager);
       }
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -819,20 +847,20 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   // broadcast so non-joiners can render a "wants to play again" badge above
   // each joined seat's avatar — and so non-clickers see the new room code
   // and can hit Play Again themselves.
-  socket.on('request-rematch', async ({ playerName, avatar } = {}) => {
+  socket.on('request-rematch', async () => {
     try {
       const oldMapping = gameManager.getMappingBySocketId(socketId);
       if (!oldMapping) return emitError('You are not in a room.');
       const oldRoomCode = oldMapping.roomCode;
-      const oldSeat     = oldMapping.seat;
       const oldRoom     = gameManager.getRoom(oldRoomCode);
       if (!oldRoom) return emitError('Room not found.');
-      // Fall back to whatever name/avatar the player had on file — saves
-      // the client from having to re-pass it through every rematch click.
-      const fallbackPlayer = oldRoom.players.find((p) => p.seat === oldSeat);
-      const useName   = (typeof playerName === 'string' && playerName.trim()) || fallbackPlayer?.name;
-      const useAvatar = avatar || fallbackPlayer?.avatar || null;
-      if (!useName) return emitError('Player name unavailable.');
+      // The new room keeps the identity of the seat this socket holds.
+      const seatRow = oldRoom.players.find((p) => p.seat === oldMapping.seat);
+      if (!seatRow) return emitError('Player name unavailable.');
+      const me = {
+        name: seatRow.name, avatar: seatRow.avatar || null,
+        profileId: seatRow.profileId || null, ownerKey: seatRow.ownerKey || socket.data.ownerKey || null,
+      };
 
       // A tournament seat is not rematchable — the bracket decides what comes
       // next, and spawning a stray room here would strand the player outside
@@ -844,11 +872,11 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       // that just finished already counts, so after a player's 2nd game of
       // the day this correctly refuses (they can still rematch publicly by
       // creating a room from the lobby).
-      if (oldRoom.mode === 'championship' && await _championshipBlocked(useName.trim())) {
+      if (oldRoom.mode === 'championship' && await _championshipBlocked(me.name)) {
         return emitChampionshipLimit();
       }
 
-      const result = gameManager.requestRematch(socketId, useName.trim(), useAvatar);
+      const result = gameManager.requestRematch(socketId, me);
       if (result.error) return emitError(result.error);
 
       const { newRoomCode, seat, joinedOldSeats } = result;
@@ -883,7 +911,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         joinedOldSeats,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -913,7 +941,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         players: room ? playersView(room.players) : state.players,
       });
     } catch (err) {
-      emitError(err.message);
+      fail(err);
     }
   });
 
@@ -927,9 +955,10 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
     io.emit('live-games', gameManager.watchableGames());
   }
 
-  socket.on('announce-presence', ({ playerName, avatar } = {}) => {
+  socket.on('announce-presence', async (payload = {}) => {
     try {
-      gameManager.announcePresence(socketId, playerName, avatar || null);
+      const me = await _identify(socket, payload);
+      gameManager.announcePresence(socketId, me.name);
       _broadcastLobby();
     } catch (err) { /* no-op */ }
   });
@@ -944,24 +973,23 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   // Watch any live King table from the homepage. Same masked state and the
   // same socket-room join as tournament spectating — the difference is only
   // who is allowed in and what they may send once there (see canSpeak).
-  socket.on('watch-game', ({ roomCode, playerName, avatar } = {}) => {
+  socket.on('watch-game', async (payload = {}) => {
     try {
-      const rc = String(roomCode || '').toUpperCase();
+      const rc = String(payload.roomCode || '').toUpperCase();
+      const me = await _identify(socket, payload);
       const room = gameManager.getRoom(rc);
       if (!room) return emitError('That table is no longer available.');
       if (room.status !== 'playing' || !room.gameState) {
         return emitError('That game is not in progress.');
       }
 
-      const name = String(playerName || '').trim();
-      if (!name) return emitError('playerName is required.');
       // Watching a table you're seated at would replace your own hand with a
       // masked state — the same trap the tournament path guards.
       const mapping = gameManager.getMappingBySocketId(socketId);
       if (mapping && mapping.roomCode === rc) {
         return emitError('You are playing at that table.');
       }
-      if (room.players.some((p) => p.name.toLowerCase() === name.toLowerCase())) {
+      if (gameManager.isSeated(room, me)) {
         return emitError('You are seated at that table.');
       }
 
@@ -969,7 +997,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (previous && previous.roomCode !== rc) socket.leave(previous.roomCode);
 
       // No tournamentId: this is a public watcher, so canSpeak stays false.
-      gameManager.addSpectator(socketId, rc, { name, avatar: avatar || null });
+      gameManager.addSpectator(socketId, rc, { name: me.name, avatar: me.avatar });
       socket.join(rc);
 
       socket.emit('spectate-started', {
@@ -987,7 +1015,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       // Let the table know someone is watching, and refresh the lobby counts.
       io.to(rc).emit('watchers', { count: gameManager.spectatorCount(rc) });
       _broadcastLobby();
-    } catch (err) { emitError(err.message); }
+    } catch (err) { fail(err); }
   });
 
   socket.on('stop-watching', () => {
@@ -1014,22 +1042,37 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       .map((x) => tournamentManager.lobbyView(x)));
   }
 
-  socket.on('tournament-create', ({ playerName, avatar, size } = {}) => {
+  socket.on('tournament-create', async (payload = {}) => {
     try {
       if (!tournamentManager) return emitError('Tournaments are unavailable.');
-      const t = tournamentManager.create(socketId, playerName, avatar || null, size);
+      const me = await _identify(socket, payload);
+      const t = tournamentManager.create(socketId, me, payload.size);
       socket.join(t.id);
       socket.emit('tournament-joined', tournamentManager.lobbyView(t));
       _tournamentSync(t);
-    } catch (err) { emitError(err.message); }
+    } catch (err) { fail(err); }
   });
 
-  socket.on('tournament-join', ({ code, playerName, avatar } = {}) => {
+  // Entering a lobby, or coming back to an entry after a refresh or a socket
+  // blip — in which case a player whose bracket is already running is seated
+  // back at their live table.
+  socket.on('tournament-join', async (payload = {}) => {
     try {
       if (!tournamentManager) return emitError('Tournaments are unavailable.');
-      const { tournament: t } = tournamentManager.join(code, socketId, playerName, avatar || null);
+      const me = await _identify(socket, payload);
+      const { tournament: t, rejoined } = tournamentManager.join(payload.code, socketId, me);
       socket.join(t.id);
       socket.emit('tournament-joined', tournamentManager.lobbyView(t));
+      if (rejoined && t.status !== 'lobby') {
+        socket.emit('tournament-overview', tournamentManager.overview(t));
+        const rc = tournamentManager.liveRoomOf(t, me);
+        if (rc && gameManager.getMappingBySocketId(socketId)?.roomCode !== rc) {
+          const { seat } = gameManager.joinRoom(rc, socketId, me);
+          socket.join(rc);
+          _emitReconnected(rc, seat, me);
+        }
+        return;
+      }
       _tournamentSync(t);
       // The draw happens the moment the last seat is taken.
       if (tournamentManager.isFull(t)) {
@@ -1037,7 +1080,7 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
         _tournamentSync(t);
         io.to(t.id).emit('tournament-overview', tournamentManager.overview(t));
       }
-    } catch (err) { emitError(err.message); }
+    } catch (err) { fail(err); }
   });
 
   socket.on('tournament-leave', () => {
@@ -1079,18 +1122,18 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
   // action — cards played, tricks, scores. The one thing a watcher would
   // otherwise miss is the current state, and that goes through the masked
   // `getStateForSpectator()`.
-  socket.on('tournament-spectate', ({ roomCode, playerName, avatar } = {}) => {
+  socket.on('tournament-spectate', async (payload = {}) => {
     try {
       if (!tournamentManager) return;
-      const rc = String(roomCode || '').toUpperCase();
+      const rc = String(payload.roomCode || '').toUpperCase();
+      const me = await _identify(socket, payload);
       const room = gameManager.getRoom(rc);
       if (!room) return emitError('That table is no longer available.');
 
       const t = tournamentManager.findByRoom(rc);
       if (!t) return emitError('That table is not part of a tournament.');
       // Only people in this tournament may watch its tables.
-      const entrant = t.players.find((p) => p.id === socketId
-        || (playerName && p.name.toLowerCase() === String(playerName).trim().toLowerCase()));
+      const entrant = t.players.find((p) => p.id === socketId || ownsSeat(p, me));
       if (!entrant) return emitError('Only players in this tournament can watch.');
 
       // Watching is for players whose own table is done. Two reasons to be
@@ -1133,15 +1176,8 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
           players: playersView(room.players),
         });
       }
-    } catch (err) { emitError(err.message); }
-  });
-
-  socket.on('tournament-stop-spectating', () => {
-    try {
-      const gone = gameManager.removeSpectator(socketId);
-      if (gone) socket.leave(gone.roomCode);
-      socket.emit('spectate-stopped');
-    } catch (err) { /* no-op */ }
+      io.to(rc).emit('watchers', { count: gameManager.spectatorCount(rc) });
+    } catch (err) { fail(err); }
   });
 
   // ─── leave-room ───────────────────────────────────────────────────────────
@@ -1151,6 +1187,12 @@ function registerHandlers(io, socket, gameManager, tournamentManager) {
       if (!result) return;
       const { roomCode, playerName, room } = result;
       socket.leave(roomCode);
+      if (result.stayed) {
+        // Left a running game: the seat stays for its owner (see leaveRoom).
+        if (room.players.every((p) => !p.connected)) gameManager.armRoomGrace(roomCode);
+        else io.to(roomCode).emit('player-disconnected', { playerName });
+        return;
+      }
       io.to(roomCode).emit('player-left', {
         playerName,
         players: (room.players || []).map((p) => ({ id: p.id, name: p.name, seat: p.seat })),
@@ -1265,18 +1307,15 @@ function _finishGame(io, room, roomCode, gameManager, extra = {}) {
   const isTie = winners.length > 1;
   const mode = room.mode === 'championship' ? 'championship' : 'public';
 
-  // Server-authoritative save, fired before the broadcast so it (almost
-  // always) beats the clients' backup POST /api/games to the INSERT IGNORE.
-  // The id is derived from data all three clients also see, so whichever
-  // write lands first the row is identical — except only the server knows
-  // the room's true mode, hence saving here instead of trusting clients.
+  // The game server is the only writer of King Online results. The id is
+  // derived from the room and the final scores, so a retry can't double-save.
   const scorePart = [0, 1, 2]
     .map((s) => finalScores[s] ?? 0)
     .join('.')
     .replace(/-/g, 'n');
-  const sharedId = `g_${roomCode}_${winner.seat}_${scorePart}`;
-  store.saveFinishedGame({
-    id: sharedId,
+  const gameId = `g_${roomCode}_${winner.seat}_${scorePart}`;
+  _saveWithRetry(gameId, {
+    id: gameId,
     players: room.players.map((p) => ({
       seat: p.seat, name: p.name, avatar: p.avatar || null,
       score: finalScores[p.seat] ?? 0,
@@ -1285,8 +1324,6 @@ function _finishGame(io, room, roomCode, gameManager, extra = {}) {
     winners,
     isChampionship: mode === 'championship',
     roundDetails: gs.roundDetails || [],
-  }).catch((err) => {
-    console.warn(`[handlers] saving finished game ${sharedId} failed: ${err.message}`);
   });
 
   io.to(roomCode).emit('game-over', {
@@ -1306,6 +1343,7 @@ function _finishGame(io, room, roomCode, gameManager, extra = {}) {
   // them attached would leave them showing as "watching" a finished game with
   // no way back to the lobby.
   for (const watcherId of gameManager.evictSpectators(roomCode)) {
+    io.in(watcherId).socketsLeave(roomCode);
     io.to(watcherId).emit('spectate-stopped', { reason: 'game-over' });
   }
   _refreshLobby(io, gameManager);
@@ -1331,6 +1369,20 @@ function _finishGame(io, room, roomCode, gameManager, extra = {}) {
   gameManager.retireRoom(roomCode);
 }
 
+const SAVE_RETRY_MS = [2000, 10000, 30000];
+
+function _saveWithRetry(gameId, record, attempt = 0) {
+  store.saveFinishedGame(record).catch((err) => {
+    if (attempt >= SAVE_RETRY_MS.length) {
+      console.error(`[handlers] saving finished game ${gameId} failed for good: ${err.message}`);
+      return;
+    }
+    console.warn(`[handlers] saving finished game ${gameId} failed (${err.message}) — retrying`);
+    const t = setTimeout(() => _saveWithRetry(gameId, record, attempt + 1), SAVE_RETRY_MS[attempt]);
+    if (typeof t.unref === 'function') t.unref();
+  });
+}
+
 /**
  * The emitting half of the tournament manager.
  *
@@ -1350,6 +1402,11 @@ function _makeTournamentBroadcaster(io, gameManager, tournamentManager) {
 
       for (const p of room.players) {
         if (!p.id) continue;
+        // A finalist's socket still sits in its semifinal room; leaving it
+        // keeps that table's chat and roster events off the final.
+        if (stage === 'final') {
+          for (const tb of t.tables) io.in(p.id).socketsLeave(tb.roomCode);
+        }
         // Join by socket id: every socket is implicitly in a room named after
         // itself, so this works without holding socket objects.
         io.in(p.id).socketsJoin(roomCode);

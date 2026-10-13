@@ -19,8 +19,8 @@
 // ჩაწერა read its games back unchanged.
 
 const crypto = require('crypto');
+const { ALL_TYPE_CODES: GAME_TYPES } = require('../game/constants');
 
-const GAME_TYPES = ['K', 'Q', 'J', 'H', 'L2', 'T', 'P1', 'P2', 'P3'];
 const TAKEN_FIELD = {
   Q: 'queensTaken', J: 'jacksTaken', H: 'heartsTaken',
   T: 'tricksTaken', P1: 'tricksTaken', P2: 'tricksTaken', P3: 'tricksTaken',
@@ -202,4 +202,4 @@ function fromLegacyRows(result, detail, profileOf) {
   });
 }
 
-module.exports = { fromScoreSheet, fromLegacyRows, GAME_TYPES, TAKEN_FIELD };
+module.exports = { fromScoreSheet, fromLegacyRows };

@@ -7,7 +7,6 @@ export class PreloadScene extends Phaser.Scene {
 
   preload() {
     this.load.image("card-back-raw", "/art/card-back.webp");
-    this.load.image("table-felt", "/art/table-felt.webp");
     this.load.svg("avatar-default", "/art/player-mark.svg", {
       width: 128,
       height: 128,

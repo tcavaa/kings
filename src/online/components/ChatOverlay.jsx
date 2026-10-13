@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Send,
-  X,
   MessageCircle,
   Mic,
   Trash2,

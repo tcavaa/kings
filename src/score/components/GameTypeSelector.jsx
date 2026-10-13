@@ -32,17 +32,6 @@ export default function GameTypeSelector({
     if (!usedSet.has(preselectedCode)) setSelectedTypeCode(preselectedCode)
   }, [preselectedCode, activePlayer.id, usedTypesByPlayer])
 
-  useEffect(() => {
-    function handler(e) {
-      const code = e.detail?.code
-      if (!code) return
-      const usedSet = usedTypesByPlayer[activePlayer.id] || new Set()
-      if (!usedSet.has(code)) setSelectedTypeCode(code)
-    }
-    window.addEventListener('preselectGameType', handler)
-    return () => window.removeEventListener('preselectGameType', handler)
-  }, [activePlayer.id, usedTypesByPlayer])
-
   const sumCounts = useMemo(
     () => Object.values(countsByPlayerId).reduce((a, b) => a + (Number(b) || 0), 0),
     [countsByPlayerId]

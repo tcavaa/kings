@@ -74,7 +74,9 @@ export default function PinPromptModal({
         onSuccess?.({ profile, pin });
         return;
       }
-      setError("არასწორი კოდი, სცადე ხელახლა.");
+      setError(r.reason === "locked"
+        ? "ძალიან ბევრი მცდელობა. სცადე 15 წუთში."
+        : "არასწორი კოდი, სცადე ხელახლა.");
       setPin("");
       // Brief shake animation feedback handled via CSS class (added below).
       const el = inputRef.current;

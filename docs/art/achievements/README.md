@@ -1,6 +1,10 @@
 # Achievement artwork
 
-Five generated emblems. Remaining icons use distinct vector emblems because the image generation service reached its usage limit.
+All 23 achievements have generated emblems. The 18 remaining emblems were completed with the built-in image generation tool on 2026-10-13. Original five assets are unchanged.
+
+Format: 256 × 256 RGB WebP, opaque charcoal background. New assets use quality 80, effort 6, with metadata stripped.
+
+The original prompts for the 18 completed assets are preserved in `pending-prompts.json` (historical filename; none remain pending). Each prompt was supplemented with: “Use case: stylized-concept. Match existing platinum and citron achievement collection; broad clean silver sculptural facets. One emblem only.” The first two additionally referenced the existing star and phoenix.
 
 ## PERFECT_PLUS
 Platinum eight-point sculpted star with pale citron inset on charcoal, premium game achievement icon.

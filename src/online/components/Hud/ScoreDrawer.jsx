@@ -1,5 +1,4 @@
 import { lazy, Suspense } from "react";
-import { X } from "lucide-react-online";
 import Sheet from "../ui/Sheet";
 import ScoreTable from "../ScoreTable";
 import GameTypeMatrix from "../GameTypeMatrix";

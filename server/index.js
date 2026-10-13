@@ -2,10 +2,10 @@
 
 require('dotenv').config();
 
+const crypto  = require('crypto');
 const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
-const cors    = require('cors');
 
 const GameManager      = require('./game/GameManager');
 const registerHandlers = require('./socket/handlers');
@@ -27,12 +27,6 @@ const CORS_ORIGINS = RAW_CORS_ORIGIN === '*'
 
 // ─── Express ────────────────────────────────────────────────────────────────
 const app = express();
-app.use(cors({
-  origin: CORS_ORIGINS,
-  credentials: false,
-  methods: ['GET', 'OPTIONS'],
-  maxAge: 600,
-}));
 
 // ─── Health ─────────────────────────────────────────────────────────────────
 // Also what the hosting platform's health check (and anything that wants to
@@ -53,6 +47,17 @@ const gameManager = new GameManager();
 // them and reacts to their game-over.
 const tournamentManager = new TournamentManager(gameManager);
 
+// Each browser sends its own random secret when it connects. Seats are bound
+// to (a hash of) it, so a refresh can take its seat back but nobody else can.
+// Only the hash is kept — it also ends up in live_games snapshots.
+io.use((socket, next) => {
+  const key = socket.handshake.auth?.clientKey;
+  socket.data.ownerKey = typeof key === 'string' && key.length >= 16 && key.length <= 128
+    ? crypto.createHash('sha256').update(key).digest('hex')
+    : null;
+  next();
+});
+
 io.on('connection', (socket) => {
   registerHandlers(io, socket, gameManager, tournamentManager);
 });
@@ -69,4 +74,3 @@ server.listen(PORT, () => {
   console.log(`[server] CORS origin(s): ${RAW_CORS_ORIGIN}`);
 });
 
-module.exports = { app, server, io };

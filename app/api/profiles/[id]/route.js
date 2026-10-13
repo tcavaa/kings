@@ -1,17 +1,11 @@
 import store from '@/server/db/store'
 import {
-  deviceKey, json, publicProfile, readJson, sendErr, validateAvatar,
+  json, pinLocked, publicProfile, readJson, recordWrongPin, sendErr, validateAvatar,
 } from '@/lib/api/http'
 
-export async function GET(_request, { params }) {
-  try {
-    const { id } = await params
-    const p = await store.getProfile(id)
-    if (!p) return json({ error: 'Profile not found' }, 404)
-    return json(publicProfile(p))
-  } catch (err) { return sendErr(err) }
-}
-
+// Create or edit a profile. Editing one with a PIN needs `currentPin`; a
+// successful save returns a session token, since the caller just proved it
+// owns the profile. `avatar` left out keeps the photo, null removes it.
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
@@ -19,19 +13,16 @@ export async function PUT(request, { params }) {
     if (typeof name !== 'string' || !name.trim()) {
       return json({ error: 'name is required' }, 400)
     }
-    const cleanAvatar = validateAvatar(avatar)
-    // Pass pin straight through — the store decides whether to keep, set, or
-    // clear it (undefined = keep, '' = clear, '1234' = set).
-    const saved = await store.upsertProfile({
+    const locked = await pinLocked(id)
+    if (locked) return locked
+    const saved = await guardPin(id, () => store.upsertProfile({
       id,
       name,
-      avatar: cleanAvatar,
-      deviceKey: deviceKey(request),
+      avatar: avatar === undefined ? undefined : validateAvatar(avatar),
       pin,
-      // Required when the profile already has a PIN (403 otherwise).
       currentPin,
-    })
-    return json(publicProfile(saved))
+    }))
+    return json({ ...publicProfile(saved), token: await store.createProfileSession(id) })
   } catch (err) { return sendErr(err) }
 }
 
@@ -39,8 +30,20 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params
     const { currentPin } = (await readJson(request)) || {}
-    const ok = await store.deleteProfile(id, currentPin)
+    const locked = await pinLocked(id)
+    if (locked) return locked
+    const ok = await guardPin(id, () => store.deleteProfile(id, currentPin))
     if (!ok) return json({ error: 'Profile not found' }, 404)
     return json({ ok: true })
   } catch (err) { return sendErr(err) }
+}
+
+// A wrong `currentPin` counts toward the same guess limit as verify-pin.
+async function guardPin(id, fn) {
+  try {
+    return await fn()
+  } catch (err) {
+    if (err.status === 403) await recordWrongPin(id)
+    throw err
+  }
 }

@@ -2,12 +2,10 @@ import { ArrowUpRight, Plus, Check, LogOut } from "lucide-react-online";
 import { useGame } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
 
-export default function PublicRoomPanel({
-  active,
-  mode = "public",
-  quota,
-  onNeedProfile,
-}) {
+// The homepage league table (every King Online table is a league table).
+const MODE = "championship";
+
+export default function PublicRoomPanel({ active, quota, onNeedProfile }) {
   const {
     connected,
     publicRoom,
@@ -17,49 +15,34 @@ export default function PublicRoomPanel({
     standPublic,
     setPublicEmoji,
   } = useGame();
-  const table = publicRoom?.[mode] || { seats: [] };
+  const table = publicRoom?.[MODE] || { seats: [] };
   const seats = table.seats || [];
   const seated = publicSeat !== null;
-  const here = seated && publicSeatMode === mode;
-  const ranked = mode === "championship";
-  const quotaSpent = ranked && quota != null && quota.remaining <= 0;
+  const here = seated && publicSeatMode === MODE;
+  const quotaSpent = quota != null && quota.remaining <= 0;
   const canSit = connected && !seated && !quotaSpent && seats.length < 3;
   const join = () =>
     active
-      ? canSit && sitPublic(active.name, active.avatar, null, mode)
+      ? canSit && sitPublic(active.name, null, MODE)
       : onNeedProfile?.();
   return (
     <div className="k-matchmaking">
       <div className="k-match-intro">
         <span className="k-eyebrow">
-          {ranked ? "PLAY FOR YOUR PLACE" : "THE ORIGINAL, REIMAGINED"}
+          PLAY FOR YOUR PLACE
         </span>
         <h3>
-          {ranked ? (
-            <>
-              შენი თამაში.
-              <br />
-              შენი რეიტინგი.
-            </>
-          ) : (
-            <>
-              სამი მოთამაშე.
-              <br />
-              სუფთა სტრატეგია.
-            </>
-          )}
+          შენი თამაში.
+          <br />
+          შენი რეიტინგი.
         </h3>
         <p>
-          {ranked
-            ? "ყოველი შედეგი სეზონის ნაწილია. დაიკავე ადგილი და აჩვენე შენი საუკეთესო თამაში."
-            : "კლასიკური კინგი, ზედმეტი ხმაურის გარეშე. მაგიდა შეივსება და თამაში ავტომატურად დაიწყება."}
+          ყოველი შედეგი სეზონის ნაწილია. დაიკავე ადგილი და აჩვენე შენი საუკეთესო თამაში.
         </p>
         <div className="k-match-meta">
           <span>27 რაუნდი</span>
           <span>
-            {ranked
-              ? `${quota?.remaining ?? "—"} / ${quota?.limit ?? 8} დღეს`
-              : "მეგობრული თამაში"}
+            {`${quota?.remaining ?? "—"} / ${quota?.limit ?? 8} დღეს`}
           </span>
         </div>
       </div>

@@ -179,7 +179,7 @@ const tdStyle = { padding: '7px 10px', textAlign: 'left' }
 // ─── List view ────────────────────────────────────────────────────────────────
 
 export default function OnlineHistoryTab() {
-  const { games, loading, error } = useOnlineGames(200)
+  const { games, loading, error } = useOnlineGames()
   const [selectedGame, setSelectedGame] = useState(null)
 
   if (selectedGame) {

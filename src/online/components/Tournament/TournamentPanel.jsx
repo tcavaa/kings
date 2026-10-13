@@ -120,7 +120,7 @@ export default function TournamentPanel({ active, onNeedProfile }) {
           disabled={active && !canAct}
           onClick={() =>
             active
-              ? createTournament(active.name, active.avatar, size)
+              ? createTournament(active.name, size)
               : onNeedProfile?.()
           }
         >
@@ -135,7 +135,7 @@ export default function TournamentPanel({ active, onNeedProfile }) {
             <button
               key={t.id}
               disabled={!canAct}
-              onClick={() => joinTournament(t.code, active.name, active.avatar)}
+              onClick={() => joinTournament(t.code, active.name)}
             >
               <strong>
                 {t.code}
@@ -163,7 +163,7 @@ export default function TournamentPanel({ active, onNeedProfile }) {
           onSubmit={(e) => {
             e.preventDefault();
             if (canAct && code.trim().length >= 4)
-              joinTournament(code.trim(), active.name, active.avatar);
+              joinTournament(code.trim(), active.name);
           }}
         >
           <input

@@ -1,7 +1,7 @@
 // Players and games for every screen, from the app's API: one player list
 // (King Online's profiles) and one games table (King Online's games plus the
-// ones recorded here). Loaded once and shared by all hooks; saving a game or
-// changing the player list reloads it.
+// ones recorded here). Loaded once and shared by all hooks; saving a game
+// reloads it.
 
 import { useEffect, useState } from 'react'
 import { liveGameToLegacy, onlineGameToLegacy } from './gameShapes'
@@ -24,7 +24,7 @@ async function load() {
     request('/api/games?limit=all&avatars=0'),
   ])
   // `online_name` is the player's own name now: one name per person in both apps.
-  const players = profiles.map(p => ({ id: p.id, name: p.name, online_name: p.name, has_pin: p.has_pin, created_at: p.created_at }))
+  const players = profiles.map(p => ({ id: p.id, name: p.name, online_name: p.name, created_at: p.created_at }))
   const idByName = new Map(players.map(p => [p.name, p.id]))
   const idOfName = name => idByName.get(name) ?? `guest:${name}`
 
@@ -47,30 +47,23 @@ async function load() {
   return { players, live, online }
 }
 
-export function loadGameData() {
-  if (!current) current = load()
-  return current
+// A failed load is not kept: the next screen that asks tries again.
+function start() {
+  const promise = load()
+  promise.catch(() => { if (current === promise) current = null })
+  current = promise
+  return promise
 }
 
-/** Reload after a change (new game, player added/removed). */
-export function reloadGameData() {
-  current = load()
-  listeners.forEach(fn => fn(current))
-  return current
+function loadGameData() {
+  return current || start()
 }
 
-export async function savePlayer(name) {
-  await request('/api/players', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
-  })
-  await reloadGameData().catch(() => {})
-}
-
-export async function removePlayer(id) {
-  await request(`/api/players/${encodeURIComponent(id)}`, { method: 'DELETE' })
-  await reloadGameData().catch(() => {})
+/** Reload after a change (a new game). */
+function reloadGameData() {
+  const promise = start()
+  listeners.forEach(fn => fn(promise))
+  return promise
 }
 
 export async function saveGame({ players, rounds, durationSeconds }) {

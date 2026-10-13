@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { Component, useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { computeScoresForRound } from './utils/scoring'
 import PlayerInput from './components/PlayerInput.jsx'
 import GameTypeSelector from './components/GameTypeSelector.jsx'
@@ -15,7 +15,6 @@ import StatsPage from './components/StatsPage.jsx'
 import MorePage from './components/MorePage.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import SeasonBanner from './components/SeasonBanner.jsx'
-import SeasonEndModal from './components/SeasonEndModal.jsx'
 import GameTimer from './components/GameTimer.jsx'
 import ThemeDecorations from './components/ThemeDecorations.jsx'
 import { saveGame, publishLiveSheet, removeLiveSheet } from './lib/gameData.js'
@@ -33,6 +32,14 @@ export const PLAYER_COLORS = ['#2563eb', '#059669', '#dc2626', '#d97706']
 // Each game in progress is published under its own id so others can follow it.
 const newSheetId = () =>
   (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`).replace(/[^A-Za-z0-9_-]/g, '')
+
+// Other people's games in progress are a bonus on the home screen: if one
+// can't be drawn, show the player picker on its own rather than a broken page.
+class LiveSheetsBoundary extends Component {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? this.props.fallback : this.props.children }
+}
 
 function App() {
   const [state, dispatch] = useReducer(
@@ -86,13 +93,10 @@ function App() {
   const [saving, setSaving] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('king-sound') !== 'off')
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('king-theme') === 'dark')
-  const [editingSeason, setEditingSeason] = useState(false)
   const {
     seasons, currentChampion, currentSeasonStart,
     currentSeasonName, currentSeasonTheme,
-    endSeason, updateCurrentSeason,
   } = useSeasons()
-  const lastPlayersRef = useRef(null)
 
   // Apply dark mode class to body
   useEffect(() => {
@@ -211,7 +215,6 @@ function App() {
   const handleComplete = useCallback(async () => {
     if (!players) return
     setSaving(true)
-    lastPlayersRef.current = players
     const saved = await saveGameToDB(players, rounds, durationSeconds)
     setSaving(false)
     if (!saved) return
@@ -276,11 +279,6 @@ function App() {
     setView('home')
   }, [sheetId])
 
-  async function handleSeasonEdit({ name, theme }) {
-    await updateCurrentSeason({ name, theme })
-    setEditingSeason(false)
-  }
-
   return (
     <div className="app">
       <ThemeDecorations themeId={currentSeasonTheme} />
@@ -307,11 +305,7 @@ function App() {
         )}
 
         {view === 'history' && (
-          <WinnersPage
-            seasons={seasons}
-            currentSeasonStart={currentSeasonStart}
-            endSeason={endSeason}
-          />
+          <WinnersPage seasons={seasons} />
         )}
 
         {view === 'stats' && (
@@ -330,15 +324,16 @@ function App() {
             onToggleDark={() => setDarkMode(v => !v)}
             seasonName={currentSeasonName}
             seasonTheme={currentSeasonTheme}
-            onEditSeason={() => setEditingSeason(true)}
             onResetGame={handleReset}
           />
         )}
 
         {view === 'home' && !players && (
-          <LiveSheets>
-            <PlayerInput onStart={handleStart} />
-          </LiveSheets>
+          <LiveSheetsBoundary fallback={<PlayerInput onStart={handleStart} />}>
+            <LiveSheets>
+              <PlayerInput onStart={handleStart} />
+            </LiveSheets>
+          </LiveSheetsBoundary>
         )}
 
         {view === 'home' && players && !gameFinished && (
@@ -406,16 +401,6 @@ function App() {
       </main>
 
       <BottomNav view={view} onNavigate={setView} />
-
-      {editingSeason && (
-        <SeasonEndModal
-          mode="edit"
-          defaultName={currentSeasonName || ''}
-          defaultTheme={currentSeasonTheme}
-          onCancel={() => setEditingSeason(false)}
-          onConfirm={handleSeasonEdit}
-        />
-      )}
     </div>
   )
 }

@@ -14,13 +14,7 @@ export function GameModeTag({ isChampionship, type, className = "" }) {
 }
 
 /** Paginated match history. Detailed achievements load when a match is opened. */
-export default function PastGamesList({ loading, games, onSelect }) {
-  if (loading)
-    return (
-      <p className="k-empty" role="status">
-        ისტორია იტვირთება…
-      </p>
-    );
+export default function PastGamesList({ games, onSelect }) {
   if (!games.length)
     return <p className="k-empty">პირველი თამაში აქ გამოჩნდება.</p>;
   return (

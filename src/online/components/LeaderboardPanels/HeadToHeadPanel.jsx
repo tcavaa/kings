@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
-import AvatarImg from "./AvatarImg";
-import { Swords } from "lucide-react-online";
-import { scoreColorClass } from "../../utils/scoreColor";
+import AvatarImg from "../AvatarImg";
 import { isWinnerName, isRemovedPlayer } from "../../lib/leaderboard";
 
 /**

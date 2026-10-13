@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { usePlayers } from '../hooks/usePlayers'
 import { useGameData, gamesOfType } from '../lib/gameData'
 import TrophyIcon from './TrophyIcon'
@@ -8,16 +8,11 @@ import { computeAllLifetimeAchievements } from '../utils/achievements'
 import { isWinnerOf, isChampionName } from '../utils/winners'
 
 export default function PlayersPage({ onBack, currentChampion }) {
-  // One list with King Online: a player added here shows up there (without a
-  // PIN) and the other way round. Players with a King Online PIN are managed there.
-  const { players, loading, addPlayer, deletePlayer } = usePlayers()
+  // One list with King Online. Players are added and removed in /admin.
+  const { players, loading } = usePlayers()
   const { data, loading: resultsLoading } = useGameData()
   const [type, setType] = useTypeFilter()
   const { results, details: allDetails } = useMemo(() => gamesOfType(data, type), [data, type])
-  const [name, setName] = useState('')
-  const [err, setErr] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [confirmDelete, setConfirmDelete] = useState(null) // player object to confirm
 
   const stats = useMemo(() => {
     const map = {}
@@ -38,37 +33,15 @@ export default function PlayersPage({ onBack, currentChampion }) {
     [allDetails, results]
   )
 
-  async function handleAdd(e) {
-    e.preventDefault()
-    if (!name.trim()) return
-    setSaving(true)
-    const error = await addPlayer(name)
-    setSaving(false)
-    if (error) { setErr(error); return }
-    setName('')
-    setErr(null)
-  }
-
   return (
     <div className="card">
-      <h2>Manage Players</h2>
-      <form onSubmit={handleAdd} className="row">
-        <input
-          value={name}
-          onChange={(e) => { setName(e.target.value); setErr(null) }}
-          placeholder="Player name"
-          type="text"
-          style={{ flex: 1, fontSize: 16, minHeight: 44, padding: '8px 10px', borderRadius: 10, border: '1px solid var(--line-strong)', background: 'var(--input-bg)', color: 'var(--text)' }}
-        />
-        <button className="primary" disabled={saving || !name.trim()}>Add</button>
-      </form>
-      {err && <div className="validation" style={{ marginTop: 8 }}>{err}</div>}
+      <h2>Players</h2>
       <TypeFilter value={type} onChange={setType} />
 
       {loading || resultsLoading ? (
         <p style={{ color: 'var(--muted)', marginTop: 12 }}>Loading...</p>
       ) : players.length === 0 ? (
-        <p style={{ color: 'var(--muted)', marginTop: 12 }}>No players yet. Add one above.</p>
+        <p style={{ color: 'var(--muted)', marginTop: 12 }}>No players yet.</p>
       ) : (
         <ul className="player-list">
           {players.map((p) => {
@@ -91,9 +64,6 @@ export default function PlayersPage({ onBack, currentChampion }) {
                   )}
                   <AchievementBadges achievements={lifetimeAchievements[p.name] || {}} />
                 </div>
-                {!p.has_pin && (
-                  <button className="link" style={{ color: '#dc2626', alignSelf: 'flex-start', marginTop: 2 }} onClick={() => setConfirmDelete(p)}>Remove</button>
-                )}
               </li>
             )
           })}
@@ -104,29 +74,6 @@ export default function PlayersPage({ onBack, currentChampion }) {
         <button className="primary" onClick={onBack}>Back to Game</button>
       </div>
 
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Remove Player</h3>
-            <p>Remove <strong>{confirmDelete.name}</strong>? This won't delete their game history.</p>
-            <div className="modal-actions">
-              <button className="link" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button
-                className="primary"
-                style={{ background: '#dc2626', borderColor: '#dc2626' }}
-                onClick={async () => {
-                  const target = confirmDelete
-                  setConfirmDelete(null)
-                  const error = await deletePlayer(target.id)
-                  if (error) setErr(error)
-                }}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

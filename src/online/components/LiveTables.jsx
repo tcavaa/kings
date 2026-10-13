@@ -85,7 +85,7 @@ export default function LiveTables({ active, onNeedProfile }) {
   const { liveGames, connected, publicSeat, watchGame } = useGame();
   if (!liveGames.length) return null;
 
-  const watch = (roomCode) => watchGame(roomCode, active.name, active.avatar);
+  const watch = (roomCode) => watchGame(roomCode, active.name);
   return (
     <section className="k-live-tables" aria-labelledby="live-tables-title">
       <div className="k-section-title">

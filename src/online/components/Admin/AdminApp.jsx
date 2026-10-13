@@ -1,7 +1,9 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react'
-import { Volume2, Trash2, Upload, Play, Square, Pencil, Check, X, LogOut, GripVertical } from 'lucide-react-online'
+import { Volume2, Trash2, Upload, Play, Square, Pencil, Check, X, LogOut, GripVertical, Trophy, Users } from 'lucide-react-online'
 import { adminApi, API_BASE } from '../../lib/api'
 import { voicePlayer } from '../../lib/voicePlayer'
+import SeasonsAdmin from './SeasonsAdmin'
+import PlayersAdmin from './PlayersAdmin'
 
 // Where the passcode lives between renders. sessionStorage, not local: the
 // latch should lift when the tab closes.
@@ -64,7 +66,6 @@ function PasscodeGate({ onUnlock }) {
         </p>
         <input
           type="password"
-          inputMode="numeric"
           autoFocus
           value={code}
           onChange={(e) => { setCode(e.target.value); setError('') }}
@@ -296,10 +297,9 @@ function UploadForm({ passcode, onAdded, onError }) {
   )
 }
 
-/* ─── page ────────────────────────────────────────────────────────────── */
+/* ─── sounds tab ──────────────────────────────────────────────────────── */
 
-export default function AdminApp() {
-  const [passcode, setPasscode] = useState(readPass)
+function SoundsAdmin({ passcode, onLocked }) {
   const [sounds, setSounds] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -464,54 +464,29 @@ export default function AdminApp() {
     }
   }, [dragId])
 
-  const reload = useCallback(async (code) => {
-    const pass = code || passcode
-    if (!pass) return
+  const reload = useCallback(async () => {
     setLoading(true)
     try {
-      setSounds(await adminApi.listSounds(pass))
+      setSounds(await adminApi.listSounds(passcode))
       setError('')
     } catch (err) {
       // A stale sessionStorage code (server passcode changed) lands here —
       // drop it and fall back to the gate rather than showing an empty list.
       if ((err.message || '').includes('HTTP 401')) {
-        writePass('')
-        setPasscode('')
+        onLocked()
         return
       }
       setError(err.message)
     } finally { setLoading(false) }
-  }, [passcode])
+  }, [passcode, onLocked])
 
-  useEffect(() => { if (passcode) reload(passcode) }, [passcode, reload])
+  useEffect(() => { reload() }, [reload])
 
   // Stop any preview when leaving the page — the player lives outside React.
   useEffect(() => () => voicePlayer.stop(), [])
 
-  if (!passcode) {
-    return <PasscodeGate onUnlock={(code) => setPasscode(code)} />
-  }
-
   return (
-    <div className="saloon-bg min-h-screen px-4 py-8">
-      <div className="max-w-xl mx-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h1 className="text-3xl font-western inline-flex items-center gap-2" style={{ color: '#d5b982' }}>
-            <Volume2 size={26} /> ხმები
-          </h1>
-          <div className="flex items-center gap-2">
-            <a href="/" className="text-xs font-typewriter underline" style={{ color: 'rgba(225,233,225,0.6)' }}>
-              მთავარი
-            </a>
-            <button onClick={() => { writePass(''); setPasscode('') }}
-                    title="გასვლა"
-                    className="p-2 rounded-lg transition-opacity hover:opacity-70"
-                    style={{ color: 'rgba(225,233,225,0.6)' }}>
-              <LogOut size={16} />
-            </button>
-          </div>
-        </div>
-
+    <>
         <UploadForm passcode={passcode} onAdded={() => reload()} onError={setError} />
 
         {error && (
@@ -556,6 +531,58 @@ export default function AdminApp() {
         <p className="text-[10px] font-typewriter mt-4 text-center" style={{ color: 'rgba(225,233,225,0.4)' }}>
           ცვლილებები მოთამაშეებთან შემდეგი გვერდის გახსნისას გამოჩნდება.
         </p>
+    </>
+  )
+}
+
+/* ─── page ────────────────────────────────────────────────────────────── */
+
+const TABS = [
+  { id: 'sounds',  label: 'ხმები',       Icon: Volume2 },
+  { id: 'seasons', label: 'სეზონები',    Icon: Trophy },
+  { id: 'players', label: 'მოთამაშეები', Icon: Users },
+]
+
+export default function AdminApp() {
+  const [passcode, setPasscode] = useState(readPass)
+  const [tab, setTab] = useState('sounds')
+  const lock = useCallback(() => { writePass(''); setPasscode('') }, [])
+
+  if (!passcode) {
+    return <PasscodeGate onUnlock={(code) => setPasscode(code)} />
+  }
+
+  return (
+    <div className="saloon-bg min-h-screen px-4 py-8">
+      <div className="max-w-xl mx-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-3xl font-western" style={{ color: '#d5b982' }}>ადმინი</h1>
+          <div className="flex items-center gap-2">
+            <a href="/" className="text-xs font-typewriter underline" style={{ color: 'rgba(225,233,225,0.6)' }}>
+              მთავარი
+            </a>
+            <button onClick={lock}
+                    title="გასვლა"
+                    className="p-2 rounded-lg transition-opacity hover:opacity-70"
+                    style={{ color: 'rgba(225,233,225,0.6)' }}>
+              <LogOut size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-5" role="tablist">
+          {TABS.map(({ id, label, Icon }) => (
+            <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+                    className="western-pill px-3 py-2 text-xs font-bold inline-flex items-center gap-1.5"
+                    style={{ color: '#eeeae1', opacity: tab === id ? 1 : 0.55 }}>
+              <Icon size={14} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {tab === 'sounds'  && <SoundsAdmin  passcode={passcode} onLocked={lock} />}
+        {tab === 'seasons' && <SeasonsAdmin passcode={passcode} onLocked={lock} />}
+        {tab === 'players' && <PlayersAdmin passcode={passcode} onLocked={lock} />}
       </div>
     </div>
   )

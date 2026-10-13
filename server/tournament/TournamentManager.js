@@ -1,6 +1,10 @@
 'use strict';
 
 const { seedTables, pickFinalists, VALID_SIZES, FINAL_SEATS } = require('./bracket');
+const { ownsSeat } = require('../game/GameManager');
+
+// How long a finished tournament stays around for its results screen.
+const DONE_TTL_MS = 10 * 60 * 1000;
 
 function generateCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -10,6 +14,17 @@ function generateCode() {
 }
 
 const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+
+function entryFor(socketId, identity) {
+  return {
+    id: socketId,
+    name: identity.name,
+    avatar: identity.avatar || null,
+    connected: true,
+    profileId: identity.profileId || null,
+    ownerKey: identity.ownerKey || null,
+  };
+}
 
 /**
  * Runs King tournaments: a lobby that fills to exactly 6 or 9, a randomly
@@ -39,18 +54,49 @@ class TournamentManager {
 
   // ── lookup ────────────────────────────────────────────────────────────────
 
-  findById(id) { return this.tournaments.get(id) || null; }
-
   findByCode(code) {
     const wanted = String(code || '').toUpperCase();
     for (const t of this.tournaments.values()) if (t.code === wanted) return t;
     return null;
   }
 
-  /** The tournament a socket is entered in (by socket id, then by name). */
+  /** The unfinished tournament a socket is entered in. */
   findBySocket(socketId) {
     for (const t of this.tournaments.values()) {
-      if (t.players.some((p) => p.id === socketId)) return t;
+      if (t.status !== 'done' && t.players.some((p) => p.id === socketId)) return t;
+    }
+    return null;
+  }
+
+  /** The unfinished tournament this identity holds an entry in. */
+  findByIdentity(identity) {
+    for (const t of this.tournaments.values()) {
+      if (t.status !== 'done' && t.players.some((p) => ownsSeat(p, identity))) return t;
+    }
+    return null;
+  }
+
+  /**
+   * A socket reconnected: point the identity's entry at the new socket id so
+   * the bracket reaches it again (tables, the final, overview updates).
+   * Returns the tournament, or null.
+   */
+  rebind(socketId, identity) {
+    const t = this.findByIdentity(identity);
+    if (!t) return null;
+    const entry = t.players.find((p) => ownsSeat(p, identity));
+    entry.id = socketId;
+    entry.connected = true;
+    if (identity.avatar) entry.avatar = identity.avatar;
+    return t;
+  }
+
+  /** The live King room this identity plays in (a semifinal table or the final). */
+  liveRoomOf(t, identity) {
+    const codes = [t.finalRoomCode, ...t.tables.map((tb) => tb.roomCode)].filter(Boolean);
+    for (const code of codes) {
+      const room = this.gameManager.getRoom(code);
+      if (room && room.status === 'playing' && room.players.some((p) => ownsSeat(p, identity))) return code;
     }
     return null;
   }
@@ -71,18 +117,18 @@ class TournamentManager {
 
   // ── lobby ─────────────────────────────────────────────────────────────────
 
-  create(socketId, playerName, avatar, size) {
+  create(socketId, identity, size) {
     const n = Number(size);
     if (!VALID_SIZES.includes(n)) {
       throw new Error(`A tournament must be ${VALID_SIZES.join(' or ')} players.`);
     }
-    const name = String(playerName || '').trim();
-    if (!name) throw new Error('playerName is required.');
+    const { name } = identity;
 
     // One tournament at a time per player — otherwise a single person could
     // hold seats in two brackets and stall both.
-    const existing = this.findBySocket(socketId);
-    if (existing) throw new Error('You are already in a tournament.');
+    if (this.findBySocket(socketId) || this.findByIdentity(identity)) {
+      throw new Error('You are already in a tournament.');
+    }
 
     let code;
     do { code = generateCode(); } while (this.findByCode(code));
@@ -93,12 +139,11 @@ class TournamentManager {
       size: n,
       status: 'lobby',
       createdBy: name,
-      players: [{ id: socketId, name, avatar: avatar || null, connected: true }],
+      players: [entryFor(socketId, identity)],
       tables: [],
       finalRoomCode: null,
       standings: [],
       winners: [],
-      createdAt: Date.now(),
     };
     this.tournaments.set(tournament.id, tournament);
     console.log(`[Tournament] ${name} opened ${code} for ${n} players`);
@@ -109,25 +154,28 @@ class TournamentManager {
    * Enter a lobby, or re-attach to a seat already held under this name (so a
    * refresh doesn't cost the player their place).
    */
-  join(code, socketId, playerName, avatar) {
+  join(code, socketId, identity) {
     const t = this.findByCode(code);
-    if (!t) throw new Error('Tournament not found.');
-    const name = String(playerName || '').trim();
-    if (!name) throw new Error('playerName is required.');
+    if (!t || t.status === 'done') throw new Error('Tournament not found.');
+    const { name } = identity;
 
-    const seated = t.players.find((p) => sameName(p.name, name));
+    const seated = t.players.find((p) => identity.profileId && p.profileId === identity.profileId)
+      || t.players.find((p) => sameName(p.name, name));
     if (seated) {
+      if (!ownsSeat(seated, identity)) throw new Error('That name is already in this tournament.');
       seated.id = socketId;
       seated.connected = true;
-      if (avatar) seated.avatar = avatar;
+      if (identity.avatar) seated.avatar = identity.avatar;
       return { tournament: t, rejoined: true };
     }
 
     if (t.status !== 'lobby') throw new Error('That tournament has already started.');
     if (t.players.length >= t.size) throw new Error('Tournament is full.');
-    if (this.findBySocket(socketId)) throw new Error('You are already in a tournament.');
+    if (this.findBySocket(socketId) || this.findByIdentity(identity)) {
+      throw new Error('You are already in a tournament.');
+    }
 
-    t.players.push({ id: socketId, name, avatar: avatar || null, connected: true });
+    t.players.push(entryFor(socketId, identity));
     console.log(`[Tournament] ${name} joined ${t.code} (${t.players.length}/${t.size})`);
     return { tournament: t, rejoined: false };
   }
@@ -195,12 +243,8 @@ class TournamentManager {
     // Tournament games are championship-grade for the leaderboard, but entry
     // is never gated on the daily quota — that check is skipped upstream for
     // tournament rooms.
-    const { roomCode } = this.gameManager.createRoom(
-      host.id, host.name, host.avatar || null, 'championship', 'king'
-    );
-    for (const p of rest) {
-      this.gameManager.joinRoom(roomCode, p.id, p.name, p.avatar || null);
-    }
+    const { roomCode } = this.gameManager.createRoom(host.id, host, 'championship');
+    for (const p of rest) this.gameManager.joinRoom(roomCode, p.id, p);
 
     const room = this.gameManager.getRoom(roomCode);
     room.tournamentId = t.id;
@@ -232,6 +276,7 @@ class TournamentManager {
       t.winners = payload.winners || [];
       console.log(`[Tournament] ${t.code} won by ${t.winners.map((w) => w.name).join(', ')}`);
       if (this.broadcast) this.broadcast.tournamentComplete(t);
+      this._forgetLater(t);
       return 'complete';
     }
 
@@ -266,19 +311,39 @@ class TournamentManager {
       console.warn(`[Tournament] ${t.code} could not fill the final (${finalists.length})`);
       t.status = 'done';
       if (this.broadcast) this.broadcast.tournamentComplete(t);
+      this._forgetLater(t);
       return;
     }
 
-    // Map finalists back to their live entries so we have current socket ids.
+    // Map finalists back to their entries. The socket id comes from their
+    // semifinal seat when that is newer: `join-room` keeps it current through
+    // reconnects even if the client never re-sent `tournament-join`.
     const group = finalists.map((f) => {
-      const entry = t.players.find((p) => sameName(p.name, f.name));
-      return entry || { id: null, name: f.name, avatar: f.avatar || null };
+      const entry = t.players.find((p) => sameName(p.name, f.name))
+        || { id: null, name: f.name, avatar: f.avatar || null, connected: false };
+      const seat = this._semifinalSeat(t, entry);
+      if (seat?.connected && seat.id) { entry.id = seat.id; entry.connected = true; }
+      return entry;
     });
 
     t.finalRoomCode = this._openTable(t, group, 0, 'final');
     t.status = 'final';
     console.log(`[Tournament] ${t.code} final: ${group.map((g) => g.name).join(' vs ')}`);
     if (this.broadcast) this.broadcast.finalStarted(t, t.finalRoomCode, finalists);
+  }
+
+  _semifinalSeat(t, entry) {
+    for (const tb of t.tables) {
+      const seat = this.gameManager.getRoom(tb.roomCode)?.players.find((p) => sameName(p.name, entry.name));
+      if (seat) return seat;
+    }
+    return null;
+  }
+
+  /** Keep a finished tournament for its results screen, then drop it. */
+  _forgetLater(t) {
+    const timer = setTimeout(() => this.tournaments.delete(t.id), DONE_TTL_MS);
+    if (typeof timer.unref === 'function') timer.unref();
   }
 
   // ── views ─────────────────────────────────────────────────────────────────
@@ -343,8 +408,6 @@ class TournamentManager {
     };
   }
 
-  /** Drop a finished tournament from memory (called after the final wraps). */
-  destroy(id) { this.tournaments.delete(id); }
 }
 
 module.exports = TournamentManager;

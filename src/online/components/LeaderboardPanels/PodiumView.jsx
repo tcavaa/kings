@@ -1,4 +1,4 @@
-import AvatarImg from "./AvatarImg";
+import AvatarImg from "../AvatarImg";
 import { isWinnerName } from "../../lib/leaderboard";
 export default function PodiumView({ game, sortedPlayers }) {
   return (

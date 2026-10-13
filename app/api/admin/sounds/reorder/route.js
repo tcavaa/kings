@@ -6,7 +6,7 @@ import { UPLOAD_LIMIT, json, readJson, requireAdmin, sendErr } from '@/lib/api/h
 export async function POST(request) {
   try {
     const body = await readJson(request, UPLOAD_LIMIT)
-    const denied = requireAdmin(request)
+    const denied = await requireAdmin(request)
     if (denied) return denied
     return json(await store.reorderSounds((body || {}).ids))
   } catch (err) { return sendErr(err) }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Spade, AlertTriangle, Check, ArrowRight } from "lucide-react-online";
+import { Check, ArrowRight } from "lucide-react-online";
 import { useGame } from "../context/GameContext";
 import { GAME_TYPES } from "../constants/gameTypes";
 import ModalShell from "./ModalShell";

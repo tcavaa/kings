@@ -9,7 +9,6 @@ import {
 } from "../objects/Card.js";
 
 // CSS hex string ("#daa520") → Phaser color int (0xdaa520).
-const hexToInt = (hex) => parseInt(hex.slice(1), 16);
 
 // ── Table layouts ─────────────────────────────────────────────────────────────
 // The scene is drawn in its own coordinates and FIT-scaled into the screen.
@@ -76,8 +75,6 @@ export const isPortraitBox = (w, h) => h > w * 1.1;
 export const sceneSize = (L) => ({ width: L.W, height: L.H - L.VIEW_TOP });
 
 // Avatar accent colours
-const AVATAR_COLOR = [0xd7fa52, 0x91a578, 0x91a578]; // self gold, opps green
-const AVATAR_COLOR_HEX = ["#d7fa52", "#91a578", "#91a578"];
 
 // Mirror of server-side validatePlay() so the UI greys out cards that the
 // server would reject. Source of truth lives in server/game/GameState.js —
@@ -152,8 +149,6 @@ export class GameScene extends Phaser.Scene {
     // Track when a fresh deal happens so we play the deal animation only on
     // the moment hands materialise (round start), not on every re-render.
     this._lastDealRound = null;
-    this._lastTrickWinner = null;
-    this._lastTrickKingHearts = false;
   }
 
   _ensureAvatarTexture(player) {
@@ -168,7 +163,6 @@ export class GameScene extends Phaser.Scene {
     this.L = layoutFor(size.height > size.width);
     this.staticObjs = [];
     this._drawBackground();
-    this._drawTable();
     this._drawWatermark();
 
     this.cameras.main.setScroll(0, this.L.VIEW_TOP);
@@ -295,7 +289,7 @@ export class GameScene extends Phaser.Scene {
     this._onVisibility = null;
   }
 
-  // ── Saloon-felt background (PNG) with a procedural fallback ──────────────
+  // ── The table: a parchment room with a green felt, drawn in code ─────────
   _drawBackground() {
     const { W, H, felt } = this.L;
     const g = this.add.graphics();
@@ -323,8 +317,6 @@ export class GameScene extends Phaser.Scene {
     g.lineBetween(W * 0.5, top + 22, W * 0.5, top + 45);
     g.lineBetween(W * 0.5, bottom - 22, W * 0.5, bottom - 45);
   }
-
-  _drawTable() {}
 
   _drawWatermark() {
     const { TABLE_CX, TABLE_CY } = this.L;
@@ -496,8 +488,6 @@ export class GameScene extends Phaser.Scene {
       if (!player) return;
 
       const pos = this.L.AVATAR_POS[rel];
-      const accentHex = AVATAR_COLOR_HEX[rel];
-      const accentInt = AVATAR_COLOR[rel];
       // A watcher occupies no seat: rel 0 is simply the player the table is
       // being viewed from, not the person looking. Treating them as "own"
       // would label a stranger "შენ" and hand the watcher their sound buttons.
@@ -666,8 +656,6 @@ export class GameScene extends Phaser.Scene {
         );
       }
 
-      // Sound buttons (3 different reactions) next to the avatar
-
       this.avatarObjs.push(container);
     });
   }
@@ -757,8 +745,6 @@ export class GameScene extends Phaser.Scene {
       container.setScale(k);
       container.setAngle(fanAngle);
       container.setDepth(20 + i);
-      container.origY = y;
-      container.fanAngle = fanAngle;
 
       if (gamePhase === "playing" && !playable) {
         container.setAlpha(0.82);
@@ -872,7 +858,6 @@ export class GameScene extends Phaser.Scene {
       const container = createFaceUpCard(this, pos.x, pos.y, card, false);
       container.setAngle(pos.angle);
       container.setDepth(50 + rel);
-      container.trickRel = rel;
       this.trickCards.push(container);
 
       // Card-play swoop: enter from the seat's avatar position, rotate +
@@ -1062,9 +1047,6 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  shutdown() {
-    this._cleanupBus();
-  }
 }
 
 // Re-export for PhaserGame to know the canvas size

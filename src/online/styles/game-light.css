@@ -75,29 +75,6 @@ body.king-light-game .k-game-round > i {
   background: #c5d6ca;
   margin: 0 4px;
 }
-body.king-light-game .k-game-round > b {
-  color: #173e32;
-  font-weight: 700;
-  font-size: 13px;
-}
-body.king-light-game .k-game-round .k-trump-label {
-  display: block;
-  width: fit-content;
-  color: #6d4810;
-  background: #ffebba;
-  border: 1px solid #e8c774;
-  padding: 3px 8px;
-  margin-top: 4px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 700;
-}
-body.king-light-game .k-trump-label.suit-H,
-body.king-light-game .k-trump-label.suit-D {
-  color: #ae3044;
-  background: #ffe5df;
-  border-color: #ecb6a7;
-}
 .k-round-progress {
   position: absolute;
   left: 0;
@@ -183,6 +160,14 @@ body.king-light-game .k-data-table td {
 body.king-light-game .k-data-table thead th {
   background: #e8f1e9;
   color: #476957;
+}
+/* The global .is-positive/.is-negative tints are for dark panels and use
+   !important; on the cream score drawer they need darker shades. */
+body.king-light-game .k-data-table .is-positive {
+  color: #087b59 !important;
+}
+body.king-light-game .k-data-table .is-negative {
+  color: #b44941 !important;
 }
 body.king-light-game .k-data-table small,
 body.king-light-game .k-data-caption,
@@ -377,13 +362,6 @@ body.king-light-game .k-suit-choices button[aria-pressed="true"] {
   background: #d9eedb;
 }
 @media (max-width: 700px) {
-  body.king-light-game .k-game-round > b {
-    font-size: 11px;
-  }
-  body.king-light-game .k-game-round .k-trump-label {
-    font-size: 10px;
-    padding: 2px 4px;
-  }
   body.king-light-game .k-game-round strong {
     font-size: 23px;
     padding: 2px 6px;
@@ -457,9 +435,6 @@ body.king-light-game .k-table-menu-secondary span {
   }
   body.king-light-game .k-game-tools {
     gap: 4px;
-  }
-  body.king-light-game .k-game-round > b {
-    max-width: 105px;
   }
 }
 

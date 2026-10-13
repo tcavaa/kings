@@ -85,17 +85,11 @@ const ALL_TYPE_CODES = ['K', 'Q', 'J', 'H', 'L2', 'T', 'P1', 'P2', 'P3'];
 // Total number of rounds in a full game (9 types × 3 players)
 const TOTAL_ROUNDS = 27;
 
-// Number of players
-const PLAYER_COUNT = 3;
-
 // Cards dealt to each player
 const CARDS_PER_PLAYER = 10;
 
 // Center cards
 const CENTER_CARD_COUNT = 2;
-
-// Cards leader discards
-const DISCARD_COUNT = 2;
 
 module.exports = {
   RANKS,
@@ -103,8 +97,6 @@ module.exports = {
   GAME_TYPES,
   ALL_TYPE_CODES,
   TOTAL_ROUNDS,
-  PLAYER_COUNT,
   CARDS_PER_PLAYER,
   CENTER_CARD_COUNT,
-  DISCARD_COUNT,
 };

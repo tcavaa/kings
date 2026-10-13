@@ -64,9 +64,6 @@ function calculate(gameType, roundData) {
         for (const seat of lastTwo) {
           scores[seat] -= 20;
         }
-      } else if (trickWinners && trickWinners.length === 1) {
-        // Edge case: only one trick was played
-        scores[trickWinners[0]] -= 20;
       }
       break;
     }

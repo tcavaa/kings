@@ -21,6 +21,37 @@ function generateCode() {
 // the short-term one.
 const ROOM_GRACE_MS = 90 * 1000;
 
+const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+
+/**
+ * Whether `identity` (see handlers' `_identify`) may take over a seat row: the
+ * same verified profile, or the same browser. A name alone is never enough —
+ * every visitor can see who sits at which table.
+ */
+function ownsSeat(row, identity) {
+  if (!row || !identity) return false;
+  return !!((identity.profileId && row.profileId === identity.profileId)
+    || (identity.ownerKey && row.ownerKey === identity.ownerKey));
+}
+
+/** The seat row for this identity's profile, else for its name. */
+function findSeat(players, identity) {
+  return players.find((p) => identity.profileId && p.profileId === identity.profileId)
+    || players.find((p) => sameName(p.name, identity.name));
+}
+
+function seatRow(socketId, identity, seat) {
+  return {
+    id: socketId,
+    name: identity.name,
+    avatar: identity.avatar || null,
+    seat,
+    connected: true,
+    profileId: identity.profileId || null,
+    ownerKey: identity.ownerKey || null,
+  };
+}
+
 class GameManager {
   constructor() {
     this.rooms = new Map();
@@ -37,7 +68,7 @@ class GameManager {
     // those all resolve a sender via socketRoomMap, which a spectator is
     // deliberately absent from.
     this.spectators = new Map();   // socketId -> { roomCode, tournamentId, name, avatar }
-    // Everyone currently on the site, table or not. socketId -> { name, avatar, since }
+    // Everyone currently on the site, table or not. socketId -> { name, since }
     this.presence = new Map();
   }
 
@@ -99,12 +130,11 @@ class GameManager {
   // socket, but collapsed by NAME on the way out — two tabs is one person, not
   // two, and showing them twice on the homepage rail would look broken.
 
-  announcePresence(socketId, name, avatar) {
+  announcePresence(socketId, name) {
     const clean = String(name || '').trim();
     if (!clean) return;
     this.presence.set(socketId, {
       name: clean,
-      avatar: avatar || null,
       since: this.presence.get(socketId)?.since || Date.now(),
     });
   }
@@ -141,7 +171,7 @@ class GameManager {
       const rank = { playing: 3, waiting: 2, watching: 1, lobby: 0 };
       const existing = byName.get(key);
       if (!existing || rank[status] > rank[existing.status]) {
-        byName.set(key, { name: p.name, avatar: p.avatar, status, roomCode, since: p.since });
+        byName.set(key, { name: p.name, status, roomCode, since: p.since });
       }
     }
     return [...byName.values()].sort((a, b) => a.since - b.since);
@@ -193,7 +223,6 @@ class GameManager {
   _roomSnapshot(room) {
     return {
       code: room.code,
-      creatorSeat: room.creatorSeat,
       status: room.status,
       mode: room.mode || 'public',
       isPublic: !!room.isPublic,
@@ -203,9 +232,11 @@ class GameManager {
       tournamentId: room.tournamentId || null,
       tournamentTable: room.tournamentTable ?? null,
       tournamentStage: room.tournamentStage || null,
+      // Avatars are short /api/profiles/:id/avatar links, not photos.
       players: room.players.map((p) => ({
         id: p.id, name: p.name, avatar: p.avatar || null,
         seat: p.seat, connected: !!p.connected,
+        profileId: p.profileId || null, ownerKey: p.ownerKey || null,
       })),
       gameState: room.gameState ? room.gameState.serialize() : null,
     };
@@ -215,7 +246,6 @@ class GameManager {
     if (!snap || !Array.isArray(snap.players)) return null;
     const room = {
       code: snap.code,
-      creatorSeat: snap.creatorSeat ?? 0,
       status: snap.status || 'waiting',
       // Rows written before game modes existed have no `mode` — they were
       // all counted as championship games historically, but a *live* legacy
@@ -227,8 +257,12 @@ class GameManager {
       tournamentTable: snap.tournamentTable ?? null,
       tournamentStage: snap.tournamentStage || null,
       players: snap.players.map((p) => ({
-        id: p.id || null, name: p.name, avatar: p.avatar || null,
+        id: p.id || null, name: p.name,
+        // Snapshots written before photos became links carry a base64 photo.
+        avatar: p.avatar && !String(p.avatar).startsWith('data:') ? p.avatar : null,
         seat: p.seat,
+        profileId: p.profileId || null,
+        ownerKey: p.ownerKey || null,
         // After a server restart no live socket exists, so everyone starts
         // disconnected until they re-join with the same room code + name.
         connected: false,
@@ -331,13 +365,11 @@ class GameManager {
     return code;
   }
 
-  createRoom(socketId, playerName, avatar = null, mode = 'public') {
+  createRoom(socketId, identity, mode = 'public') {
     const roomCode = this._generateUniqueCode();
-    const player = { id: socketId, name: playerName, avatar, seat: 0, connected: true };
     this.rooms.set(roomCode, {
       code: roomCode,
-      players: [player],
-      creatorSeat: 0,
+      players: [seatRow(socketId, identity, 0)],
       gameState: null,
       status: 'waiting',
       // 'championship' games count toward the daily quota and feed the
@@ -354,24 +386,19 @@ class GameManager {
     return { roomCode, seat: 0 };
   }
 
-  joinRoom(roomCode, socketId, playerName, avatar = null) {
+  joinRoom(roomCode, socketId, identity) {
     const room = this.rooms.get(roomCode);
     if (!room) throw new Error(`Room ${roomCode} not found.`);
 
-    // Reconnection by name, in *every* phase including the `waiting` lobby.
-    // Switching tabs / a brief wifi blip makes socket.io reconnect with a
-    // fresh id and the client re-emits `join-room` (see GameContext). If
-    // we only matched names in `playing`/`finished`, a same-name rejoin
-    // during the lobby would fall through to the "create a new seat"
-    // branch below and the same human would be seated twice. The name
-    // check also has to ignore the `connected` flag, because under a race
-    // (new socket's `connect` is processed before the old socket's
-    // `disconnect`) the old row may still be marked connected.
-    const existingPlayer = room.players.find(
-      (p) => p.name.toLowerCase() === playerName.toLowerCase()
-    );
+    // Reconnection, in *every* phase including the `waiting` lobby: a tab
+    // switch or wifi blip makes socket.io reconnect with a fresh id and the
+    // client re-emits `join-room` (see GameContext). It ignores `connected`,
+    // because the new socket's `connect` can be processed before the old
+    // socket's `disconnect`. Only the seat's owner may take it back.
+    const existingPlayer = findSeat(room.players, identity);
 
     if (existingPlayer) {
+      if (!ownsSeat(existingPlayer, identity)) throw new Error('That name is already taken at this table.');
       // Cut the old socket's mapping loose so its eventual disconnect
       // event (which we may not even get) can't mutate this player's row.
       if (existingPlayer.id && existingPlayer.id !== socketId) {
@@ -379,24 +406,19 @@ class GameManager {
       }
       existingPlayer.id = socketId;
       existingPlayer.connected = true;
-      if (avatar && !existingPlayer.avatar) existingPlayer.avatar = avatar;
+      existingPlayer.ownerKey = existingPlayer.ownerKey || identity.ownerKey || null;
+      if (identity.avatar) existingPlayer.avatar = identity.avatar;
       this.socketRoomMap.set(socketId, { roomCode, seat: existingPlayer.seat });
-      if (room.gameState) {
-        const gsPlayer = room.gameState.players.find((p) => p.seat === existingPlayer.seat);
-        if (gsPlayer) gsPlayer.id = socketId;
-      }
       // Someone is back — abort any pending "delete empty room" job.
       this.cancelRoomGrace(roomCode);
-      console.log(`[GameManager] ${playerName} reconnected to room ${roomCode} as seat ${existingPlayer.seat}`);
+      console.log(`[GameManager] ${existingPlayer.name} reconnected to room ${roomCode} as seat ${existingPlayer.seat}`);
       this._persist(roomCode);
       return { seat: existingPlayer.seat, reconnected: true, status: room.status };
     }
 
     // No existing seat for this name — must be a genuinely new sit-down.
-    // Reject if the game has already started; only the original 3 names
-    // can come back to a running table.
     if (room.status === 'playing' || room.status === 'finished') {
-      throw new Error('Game has already started. Use the same name to reconnect.');
+      throw new Error('Game has already started.');
     }
 
     if (room.players.length >= 3) throw new Error('Room is full.');
@@ -407,12 +429,16 @@ class GameManager {
     const takenSeats = new Set(room.players.map((p) => p.seat));
     let seat = 0;
     while (takenSeats.has(seat)) seat++;
-    const player = { id: socketId, name: playerName, avatar, seat, connected: true };
-    room.players.push(player);
+    room.players.push(seatRow(socketId, identity, seat));
     this.socketRoomMap.set(socketId, { roomCode, seat });
-    console.log(`[GameManager] ${playerName} joined room ${roomCode} as seat ${seat}`);
+    console.log(`[GameManager] ${identity.name} joined room ${roomCode} as seat ${seat}`);
     this._persist(roomCode);
     return { seat, status: room.status };
+  }
+
+  /** Whether this identity already holds a seat in the room. */
+  isSeated(room, identity) {
+    return !!room && room.players.some((p) => ownsSeat(p, identity));
   }
 
   leaveRoom(socketId) {
@@ -424,6 +450,12 @@ class GameManager {
     const playerIdx = room.players.findIndex((p) => p.id === socketId);
     if (playerIdx === -1) { this.socketRoomMap.delete(socketId); return null; }
     const { name: playerName } = room.players[playerIdx];
+    // A running game still deals to and waits on this seat, so leaving it is
+    // a disconnect: the seat stays and its owner can come back.
+    if (room.status === 'playing') {
+      const info = this.markDisconnected(socketId);
+      return info && { ...info, room, stayed: true };
+    }
     room.players.splice(playerIdx, 1);
     this.socketRoomMap.delete(socketId);
     if (room.players.length === 0) {
@@ -463,12 +495,6 @@ class GameManager {
   }
 
   getRoom(roomCode) { return this.rooms.get(roomCode); }
-
-  getRoomBySocketId(socketId) {
-    const mapping = this.socketRoomMap.get(socketId);
-    if (!mapping) return undefined;
-    return this.rooms.get(mapping.roomCode);
-  }
 
   getMappingBySocketId(socketId) { return this.socketRoomMap.get(socketId); }
 
@@ -635,7 +661,7 @@ class GameManager {
    * Seat a socket at a quick-match table. Creates the room on first sit.
    * Same-name sitters are re-attached to their existing seat (refresh-safe).
    */
-  sitPublic(socketId, playerName, avatar = null, emoji = null, mode = 'public') {
+  sitPublic(socketId, identity, emoji = null, mode = 'public') {
     const key = this._normalizeQuickMatchMode(mode);
     let code = this.quickMatchCodes[key];
     let room = code ? this.rooms.get(code) : null;
@@ -648,14 +674,14 @@ class GameManager {
 
     let seat;
     if (!room) {
-      const created = this.createRoom(socketId, playerName, avatar, key);
+      const created = this.createRoom(socketId, identity, key);
       code = created.roomCode;
       seat = created.seat;
       room = this.rooms.get(code);
       room.isPublic = true;
       this.quickMatchCodes[key] = code;
     } else {
-      const joined = this.joinRoom(code, socketId, playerName, avatar);
+      const joined = this.joinRoom(code, socketId, identity);
       seat = joined.seat;
     }
 
@@ -703,9 +729,9 @@ class GameManager {
   // The old room learns who has signed up so the game-over UI on other
   // clients can render a "wants to play again" badge above each joined seat.
   //
-  // Returns { newRoomCode, seat, isFirst, joinedOldSeats: number[] } on
-  // success, or { error: string } on validation failure.
-  requestRematch(socketId, playerName, avatar = null) {
+  // Returns { newRoomCode, seat, joinedOldSeats: number[] } on success, or
+  // { error: string } on validation failure.
+  requestRematch(socketId, identity) {
     const mapping = this.socketRoomMap.get(socketId);
     if (!mapping) return { error: 'You are not in a room.' };
     const oldRoom = this.rooms.get(mapping.roomCode);
@@ -717,18 +743,16 @@ class GameManager {
     // if two players click "Play Again" at the same instant, only one of
     // them creates the room and the second one joins it.
     let newRoomCode = oldRoom.rematchRoomCode;
-    let isFirst = false;
     let seat;
 
     if (!newRoomCode) {
       // First click: create a fresh room with this socket as seat 0. The
       // rematch inherits the finished game's mode (championship rematches
       // are quota-checked in the socket handler before we get here).
-      const result = this.createRoom(socketId, playerName, avatar, oldRoom.mode);
+      const result = this.createRoom(socketId, identity, oldRoom.mode);
       newRoomCode = result.roomCode;
       seat = result.seat;
       oldRoom.rematchRoomCode = newRoomCode;
-      isFirst = true;
     } else {
       // Subsequent clicks: join the existing rematch room. joinRoom
       // handles "same name reconnecting" gracefully — including the
@@ -740,9 +764,9 @@ class GameManager {
         // creator left and the room went empty). Clear the stale link
         // and treat this click as a brand-new first click.
         oldRoom.rematchRoomCode = null;
-        return this.requestRematch(socketId, playerName, avatar);
+        return this.requestRematch(socketId, identity);
       }
-      const joinResult = this.joinRoom(newRoomCode, socketId, playerName, avatar);
+      const joinResult = this.joinRoom(newRoomCode, socketId, identity);
       seat = joinResult.seat;
     }
 
@@ -751,44 +775,10 @@ class GameManager {
     return {
       newRoomCode,
       seat,
-      isFirst,
       joinedOldSeats: [...oldRoom.rematchJoinedSeats].sort((a, b) => a - b),
     };
-  }
-
-  /**
-   * Look up the rematch status for a given (finished) room. Returns the new
-   * room code (if any) and the list of old seats that have already clicked
-   * Play Again. Safe to call on rooms that have no rematch state yet.
-   */
-  rematchStatus(oldRoomCode) {
-    const oldRoom = this.rooms.get(oldRoomCode);
-    if (!oldRoom) return null;
-    return {
-      newRoomCode: oldRoom.rematchRoomCode || null,
-      joinedOldSeats: oldRoom.rematchJoinedSeats
-        ? [...oldRoom.rematchJoinedSeats].sort((a, b) => a - b)
-        : [],
-    };
-  }
-
-  reconnectPlayer(newSocketId, roomCode, seat) {
-    const room = this.rooms.get(roomCode);
-    if (!room) return null;
-    const player = room.players.find((p) => p.seat === seat);
-    if (!player) return null;
-    this.socketRoomMap.delete(player.id);
-    player.id = newSocketId;
-    player.connected = true;
-    this.socketRoomMap.set(newSocketId, { roomCode, seat });
-    if (room.gameState) {
-      const gsPlayer = room.gameState.players.find((p) => p.seat === seat);
-      if (gsPlayer) gsPlayer.id = newSocketId;
-    }
-    console.log(`[GameManager] Player ${player.name} (seat ${seat}) reconnected to room ${roomCode}`);
-    this._persist(roomCode);
-    return room.gameState ? room.gameState.getStateForPlayer(seat) : null;
   }
 }
 
 module.exports = GameManager;
+module.exports.ownsSeat = ownsSeat;

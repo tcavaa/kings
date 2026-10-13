@@ -1,6 +1,5 @@
 import { memo, useEffect, useRef } from "react";
 import Phaser from "phaser";
-import { useChat } from "../context/GameContext";
 import { PreloadScene } from "./scenes/PreloadScene";
 import { GameScene, layoutFor, isPortraitBox, sceneSize } from "./scenes/GameScene";
 import { EventBus } from "./EventBus";
@@ -13,7 +12,6 @@ function PhaserGame({ gameState, onCardPlay }) {
   // ref so the table renders immediately on a refresh/rejoin instead of
   // staying blank until the next state-update arrives.
   const lastStateRef = useRef(null);
-  const { playSound } = useChat();
 
   useEffect(() => {
     if (!containerRef.current || gameRef.current) return;
@@ -29,8 +27,8 @@ function PhaserGame({ gameState, onCardPlay }) {
       parent: containerRef.current,
       width,
       height,
-      // Parchment, matching the table art — shows only for the frame or two
-      // before the felt image paints, so it must not flash dark.
+      // Parchment, matching the table — shows only for the frame or two
+      // before the scene draws, so it must not flash dark.
       backgroundColor: "#dceae1",
       scene: [PreloadScene, GameScene],
       scale: {
@@ -116,16 +114,6 @@ function PhaserGame({ gameState, onCardPlay }) {
     EventBus.on("card-clicked", handler);
     return () => EventBus.off("card-clicked", handler);
   }, [onCardPlay]);
-
-  // Player clicked a sound button next to an avatar → broadcast through socket.
-  useEffect(() => {
-    const handler = ({ soundId, targetSeat }) => {
-      if (!playSound) return;
-      playSound(soundId, targetSeat);
-    };
-    EventBus.on("request-play-sound", handler);
-    return () => EventBus.off("request-play-sound", handler);
-  }, [playSound]);
 
   return (
     // Keep the canvas letterbox the same tone as the play surface.

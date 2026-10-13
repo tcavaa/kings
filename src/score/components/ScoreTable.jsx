@@ -31,7 +31,7 @@ function AnimatedScore({ value, from = 0, showSign = true }) {
 export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLastRound, gameFinished, playerColors = [], currentChampion }) {
   const totals = players.reduce((acc, p) => { acc[p.id] = 0; return acc }, {})
   rounds.forEach((r) => {
-    Object.entries(r.scores).forEach(([pid, score]) => { totals[pid] += score })
+    Object.entries(r?.scores || {}).forEach(([pid, score]) => { totals[pid] = (totals[pid] || 0) + score })
   })
 
   const maxTotal = rounds.length > 0 && players.length > 0 ? Math.max(...players.map(p => totals[p.id])) : null

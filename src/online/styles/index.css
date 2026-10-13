@@ -7,21 +7,9 @@
   font-family: Inter, "Noto Sans Georgian", sans-serif;
   color: #f2f2ed;
   background: #171919;
-  --ink: #f2f2ed;
-  --ink-soft: #bdc1ba;
-  --ink-dim: #919891;
   --paper: #f0f0e9;
   --black: #171919;
   --acid: #d7fa52;
-  --line: #ffffff20;
-  --line-soft: #ffffff10;
-  --parchment: #202322;
-  --parchment-light: #272b28;
-  --parchment-dark: #171919;
-  --wine: #d7fa52;
-  --gold: #d7fa52;
-  --wood: #171919;
-  --wood-deep: #121413;
   color-scheme: dark;
 }
 *,
@@ -92,7 +80,6 @@ input {
 }
 .font-western,
 .font-typewriter,
-.font-slab,
 .font-handwritten {
   font-family: Inter, "Noto Sans Georgian", sans-serif;
   letter-spacing: 0;
@@ -108,8 +95,6 @@ input {
 /* Compatibility primitives used by game drawers and statistics. */
 .saloon-bg,
 .lobby-bg,
-.wood-bg,
-.wood-bg-light,
 .leather-bg,
 .parchment-bg {
   background: #171919;
@@ -118,7 +103,6 @@ input {
   box-shadow: none;
 }
 .western-panel,
-.casino-panel,
 .parchment-panel {
   background: #242826;
   border: 1px solid #ffffff18;
@@ -127,21 +111,12 @@ input {
   color: #f2f2ed;
 }
 .western-pill,
-.western-hud-pill,
-.menu-drawer-item,
 .pin-key {
   background: #2c312d;
   border: 1px solid #ffffff18;
   border-radius: 3px;
   color: #f2f2ed;
   box-shadow: none;
-}
-.western-hud-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  font-size: 12px;
 }
 .casino-input {
   width: 100%;
@@ -158,8 +133,7 @@ input {
   color: #929a90;
 }
 .casino-btn-primary,
-.casino-btn-gold,
-.last-trick-btn {
+.casino-btn-gold {
   background: var(--acid);
   color: #171919;
   border: 0;
@@ -198,31 +172,8 @@ input {
   background: #080c0bd9;
   backdrop-filter: blur(8px);
 }
-.drawer-scrim {
-  position: absolute;
-  inset: 0;
-  background: #0006;
-  z-index: 25;
-}
-.inset-card,
-.bg-pit {
-  background: #161a17;
-  border: 1px solid #ffffff10;
-}
-.bg-leather,
-.bg-leather-dark,
-.bg-leather-soft {
-  background: #222724;
-}
 .bg-amber-glow {
   background: #d7fa5215;
-}
-.border-brass,
-.border-brass-strong {
-  border: 1px solid #ffffff20;
-}
-.border-brass-soft {
-  border: 1px solid #ffffff10;
 }
 .text-cream,
 .text-ink {
@@ -238,27 +189,16 @@ input {
 .text-amber-dim {
   color: #d7fa52;
 }
-.text-sage,
-.score-pos,
 .score-pos-soft {
   color: #b9e47a;
 }
-.text-rust,
-.score-neg,
 .score-neg-soft {
   color: #f2a097;
-}
-.score-nil,
-.score-nil-soft {
-  color: #bac2b7;
 }
 .disconnect-banner {
   background: #5c302c;
   color: #fff;
   border: 1px solid #df8d7c;
-}
-.card-pattern {
-  background: none;
 }
 #phaser-container canvas {
   display: block;
@@ -286,9 +226,6 @@ input {
 }
 .pin-shake {
   animation: pinShake 0.25s ease;
-}
-.tumbleweed {
-  display: none;
 }
 .parade-pulse,
 .trump-sparkle {
@@ -810,26 +747,22 @@ input {
   padding: 34px;
   min-height: 310px;
 }
-.k-matchmaking,
-.k-feature-mode {
+.k-matchmaking {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 45px;
 }
-.k-match-intro .k-eyebrow,
-.k-feature-mode .k-eyebrow {
+.k-match-intro .k-eyebrow {
   color: #a0ad91;
 }
-.k-match-intro h3,
-.k-feature-mode h3 {
+.k-match-intro h3 {
   font-size: 30px;
   line-height: 1.45;
   font-weight: 450;
   letter-spacing: -1px;
   margin: 15px 0;
 }
-.k-match-intro p,
-.k-feature-mode p {
+.k-match-intro p {
   font-size: 11px;
   line-height: 1.9;
   color: #939e8a;
@@ -945,26 +878,6 @@ input {
 .k-reactions button {
   padding: 5px 10px;
   border: 1px solid #ffffff20;
-}
-.k-mode-settings {
-  align-self: center;
-  display: grid;
-  gap: 16px;
-}
-.k-mode-settings label {
-  font-size: 11px;
-}
-.k-mode-settings small {
-  font-size: 10px;
-  color: #939e8a;
-}
-.k-mode-settings input {
-  font-size: 28px;
-}
-.k-feature-mode > .western-panel {
-  background: transparent;
-  border: 0;
-  padding: 0;
 }
 /* Live tables — King games in progress, open to watch. */
 .k-live-tables {
@@ -1446,17 +1359,6 @@ input {
   margin-left: 12px;
   color: #b3bda4;
 }
-.k-stack-field {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin: 20px 0;
-  font-size: 12px;
-}
-.k-stack-field input {
-  width: 120px;
-}
 .k-wait-footer {
   border-top: 1px solid #17191920;
   padding: 25px 0;
@@ -1521,8 +1423,7 @@ input {
   .k-footer {
     margin: 0 28px;
   }
-  .k-matchmaking,
-  .k-feature-mode {
+  .k-matchmaking {
     gap: 25px;
   }
   .k-mode-panel {
@@ -1577,16 +1478,13 @@ input {
   .k-welcome-copy p {
     font-size: 10px;
   }
-  .k-matchmaking,
-  .k-feature-mode {
+  .k-matchmaking {
     grid-template-columns: 1fr;
   }
-  .k-match-intro h3 br,
-  .k-feature-mode h3 br {
+  .k-match-intro h3 br {
     display: none;
   }
-  .k-match-intro h3,
-  .k-feature-mode h3 {
+  .k-match-intro h3 {
     font-size: 25px;
   }
   .k-match-intro p {
@@ -1876,10 +1774,6 @@ input {
 @media (max-height: 540px) {
   .hide-on-phone-landscape {
     display: none !important;
-  }
-  .western-hud-pill {
-    padding: 6px 9px;
-    font-size: 11px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -2262,9 +2156,6 @@ input {
   color: #f2f2e9;
   margin-bottom: 35px;
 }
-.k-history > .rounded-2xl {
-  border-radius: 0;
-}
 .k-pagination {
   display: flex;
   align-items: center;
@@ -2513,11 +2404,6 @@ input {
   background: #ffffff20;
   margin: 0 10px;
 }
-.k-game-round > b {
-  font-weight: 400;
-  font-size: 11px;
-  color: #c8d3bd;
-}
 .k-game-round em {
   font-style: normal;
   color: #d7fa52;
@@ -2527,13 +2413,6 @@ input {
   display: flex;
   gap: 10px;
   align-items: center;
-}
-.k-game-tools > div {
-  background: none !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  padding: 0 8px !important;
 }
 .k-game-connection i {
   display: block;
@@ -2635,8 +2514,7 @@ input {
   color: #91a382 !important;
   max-width: 400px;
 }
-.k-game-screen .western-panel,
-.k-game-screen .menu-drawer-item {
+.k-game-screen .western-panel {
   border-radius: 0;
 }
 .k-contract-modal {
@@ -2809,7 +2687,6 @@ input {
     font-size: 23px;
   }
   .k-game-round > span,
-  .k-game-tools > div,
   .k-game-connection {
     display: none;
   }
@@ -2821,9 +2698,6 @@ input {
   }
   .k-game-round > i {
     margin: 0 3px;
-  }
-  .k-game-round > b {
-    font-size: 9px;
   }
   .k-game-tools {
     gap: 6px;
@@ -2894,12 +2768,6 @@ input {
 @media (max-width: 520px) {
   .k-game-brand > span {
     display: none;
-  }
-  .k-game-round > b {
-    max-width: 95px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
   .k-game-round strong {
     font-size: 23px;
@@ -3345,41 +3213,6 @@ input {
   border-color: #a6b78d33 !important;
   background: none !important;
 }
-.k-durak-intro p {
-  font-size: 13px;
-  line-height: 1.9;
-  color: #78806e;
-  margin-top: 25px;
-}
-.k-durak-symbol {
-  font-size: 200px;
-  color: #74865c;
-  line-height: 1;
-}
-.k-durak-match {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 40px;
-  border-top: 1px solid #23282022;
-  border-bottom: 1px solid #23282022;
-  padding: 45px 0;
-  margin: 25px 0 40px;
-}
-.k-durak-match h2 {
-  font-size: 37px;
-  letter-spacing: -1.4px;
-  line-height: 1.25;
-  margin: 20px 0;
-}
-.k-durak-match p {
-  font-size: 11px;
-  color: #737f65;
-  line-height: 1.8;
-  margin-bottom: 25px;
-}
-.k-durak-match .k-link {
-  margin-top: 15px;
-}
 .k-six-seats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -3415,58 +3248,6 @@ input {
   font-size: 8px;
   color: #81916d;
 }
-.k-durak-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  border: 1px solid #23282022;
-}
-.k-durak-options > button {
-  position: relative;
-  text-align: left;
-  padding: 30px;
-  min-height: 240px;
-}
-.k-durak-options > button + button {
-  border-left: 1px solid #23282022;
-  background: #e3e6d7;
-}
-.k-durak-options h3 {
-  font-size: 27px;
-  line-height: 1.3;
-  margin: 20px 0 35px;
-}
-.k-durak-options small {
-  font-size: 10px;
-}
-.k-durak-options .k-circle-arrow {
-  position: absolute;
-  bottom: 25px;
-  right: 25px;
-}
-.k-durak-wait {
-  background: #20271f;
-  color: #e4e9db;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 45px;
-  min-height: 530px;
-}
-.k-durak-wait-suit {
-  font-size: 140px;
-  color: #d7fa52;
-  line-height: 1.4;
-}
-.k-durak-wait .k-six-seats {
-  width: 100%;
-  max-width: 400px;
-  margin-top: 25px;
-}
-.k-wait-copy > .k-link {
-  font-size: 10px;
-  margin-top: 22px;
-}
 @media (max-width: 900px) {
   .k-results-layout {
     grid-template-columns: 220px minmax(0, 1fr);
@@ -3484,9 +3265,6 @@ input {
   }
   .k-result-actions .k-button {
     font-size: 11px;
-  }
-  .k-durak-wait {
-    padding: 30px;
   }
 }
 @media (max-width: 760px) {
@@ -3549,15 +3327,6 @@ input {
   .k-result-actions {
     flex-direction: row;
   }
-  .k-durak-match {
-    gap: 25px;
-  }
-  .k-durak-symbol {
-    font-size: 130px;
-  }
-  .k-durak-wait {
-    min-height: 460px;
-  }
 }
 @media (max-width: 520px) {
   .k-results-star {
@@ -3585,126 +3354,8 @@ input {
   .k-result-details {
     padding: 10px;
   }
-  .k-durak-symbol {
-    display: none;
-  }
-  .k-durak-match {
-    grid-template-columns: 1fr;
-  }
-  .k-durak-match h2 {
-    font-size: 31px;
-  }
-  .k-durak-match .k-six-seats {
-    margin: 20px 0;
-  }
-  .k-durak-options {
-    grid-template-columns: 1fr;
-  }
-  .k-durak-options > button + button {
-    border-left: 0;
-    border-top: 1px solid #23282022;
-  }
-  .k-durak-options h3 {
-    font-size: 25px;
-  }
   .k-profile-photo h3 {
     font-size: 17px;
-  }
-}
-.k-durak-table {
-  background: #141917;
-  padding: 0 20px 20px;
-  color: #e6ebdd;
-}
-.k-durak-command {
-  padding: 18px 4px;
-  border-bottom: 1px solid #93a77b30;
-  min-height: 76px;
-  margin-bottom: 26px;
-}
-.k-durak-command button {
-  background: transparent !important;
-  border-radius: 50% !important;
-  border-color: #a2b88733 !important;
-  box-shadow: none !important;
-}
-.k-durak-command button[title="კოდის კოპირება"] {
-  border: 0 !important;
-  border-radius: 0 !important;
-}
-.k-durak-center {
-  position: relative;
-  isolation: isolate;
-  min-height: 280px;
-  padding: 25px 0;
-  margin: 5px 0 25px;
-}
-.k-durak-center:before {
-  content: "";
-  position: absolute;
-  inset: 0 10%;
-  border: 1px solid #9bb17b35;
-  background: #202b24;
-  border-radius: 50%;
-  z-index: -1;
-  box-shadow:
-    0 0 0 10px #18221b,
-    0 0 0 11px #8ba47622;
-}
-.k-durak-actions > button {
-  border-radius: 0 !important;
-  border-width: 1px !important;
-  box-shadow: none !important;
-  min-height: 46px;
-  padding: 12px 24px !important;
-}
-.k-durak-actions > button:not(:disabled) {
-  background: #d7fa52 !important;
-  color: #171919 !important;
-  border-color: #d7fa52 !important;
-}
-.k-durak-table .western-panel {
-  border-radius: 0 !important;
-}
-.k-durak-table .durak-stamp {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-}
-.k-durak-opponents {
-  padding: 0 15px;
-}
-.k-durak-command > div:nth-child(2) > div:first-child {
-  font-size: 13px;
-  letter-spacing: 1px;
-  color: #d7fa52 !important;
-}
-@media (max-width: 600px) {
-  .k-durak-table {
-    padding: 0 10px 12px;
-  }
-  .k-durak-command {
-    padding: 12px 0;
-    gap: 8px;
-    min-height: 62px;
-    margin-bottom: 20px;
-  }
-  .k-durak-command > div:nth-child(2) {
-    order: 3;
-    width: 100%;
-    padding: 6px 0;
-  }
-  .k-durak-center:before {
-    inset: 0 3%;
-  }
-  .k-durak-actions > button {
-    font-size: 10px !important;
-    padding: 10px 16px !important;
-  }
-  .k-durak-opponents {
-    padding: 0;
-  }
-  .k-durak-center {
-    min-height: 255px;
   }
 }
 .k-trump-body,
@@ -4123,10 +3774,6 @@ input {
 }
 .k-detail > div {
   max-width: none;
-}
-.k-detail .rounded-2xl,
-.k-detail .rounded-xl {
-  border-radius: 0 !important;
 }
 @media (max-width: 520px) {
   .k-detail {
@@ -4874,20 +4521,6 @@ input {
   width: 40%;
   height: 40%;
 }
-.k-achievements.is-inline {
-  display: inline-flex;
-  flex-wrap: wrap;
-  background: none;
-  gap: 4px;
-}
-.k-achievements.is-inline .k-achievement {
-  padding: 0;
-  background: transparent;
-  gap: 0;
-}
-.k-achievements.is-inline .k-achievement-count {
-  display: none;
-}
 .k-detail {
   padding: 0;
   background: transparent;
@@ -5040,12 +4673,6 @@ input {
   .k-turn-status {
     max-width: 110px;
   }
-  .k-game-round > b {
-    max-width: 140px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .k-analysis-panel > header {
     padding: 20px;
     gap: 12px;
@@ -5070,8 +4697,7 @@ input {
   .k-turn-status .k-live-dot {
     display: none;
   }
-  .k-game-round > i,
-  .k-game-round > b {
+  .k-game-round > i {
     display: none;
   }
   .k-turn-status small {

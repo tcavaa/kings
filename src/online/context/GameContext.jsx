@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { io } from 'socket.io-client'
 import { EventBus } from '../game/EventBus'
-import { saveGame } from '../lib/leaderboard'
-import { SOCKET_URL, api } from '../lib/api'
+import { SOCKET_URL, api, getClientKey } from '../lib/api'
+import { getProfileToken, dropProfileSession } from '../lib/profiles'
 import { voicePlayer } from '../lib/voicePlayer'
 import { readSeatMarker, writeSeatMarker, clearSeatMarker } from '../lib/publicSeatStore'
 import { getSounds, setSounds } from '../lib/soundRegistry'
@@ -61,7 +61,6 @@ export function GameProvider({ children }) {
   const [roomCode, setRoomCode]   = useState('')
   const [players, setPlayers]     = useState([])
   const [mySeat, setMySeat]       = useState(null)
-  const [myName, setMyName]       = useState('')
   const [isCreator, setIsCreator] = useState(false)
 
   const [appPhase, setAppPhase] = useState('lobby')
@@ -80,9 +79,7 @@ export function GameProvider({ children }) {
 
   const [currentTrick, setCurrentTrick]       = useState([])
   const [ledSuit, setLedSuit]                 = useState(null)
-  const [trickNumber, setTrickNumber]         = useState(1)
   const [currentTurn, setCurrentTurn]         = useState(null)
-  const [tricksTaken, setTricksTaken]         = useState({ 0: 0, 1: 0, 2: 0 })
   const [lastTrickResult, setLastTrickResult] = useState(null)
   const [trickAnimation, setTrickAnimation]   = useState(null) // { winnerSeat, trick } during animation
 
@@ -128,7 +125,6 @@ export function GameProvider({ children }) {
   // Homepage: who's around, and which King tables can be watched.
   const [onlinePlayers, setOnlinePlayers] = useState([])
   const [liveGames, setLiveGames]         = useState([])
-  const [watcherCount, setWatcherCount]   = useState(0)
   // Mode of the room we're currently in ('public' | 'championship') — shown
   // in the waiting room and on the game-over screen.
   const [roomMode, setRoomMode] = useState('public')
@@ -143,8 +139,6 @@ export function GameProvider({ children }) {
   const [tournamentList, setTournamentList]         = useState([])
   const [tournamentOverview, setTournamentOverview] = useState(null)
   const [tournamentSeat, setTournamentSeat]         = useState(null)
-  const [tournamentFinal, setTournamentFinal]       = useState(null)
-  const [tournamentResult, setTournamentResult]     = useState(null)
   const [spectating, setSpectating]                 = useState(null)
   const spectatingRef = useRef(null)
   const setSpectatingBoth = (v) => { spectatingRef.current = v; setSpectating(v) }
@@ -159,25 +153,22 @@ export function GameProvider({ children }) {
   const playersRef = useRef(players)
   const mySeatRef  = useRef(null)
   const trickTimers = useRef([])
-  const savedGameRef = useRef(null) // de-dupe key for the leaderboard save
+  // The switch to the results screen, a moment after game-over. Cancelled by
+  // anything that moves us to another table first (the tournament final).
+  const gameOverTimerRef = useRef(null)
   // Per-session credentials needed to silently rejoin our room after the
   // socket auto-reconnects with a fresh id. Stored as refs (not state) so
   // the `connect` listener — which is registered once inside the mount-only
   // useEffect below — can read the *current* values without re-binding.
   const roomCodeRef = useRef('')
   const myNameRef   = useRef('')
-  const myAvatarRef = useRef(null)
+  // The tournament we're entered in, so a reconnect can rejoin it too.
+  const tournamentCodeRef = useRef('')
   const hadDisconnectRef = useRef(false)
   // Mirrors `appPhase` for the mount-only socket effect (which can't see the
   // state variable). Used to keep background resyncs to screens that
   // actually have a table to resync.
   const appPhaseRef = useRef('lobby')
-  // Latest serialised game-state snapshot (whatever last got pushed to the
-  // Phaser scene via EventBus). The scene replays this via `scene-ready`
-  // when it finishes mounting — fixes the "table is blank after refresh
-  // until I open a drawer" bug, where the first state-update was emitted
-  // before the scene's listener was registered.
-  const lastStateForSceneRef = useRef(null)
   // "Play in flight" lock — set the moment the user clicks a card, cleared
   // when the server acks (card-played / trick-complete) or rejects (error).
   // Prevents a rapid second click from optimistically removing a *second*
@@ -226,17 +217,13 @@ export function GameProvider({ children }) {
   // hide controls the server would refuse anyway.
   const canSpeak = !spectating || !!spectating.tournamentId
 
-  // Announce presence from here rather than only from the lobby. The lobby
-  // is the homepage, so a player who reloaded straight into a game never
-  // mounted it and never announced — they were absent from presence
-  // entirely until their game ended. `myName` is set the moment we know who
-  // we are, on any screen.
-  useEffect(() => {
-    if (!connected || !myName) return
-    socketRef.current?.emit('announce-presence', {
-      playerName: myName, avatar: myAvatarRef.current ?? null,
-    })
-  }, [connected, myName])
+  // Who we play as, on every emit that seats or names us: the profile's
+  // session token (the server takes the name and photo from it), plus the
+  // name for a server that can't resolve the token.
+  const identity = (name = myNameRef.current) => ({
+    playerName: name, profileToken: getProfileToken(),
+  })
+  const setMe = (name) => { myNameRef.current = name }
 
   // Keep the ref in step with the state — cheaper than threading it through
   // every setAppPhase call site.
@@ -251,6 +238,10 @@ export function GameProvider({ children }) {
   const clearTrickTimers = () => {
     trickTimers.current.forEach(t => clearTimeout(t))
     trickTimers.current = []
+  }
+  const clearGameOverTimer = () => {
+    clearTimeout(gameOverTimerRef.current)
+    gameOverTimerRef.current = null
   }
 
   // One reusable <audio> per clip, keyed by wire id. They have to be
@@ -344,6 +335,9 @@ export function GameProvider({ children }) {
     // a bit more aggressive on the first few attempts because mobile wifi
     // tends to come back within seconds.
     const socket = io(SOCKET_URL, {
+      // This browser's own secret: the server binds our seats to it, so a
+      // refresh gets them back and nobody else can.
+      auth: { clientKey: getClientKey() },
       withCredentials: false,
       reconnection: true,
       reconnectionAttempts: Infinity,
@@ -375,14 +369,18 @@ export function GameProvider({ children }) {
       // reconnection branch (returns `room-joined { reconnected: true }`
       // and a fresh `game-state` snapshot). Without this, the table looks
       // frozen on the previous tick and the user has to refresh.
-      if (hadDisconnectRef.current && roomCodeRef.current && myNameRef.current) {
-        socket.emit('join-room', {
-          roomCode:   roomCodeRef.current,
-          playerName: myNameRef.current,
-          avatar:     myAvatarRef.current ?? null,
-        })
+      if (hadDisconnectRef.current && (roomCodeRef.current || tournamentCodeRef.current)) {
+        if (roomCodeRef.current) {
+          socket.emit('join-room', { roomCode: roomCodeRef.current, ...identity() })
+        }
+        // The tournament keeps sending roster/bracket updates — and seats the
+        // final — to whichever socket its entry points at.
+        if (tournamentCodeRef.current) {
+          socket.emit('tournament-join', { code: tournamentCodeRef.current, ...identity() })
+        }
         // Stay in the "reconnecting…" state until the server-side
-        // reconnect path acknowledges via `room-joined { reconnected: true }`.
+        // reconnect path acknowledges via `room-joined { reconnected: true }`
+        // (or `tournament-joined` in a tournament lobby).
       } else {
         // Fresh connect (page load, no prior session). We may have a stored
         // quick-match seat, but taking it back automatically is exactly the
@@ -401,7 +399,7 @@ export function GameProvider({ children }) {
       // Only flag the reconnect banner if we were actually mid-game / mid-
       // lobby — a brief blip during the very first connection attempt
       // shouldn't pop the banner.
-      if (roomCodeRef.current) {
+      if (roomCodeRef.current || tournamentCodeRef.current) {
         hadDisconnectRef.current = true
         setReconnecting(true)
       }
@@ -418,6 +416,7 @@ export function GameProvider({ children }) {
     })
 
     socket.on('room-joined', ({ roomCode: code, seat, reconnected, status, mode, tournament: tournamentTag, startedAt }) => {
+      clearGameOverTimer()
       setRoomCode(code)
       roomCodeRef.current = code
       setMySeat(seat)
@@ -446,21 +445,27 @@ export function GameProvider({ children }) {
     // ── tournament ────────────────────────────────────────────────────
     socket.on('online-players', (l) => setOnlinePlayers(Array.isArray(l) ? l : []))
     socket.on('live-games',     (l) => setLiveGames(Array.isArray(l) ? l : []))
-    socket.on('watchers',       ({ count }) => setWatcherCount(count || 0))
 
-    socket.on('tournament-joined',  (t) => { setTournament(t) })
-    socket.on('tournament-state',   (t) => { setTournament(t) })
-    socket.on('tournament-left',    ()  => { setTournament(null) })
+    const enterTournament = (t) => {
+      setTournament(t)
+      tournamentCodeRef.current = t?.code || ''
+    }
+    socket.on('tournament-joined', (t) => {
+      enterTournament(t)
+      // A reconnect in a tournament lobby has no room-joined to wait for.
+      if (!roomCodeRef.current) { hadDisconnectRef.current = false; setReconnecting(false) }
+    })
+    socket.on('tournament-state',   (t) => { enterTournament(t) })
+    socket.on('tournament-left',    ()  => { enterTournament(null) })
     socket.on('tournament-list',    (l) => { setTournamentList(Array.isArray(l) ? l : []) })
     socket.on('tournament-overview',(o) => { setTournamentOverview(o) })
 
-    socket.on('tournament-final', (payload) => {
-      setTournamentFinal(payload)
+    socket.on('tournament-final', () => {
       addToast('ფინალი იწყება!', 'success')
     })
 
     socket.on('tournament-complete', (payload) => {
-      setTournamentResult(payload)
+      tournamentCodeRef.current = ''
       const names = (payload.winners || []).map(w => w.name).join(' და ')
       if (names) addToast(`ტურნირის გამარჯვებული: ${names} 🏆`, 'success')
     })
@@ -468,6 +473,7 @@ export function GameProvider({ children }) {
     // Watching someone else's table. The server sends a masked snapshot, so
     // `hand` arrives empty and the canvas simply has nothing of ours to draw.
     socket.on('spectate-started', (payload) => {
+      clearGameOverTimer()
       setSpectatingBoth(payload)
       if (payload.startedAt) setGameStartedAt(payload.startedAt)
       roomCodeRef.current = payload.roomCode
@@ -478,8 +484,11 @@ export function GameProvider({ children }) {
     })
 
     socket.on('spectate-stopped', () => {
+      clearGameOverTimer()
       setSpectatingBoth(null)
-      setWatcherCount(0)
+      // Not our room: a reconnect must not try to join the table we watched.
+      roomCodeRef.current = ''
+      setRoomCode('')
       setHand([])
       setAppPhase('lobby')
     })
@@ -556,6 +565,7 @@ export function GameProvider({ children }) {
     })
 
     socket.on('game-started', ({ round: r, leaderSeat: ls, players: p, startedAt }) => {
+      clearGameOverTimer()
       setGameStartedAt(startedAt || Date.now())
       setRound(r)
       setLeaderSeat(ls)
@@ -587,8 +597,6 @@ export function GameProvider({ children }) {
       setCardCounts(counts)
       setCurrentTrick([])
       setLedSuit(null)
-      setTrickNumber(1)
-      setTricksTaken({ 0: 0, 1: 0, 2: 0 })
       setChosenGameType(null)
       setTrumpSuit(null)
       setLastTrickResult(null)
@@ -596,14 +604,7 @@ export function GameProvider({ children }) {
       setTrickAnimation(null)
       setPlayPendingBoth(false)
       clearTrickTimers()
-    })
-
-    // Round 1: cards revealed to non-leaders after leader picks game type
-    // (their own 10 cards + the 2 cards that were in the center).
-    socket.on('hand-revealed', ({ hand: h, cardCounts: counts, centerCards: cc }) => {
-      setHand(sortHand(h || []))
-      if (counts) setCardCounts(counts)
-      if (cc && cc.length) setCenterCards(cc)
+      clearGameOverTimer()
     })
 
     socket.on('round-started', ({ round: r, leaderSeat: ls, phase, usedTypes: ut }) => {
@@ -613,7 +614,6 @@ export function GameProvider({ children }) {
       setUsedTypes(ut)
       setCurrentTrick([])
       setLedSuit(null)
-      setTrickNumber(1)
       setLastTrickResult(null)
       setLastCenterCards([])
       setTrumpSuit(null)
@@ -673,7 +673,7 @@ export function GameProvider({ children }) {
       }
     })
 
-    socket.on('trick-complete', ({ winnerSeat, trick, trickNumber: tn, nextTurn, tricksTaken: tt, cardCounts: cc }) => {
+    socket.on('trick-complete', ({ winnerSeat, trick, nextTurn, cardCounts: cc }) => {
       // Show the full 3-card trick on the table for a moment, then animate
       // toward the winner, then clear.
       setCurrentTrick(trick)
@@ -704,8 +704,6 @@ export function GameProvider({ children }) {
       trickTimers.current.push(setTimeout(() => {
         setCurrentTrick([])
         setLedSuit(null)
-        setTricksTaken(tt)
-        setTrickNumber(tn + 1)
         setCurrentTurn(nextTurn)
         setTrickAnimation(null)
       }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS))
@@ -768,7 +766,16 @@ export function GameProvider({ children }) {
       // The public-seat bookmark (if any) has served its purpose — the game
       // it pointed at is finished, so a later refresh shouldn't chase it.
       clearSeatMarker()
-      setTimeout(() => setAppPhase('gameover'), TRICK_DISPLAY_MS + TRICK_ANIMATION_MS + 200)
+      // Switch to the results once the last trick has played out — unless we
+      // have moved on by then (seated at the tournament final, or sent back
+      // to the lobby after watching).
+      const endedRoom = roomCodeRef.current
+      clearGameOverTimer()
+      gameOverTimerRef.current = setTimeout(() => {
+        gameOverTimerRef.current = null
+        if (roomCodeRef.current !== endedRoom || appPhaseRef.current !== 'game') return
+        setAppPhase('gameover')
+      }, TRICK_DISPLAY_MS + TRICK_ANIMATION_MS + 200)
       const winnerLabel = winnersList.map(w => w.name).join(' და ')
       if (typeof surrenderedBySeat === 'number') {
         const surrenderName = (p || []).find(pl => pl.seat === surrenderedBySeat)?.name || `მოთამაშე ${surrenderedBySeat}`
@@ -778,48 +785,6 @@ export function GameProvider({ children }) {
       } else {
         addToast(`${winnerLabel} იმარჯვებს!`, 'success')
       }
-
-      // Persist this finished game to the leaderboard. Two layers of dedupe:
-      //
-      //   1. `savedGameRef` blocks a re-fired event inside *this* browser
-      //      (HMR, React-strict-mode double-mount, socket reconnect → the
-      //      server can re-send `game-over` on a fresh `game-state` flush).
-      //
-      //   2. The `id` field below is computed deterministically from data
-      //      every player in the room sees identically (room code + winner
-      //      seat + final cumulative scores). All 3 browsers therefore POST
-      //      the same id, and the server's `INSERT IGNORE` on
-      //      `finished_games.id` silently drops the cross-browser duplicates.
-      //      Without this, a 3-player game produced up to 3 rows because
-      //      each browser independently calls POST /api/games.
-      const dedupeKey = [
-        winner?.name,
-        ...(p || []).map(pl => `${pl.name}:${finalScores?.[pl.seat] ?? 0}`),
-      ].join('|')
-      if (savedGameRef.current === dedupeKey) return
-      savedGameRef.current = dedupeKey
-      try {
-        const playerRecords = (p || []).map(pl => ({
-          seat: pl.seat, name: pl.name, avatar: pl.avatar || null,
-          score: finalScores?.[pl.seat] ?? 0,
-        }))
-        const scorePart = [0, 1, 2]
-          .map(s => finalScores?.[s] ?? 0)
-          .join('.')
-          .replace(/-/g, 'n') // keep the id matching VARCHAR(64) + safe charset
-        const sharedId = `g_${roomCodeRef.current || 'noroom'}_${winner?.seat ?? 0}_${scorePart}`
-        saveGame({
-          id: sharedId,
-          players: playerRecords,
-          winner: { seat: winner?.seat, name: winner?.name, score: winner?.score },
-          winners: winnersList,
-          // Old servers don't send `mode` — leave the flag undefined there so
-          // the store applies its legacy default (championship) instead of
-          // mislabelling the game as public.
-          isChampionship: mode ? mode === 'championship' : undefined,
-          roundDetails: rd || [],
-        })
-      } catch { /* ignore network/quota errors */ }
     })
 
     // ── Sounds: a player triggered a saloon reaction ───────────────────
@@ -1048,9 +1013,7 @@ export function GameProvider({ children }) {
       if (state.lastCenterCards)               setLastCenterCards(state.lastCenterCards)
       if (state.currentTrick)                  setCurrentTrick(state.currentTrick)
       if (state.ledSuit !== undefined)         setLedSuit(state.ledSuit)
-      if (state.trickNumber)                   setTrickNumber(state.trickNumber)
       if (state.currentTurn !== undefined)     setCurrentTurn(state.currentTurn)
-      if (state.tricksTaken)                   setTricksTaken(state.tricksTaken)
       if (state.cumulativeScores)              setCumulativeScores(state.cumulativeScores)
       if (state.lastTrick)                     setLastTrickResult(state.lastTrick)
       if (state.roundScores) {
@@ -1086,6 +1049,16 @@ export function GameProvider({ children }) {
       if (playPendingRef.current) {
         setPlayPendingBoth(false)
         socketRef.current?.emit('request-state')
+      }
+      // Still in the lobby without a seat: a join was refused, so forget the
+      // room code joinRoom stashed, or a later blip would rejoin it.
+      if (appPhaseRef.current === 'lobby' && publicSeatRef.current === null) roomCodeRef.current = ''
+      if (code === 'AUTH') {
+        // Our profile session is gone (PIN changed, profile removed): the
+        // lobby asks us to pick the profile again.
+        dropProfileSession()
+        addToast('აირჩიე პროფილი თავიდან.', 'error')
+        return
       }
       if (code === 'CHAMPIONSHIP_LIMIT') {
         addToast('დღის ლიმიტი ამოიწურა — 8 ლიგის თამაში დღეში. აირჩიე კლასიკური თამაში.', 'error')
@@ -1126,6 +1099,7 @@ export function GameProvider({ children }) {
 
     return () => {
       clearTrickTimers()
+      clearGameOverTimer()
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onResumeVisibility)
       }
@@ -1135,33 +1109,25 @@ export function GameProvider({ children }) {
   }, [])
 
   // ── rematch action ────────────────────────────────────────────────────
-  // Triggered from the Play Again button on the game-over screen. Sends
-  // the current name/avatar through so the server can use them as the
-  // canonical identity for the new room (the old room's roster also has
-  // them, but passing them here saves an extra lookup on slow links).
+  // Triggered from the Play Again button on the game-over screen. The new
+  // room keeps the identity of the seat we held.
   const requestRematch = useCallback(() => {
-    socketRef.current?.emit('request-rematch', {
-      playerName: myNameRef.current,
-      avatar:     myAvatarRef.current ?? null,
-    })
+    socketRef.current?.emit('request-rematch')
   }, [])
 
-  const createRoom = useCallback((name, avatar = null, mode = 'public') => {
-    setMyName(name)
-    myNameRef.current   = name
-    myAvatarRef.current = avatar
-    socketRef.current?.emit('create-room', { playerName: name, avatar, mode })
+  const createRoom = useCallback((name, mode = 'public') => {
+    setMe(name)
+    socketRef.current?.emit('create-room', { ...identity(name), mode })
   }, [])
 
-  const joinRoom = useCallback((code, name, avatar = null) => {
-    setMyName(name)
-    myNameRef.current   = name
-    myAvatarRef.current = avatar
+  const joinRoom = useCallback((code, name) => {
+    setMe(name)
     // Pre-stash the room code too — the very first join is the only place
     // we know it before the server's `room-joined` round-trip lands, and
     // `roomCodeRef` drives the auto-rejoin path on a subsequent disconnect.
+    // A refused join clears it again (see the `error` handler).
     roomCodeRef.current = code
-    socketRef.current?.emit('join-room', { roomCode: code, playerName: name, avatar })
+    socketRef.current?.emit('join-room', { roomCode: code, ...identity(name) })
   }, [])
 
   const startGame      = useCallback(() => { socketRef.current?.emit('start-game') }, [])
@@ -1204,11 +1170,9 @@ export function GameProvider({ children }) {
   const voteQuit       = useCallback((accept) => { socketRef.current?.emit('vote-quit', { accept }) }, [])
 
   // ── public quick-match actions ──────────────────────────────────────────
-  const sitPublic = useCallback((name, avatar = null, emoji = null, mode = 'public') => {
-    setMyName(name)
-    myNameRef.current   = name
-    myAvatarRef.current = avatar
-    socketRef.current?.emit('sit-public', { playerName: name, avatar, emoji, mode })
+  const sitPublic = useCallback((name, emoji = null, mode = 'public') => {
+    setMe(name)
+    socketRef.current?.emit('sit-public', { ...identity(name), emoji, mode })
   }, [])
   const standPublic    = useCallback(() => { socketRef.current?.emit('stand-public') }, [])
 
@@ -1219,26 +1183,21 @@ export function GameProvider({ children }) {
   const resumeSeat = useCallback(() => {
     const saved = readSeatMarker()
     if (!saved) { setResumableSeat(null); return }
-    setMyName(saved.name)
-    myNameRef.current = saved.name
-    socketRef.current?.emit('rejoin-public', {
-      roomCode: saved.roomCode, playerName: saved.name,
-    })
+    setMe(saved.name)
+    socketRef.current?.emit('rejoin-public', { roomCode: saved.roomCode, ...identity(saved.name) })
     setResumableSeat(null)
   }, [])
 
   // ── tournament actions ──────────────────────────────────────────────────
-  const createTournament = useCallback((name, avatar, size) => {
-    myNameRef.current = name
-    setMyName(name)
-    socketRef.current?.emit('tournament-create', { playerName: name, avatar, size })
+  const createTournament = useCallback((name, size) => {
+    setMe(name)
+    socketRef.current?.emit('tournament-create', { ...identity(name), size })
   }, [])
 
-  const joinTournament = useCallback((code, name, avatar) => {
-    myNameRef.current = name
-    setMyName(name)
+  const joinTournament = useCallback((code, name) => {
+    setMe(name)
     socketRef.current?.emit('tournament-join', {
-      code: String(code || '').toUpperCase(), playerName: name, avatar,
+      code: String(code || '').toUpperCase(), ...identity(name),
     })
   }, [])
 
@@ -1247,9 +1206,7 @@ export function GameProvider({ children }) {
   const refreshOverview  = useCallback(() => { socketRef.current?.emit('tournament-overview') }, [])
 
   const spectateTable = useCallback((roomCode) => {
-    socketRef.current?.emit('tournament-spectate', {
-      roomCode, playerName: myNameRef.current,
-    })
+    socketRef.current?.emit('tournament-spectate', { roomCode, ...identity() })
   }, [])
 
   // `stop-watching` covers both kinds of watcher — it clears the same
@@ -1259,28 +1216,23 @@ export function GameProvider({ children }) {
   }, [])
 
   // ── homepage presence ───────────────────────────────────────────────────
-  const announcePresence = useCallback((name, avatar) => {
+  const announcePresence = useCallback((name) => {
     if (!name) return
-    socketRef.current?.emit('announce-presence', { playerName: name, avatar: avatar || null })
+    setMe(name)
+    socketRef.current?.emit('announce-presence', identity(name))
   }, [])
 
   const refreshLobby = useCallback(() => {
     socketRef.current?.emit('lobby-info')
   }, [])
 
-  // Name/avatar are passed in rather than read off the refs: those are only
-  // populated once you've created or joined a room, and watching happens
-  // straight from the lobby where they're still empty. Setting them here also
-  // means the watcher's chat messages carry the right name.
-  const watchGame = useCallback((roomCode, name, avatar = null) => {
+  // The name is passed in rather than read off the ref: watching happens
+  // straight from the lobby, before any room has set it.
+  const watchGame = useCallback((roomCode, name) => {
     const who = String(name || myNameRef.current || '').trim()
     if (!who) return
-    myNameRef.current = who
-    setMyName(who)
-    myAvatarRef.current = avatar ?? myAvatarRef.current ?? null
-    socketRef.current?.emit('watch-game', {
-      roomCode, playerName: who, avatar: myAvatarRef.current,
-    })
+    setMe(who)
+    socketRef.current?.emit('watch-game', { roomCode, ...identity(who) })
   }, [])
 
   const dismissResumeSeat = useCallback(() => {
@@ -1306,6 +1258,7 @@ export function GameProvider({ children }) {
 
   const leaveRoom = useCallback(() => {
     socketRef.current?.emit('leave-room')
+    clearGameOverTimer()
     setAppPhase('lobby')
     setRoomCode('')
     roomCodeRef.current = ''
@@ -1343,11 +1296,11 @@ export function GameProvider({ children }) {
 
   const gameValue = useMemo(() => ({
     connected,
-    roomCode, players, mySeat, myName, isCreator,
+    roomCode, players, mySeat, isCreator,
     appPhase,
     gamePhase, round, leaderSeat, chosenGameType, trumpSuit, usedTypes,
     hand, cardCounts, centerCards, lastCenterCards,
-    currentTrick, ledSuit, trickNumber, currentTurn, tricksTaken,
+    currentTrick, ledSuit, currentTurn,
     lastTrickResult, trickAnimation, playPending,
     roundScores, roundDetails, cumulativeScores, finalResults,
     toasts, disconnectedPlayer, reconnecting, selectedDiscards,
@@ -1355,10 +1308,10 @@ export function GameProvider({ children }) {
     publicRoom, publicSeat, publicSeatMode, sitPublic, standPublic, setPublicEmoji,
     resumableSeat, resumeSeat, dismissResumeSeat,
     gameStartedAt,
-    onlinePlayers, liveGames, watcherCount,
+    onlinePlayers, liveGames,
     announcePresence, refreshLobby, watchGame,
     tournament, tournamentList, tournamentOverview, tournamentSeat,
-    tournamentFinal, tournamentResult, spectating,
+    spectating,
     createTournament, joinTournament, leaveTournament,
     refreshTournaments, refreshOverview, spectateTable, stopSpectating,
     roomMode,
@@ -1367,11 +1320,11 @@ export function GameProvider({ children }) {
     playCard, nextRound, leaveRoom, toggleDiscard, addToast,
   }), [
     connected,
-    roomCode, players, mySeat, myName, isCreator,
+    roomCode, players, mySeat, isCreator,
     appPhase,
     gamePhase, round, leaderSeat, chosenGameType, trumpSuit, usedTypes,
     hand, cardCounts, centerCards, lastCenterCards,
-    currentTrick, ledSuit, trickNumber, currentTurn, tricksTaken,
+    currentTrick, ledSuit, currentTurn,
     lastTrickResult, trickAnimation, playPending,
     roundScores, roundDetails, cumulativeScores, finalResults,
     toasts, disconnectedPlayer, reconnecting, selectedDiscards,
@@ -1379,10 +1332,10 @@ export function GameProvider({ children }) {
     publicRoom, publicSeat, publicSeatMode, sitPublic, standPublic, setPublicEmoji,
     resumableSeat, resumeSeat, dismissResumeSeat,
     gameStartedAt,
-    onlinePlayers, liveGames, watcherCount,
+    onlinePlayers, liveGames,
     announcePresence, refreshLobby, watchGame,
     tournament, tournamentList, tournamentOverview, tournamentSeat,
-    tournamentFinal, tournamentResult, spectating,
+    spectating,
     createTournament, joinTournament, leaveTournament,
     refreshTournaments, refreshOverview, spectateTable, stopSpectating,
     roomMode,

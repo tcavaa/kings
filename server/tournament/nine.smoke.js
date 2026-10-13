@@ -9,7 +9,6 @@
 process.env.PORT = process.env.PORT || '3440';
 require('../index.js');
 
-const path = require('path');
 const { io } = require('socket.io-client');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass=0, fail=0;

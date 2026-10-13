@@ -6,10 +6,11 @@
   "background_color": "#efe6d6",
   "theme_color": "#0f1e2e",
   "icons": [
-    { "src": "/12427687.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
-    { "src": "/12427687.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/12427687.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/12427687.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ]
 }
-
-

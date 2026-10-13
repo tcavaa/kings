@@ -301,7 +301,6 @@ export default function Leaderboard({ onBack }) {
             <div className="k-history">
               <PastGamesList
                 games={games.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)}
-                loading={false}
                 onSelect={setSelected}
               />
             </div>

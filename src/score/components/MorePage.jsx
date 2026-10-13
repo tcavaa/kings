@@ -1,9 +1,9 @@
-import { Users, Pencil, Trash2, Handshake, Spade } from 'lucide-react'
+import { Users, Trash2, Handshake, Spade } from 'lucide-react'
 import { getTheme } from '../utils/themes'
 
 /**
- * The "More" tab: player management, preferences, season controls and a
- * small about card.
+ * The "More" tab: players, preferences, the current season and a small
+ * about card. Players and seasons are managed in King Online's /admin.
  */
 export default function MorePage({
   onOpenPlayers,
@@ -13,7 +13,6 @@ export default function MorePage({
   onToggleDark,
   seasonName,
   seasonTheme,
-  onEditSeason,
   onResetGame,
 }) {
   const ThemeIcon = getTheme(seasonTheme).Icon
@@ -22,8 +21,8 @@ export default function MorePage({
     <div className="more-page">
       <div className="card">
         <h2>Players</h2>
-        <p className="more-hint">Add or remove the people who play at your table.</p>
-        <button className="primary icon-btn" onClick={onOpenPlayers}><Users size={15} /> Manage Players</button>
+        <p className="more-hint">Everyone's games, wins and badges. Players are added and removed by the admin.</p>
+        <button className="primary icon-btn" onClick={onOpenPlayers}><Users size={15} /> Players</button>
       </div>
 
       <div className="card">
@@ -39,11 +38,8 @@ export default function MorePage({
           <span className="more-season-chip">
             <ThemeIcon size={15} /> {seasonName || 'Unnamed season'}
           </span>
-          <button className="link icon-btn" onClick={onEditSeason}><Pencil size={12} /> Rename / theme</button>
         </div>
-        <p className="more-hint">
-          Ending a season happens from History → the “End Season” button (PIN protected).
-        </p>
+        <p className="more-hint">The season's name, theme and end are set by the admin.</p>
       </div>
 
       <div className="card">

@@ -1,8 +1,8 @@
 export const CARD_W = 80;
 export const CARD_H = 114;
 
-export const SUIT_SYMBOLS = { H: "♥", D: "♦", S: "♠", C: "♣" };
-export const SUIT_COLORS = {
+const SUIT_SYMBOLS = { H: "♥", D: "♦", S: "♠", C: "♣" };
+const SUIT_COLORS = {
   H: "#b44636",
   D: "#b44636",
   S: "#0a0a0a",
@@ -82,7 +82,6 @@ export function createFaceUpCard(scene, x, y, card, interactive = false) {
     container.setInteractive();
   }
 
-  container.cardData = card;
   return container;
 }
 

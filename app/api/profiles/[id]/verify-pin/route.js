@@ -1,19 +1,23 @@
 import store from '@/server/db/store'
-import { json, readJson, sendErr } from '@/lib/api/http'
+import { json, pinLocked, readJson, recordWrongPin, sendErr } from '@/lib/api/http'
 
-// PIN verification — used by the lobby when the user picks a profile to play
-// with. 200 / { ok: true } on success, 401 on a bad PIN, 404 if the profile
-// doesn't exist. Not rate-limited: a 4-digit PIN in a shared lobby is a
-// "stop your roommate" guard, not a security boundary.
+// Picking a profile in the lobby. A right PIN (or a profile without one)
+// returns a session token the game server checks before letting a socket play
+// under that name. Wrong PINs are counted: 8 per 15 minutes per profile.
 export async function POST(request, { params }) {
   try {
     const { id } = await params
     const { pin } = (await readJson(request)) || {}
+    const locked = await pinLocked(id)
+    if (locked) return locked
     const result = await store.verifyProfilePin(id, pin)
-    if (result.ok) return json({ ok: true, hadPin: !!result.hadPin })
+    if (result.ok) {
+      return json({ ok: true, hadPin: !!result.hadPin, token: await store.createProfileSession(id) })
+    }
     if (result.reason === 'not_found') {
       return json({ ok: false, error: 'Profile not found' }, 404)
     }
+    await recordWrongPin(id)
     return json({ ok: false, error: 'Wrong PIN' }, 401)
   } catch (err) { return sendErr(err) }
 }

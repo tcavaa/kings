@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Flag, Globe, Trophy, Crown, Handshake, Timer } from 'lucide-react'
+import { Globe, Trophy, Crown, Handshake, Timer } from 'lucide-react'
 import { formatDuration } from '../utils/time'
 import { useGameResults } from '../hooks/useGameResults'
 import { useAllGameDetails } from '../hooks/useAllGameDetails'
@@ -8,59 +8,18 @@ import { useOnlineGames } from '../hooks/useOnlineData'
 import GameDetailPage from './GameDetailPage'
 import OnlineHistoryTab from './OnlineHistoryTab'
 import SeasonChampionsTab from './SeasonChampionsTab'
-import PinModal from './PinModal'
-import SeasonEndModal from './SeasonEndModal'
 import { computePerGameAchievements, ACHIEVEMENT_DEFS } from '../utils/achievements'
-import { winnerNamesOf, isWinnerOf, isTieResult, onlineWinnerNames, joinWinnerNames } from '../utils/winners'
+import { winnerNamesOf, isWinnerOf, isTieResult } from '../utils/winners'
 
-// Determine season champion(s) from combined local + online wins since
-// seasonStart. Online names are mapped to local names via
-// supabasePlayers.online_name. Tie-aware end to end: a tied GAME gives all
-// its winners a win, and a tied SEASON crowns co-champions ("A & B").
-// Only championship games arrive from the online API, so casual/public
-// online games never influence the season.
-function determineChampion(localResults, onlineGames, seasonStart, supabasePlayers) {
-  const wins = {}
-  const addWin = (name) => { if (name) wins[name] = (wins[name] || 0) + 1 }
-
-  localResults
-    .filter(r => new Date(r.played_at) > seasonStart)
-    .forEach(r => { winnerNamesOf(r).forEach(addWin) })
-
-  onlineGames
-    .filter(g => new Date(g.playedAt) > seasonStart)
-    .forEach(g => {
-      onlineWinnerNames(g).forEach(onlineName => {
-        const local = supabasePlayers.find(p => p.online_name === onlineName)
-        addWin(local?.name || onlineName)
-      })
-    })
-
-  const entries = Object.entries(wins)
-  if (!entries.length) return null
-  const maxWins = Math.max(...entries.map(([, count]) => count))
-  const champions = entries
-    .filter(([, count]) => count === maxWins)
-    .map(([name]) => name)
-    .sort()
-  return joinWinnerNames(champions)
-}
-
-export default function WinnersPage({ seasons, currentSeasonStart, endSeason }) {
+export default function WinnersPage({ seasons }) {
   const { results, loading: resultsLoading } = useGameResults()
   const { details, loading: detailsLoading } = useAllGameDetails()
   const { players: supabasePlayers } = usePlayers()
-  const { games: onlineGames } = useOnlineGames(500)
+  const { games: onlineGames } = useOnlineGames()
 
   const [subView, setSubView]           = useState('list')      // 'list' | 'detail'
   const [historyTab, setHistoryTab]     = useState('local')     // 'local' | 'online' | 'seasons'
   const [selectedResultId, setSelectedResultId] = useState(null)
-  const [showPin, setShowPin]           = useState(false)
-  // After the PIN: the computed champion for the closing season, which the
-  // SeasonEndModal shows while asking for the new season's name + theme.
-  const [pendingChampion, setPendingChampion] = useState(null)
-  const [ending, setEnding]             = useState(false)
-  const [endMsg, setEndMsg]             = useState(null)        // { ok, text }
 
   const loading = resultsLoading || detailsLoading
 
@@ -79,49 +38,6 @@ export default function WinnersPage({ seasons, currentSeasonStart, endSeason }) 
     })
     return map
   }, [details])
-
-  const seasonStart = currentSeasonStart || new Date(0)
-
-  // PIN passed → compute the champion and hand over to the naming modal.
-  function handlePinSuccess() {
-    setShowPin(false)
-    const champion = determineChampion(results, onlineGames, seasonStart, supabasePlayers)
-    if (!champion) {
-      setEndMsg({ ok: false, text: 'No games in the current season yet.' })
-      return
-    }
-    setPendingChampion(champion)
-  }
-
-  // Modal confirmed → close the old season and open the freshly-named one.
-  async function handleEndSeason({ name, theme }) {
-    setEnding(true)
-    setEndMsg(null)
-
-    // started_at = first actual game in the season (local or online), fallback to seasonStart
-    const localTimes  = results.filter(r => new Date(r.played_at) > seasonStart).map(r => new Date(r.played_at))
-    const onlineTimes = onlineGames.filter(g => new Date(g.playedAt) > seasonStart).map(g => new Date(g.playedAt))
-    const allTimes    = [...localTimes, ...onlineTimes]
-    const startedAt   = allTimes.length ? new Date(Math.min(...allTimes)).toISOString() : seasonStart.toISOString()
-    const endedAt     = new Date().toISOString()
-    const champion    = pendingChampion
-
-    const errorText = await endSeason({
-      championName: champion,
-      startedAt,
-      endedAt,
-      nextName: name,
-      nextTheme: theme,
-    })
-    setEnding(false)
-    setPendingChampion(null)
-    if (errorText) {
-      setEndMsg({ ok: false, text: errorText })
-    } else {
-      setEndMsg({ ok: true, text: `Season ended! Champion: ${champion} — new season “${name}” started.` })
-      setHistoryTab('seasons')
-    }
-  }
 
   if (subView === 'detail') {
     const result = results.find(r => r.id === selectedResultId)
@@ -144,17 +60,7 @@ export default function WinnersPage({ seasons, currentSeasonStart, endSeason }) 
     <div className="card">
       <div className="history-header">
         <h2 style={{ margin: 0 }}>Game History</h2>
-        <button
-          className="link end-season-btn icon-btn"
-          onClick={() => { setEndMsg(null); setShowPin(true) }}
-          disabled={ending}
-        >
-          {ending ? 'Ending…' : <><Flag size={13} /> End Season</>}
-        </button>
       </div>
-      {endMsg && (
-        <div className={`season-end-msg ${endMsg.ok ? 'ok' : 'err'}`}>{endMsg.text}</div>
-      )}
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -256,23 +162,6 @@ export default function WinnersPage({ seasons, currentSeasonStart, endSeason }) 
         />
       )}
 
-      {showPin && (
-        <PinModal
-          title="End Season"
-          onCancel={() => setShowPin(false)}
-          onSuccess={handlePinSuccess}
-        />
-      )}
-
-      {pendingChampion && (
-        <SeasonEndModal
-          mode="end"
-          champion={pendingChampion}
-          saving={ending}
-          onCancel={() => setPendingChampion(null)}
-          onConfirm={handleEndSeason}
-        />
-      )}
     </div>
   )
 }

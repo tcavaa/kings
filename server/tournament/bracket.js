@@ -129,7 +129,6 @@ module.exports = {
   FINAL_SEATS,
   VALID_SIZES,
   penaltyPoints,
-  compareCandidates,
   pickFinalists,
   seedTables,
   shuffle,

@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
-import { Sparkles } from "lucide-react-online";
 import { GAME_TYPES, getGameType } from "../../constants/gameTypes";
-import { scoreColorClass } from "../../utils/scoreColor";
 
 /**
  * Per-game-type performance for the chosen player.

@@ -13,7 +13,6 @@
 process.env.PORT = process.env.PORT || '3404';
 require('../index.js');
 
-const path = require('path');
 const { io } = require('socket.io-client');
 
 const URL = `http://localhost:${process.env.PORT}`;
@@ -196,7 +195,7 @@ function findCards(value, trail = '') {
   check('watcher chat carries no seat', heard?.seat === null);
 
   // ── detaching ───────────────────────────────────────────────────────────
-  watcher.emit('tournament-stop-spectating');
+  watcher.emit('stop-watching');
   await sleep(300);
   listener.chat.length = 0;
   const before = watcher.received.length;

@@ -70,8 +70,7 @@ class GameState {
   }
 
   get leaderSeat() { return (this.round - 1) % 3; }
-  get isGameOver() { return this.round > TOTAL_ROUNDS; }
-  get isTrumpType() { return TRUMP_TYPES.has(this.chosenGameType); }
+  get isGameOver() { return this.phase === 'game_over'; }
 
   // ─── persistence ───────────────────────────────────────────────────────────
   // Every field that's part of the game's mutable state. Anything derived

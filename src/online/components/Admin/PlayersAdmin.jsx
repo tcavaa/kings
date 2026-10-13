@@ -1,0 +1,81 @@
+import { useCallback, useEffect, useState } from 'react'
+import { Plus, Trash2, LockOpen } from 'lucide-react-online'
+import { adminApi } from '../../lib/api'
+import { adminCall, ErrorNote, PanelTitle, inputStyle, muted } from './adminUi'
+
+/** /admin → players: the one player list both apps use. */
+export default function PlayersAdmin({ passcode, onLocked }) {
+  const [players, setPlayers] = useState(null)
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const call = useCallback((fn) => adminCall(fn, { onLocked, onError: setError }), [onLocked])
+
+  const reload = useCallback(async () => {
+    const list = await call(() => adminApi.listPlayers())
+    if (list) setPlayers(list)
+  }, [call])
+  useEffect(() => { reload() }, [reload])
+
+  const run = async (fn) => {
+    setBusy(true); setError('')
+    const ok = await call(fn)
+    if (ok) await reload()
+    setBusy(false)
+    return ok
+  }
+
+  const add = async (e) => {
+    e.preventDefault()
+    if (name.trim() && await run(() => adminApi.addPlayer(passcode, name.trim()))) setName('')
+  }
+
+  const remove = (p) => {
+    if (window.confirm(`წავშალოთ „${p.name}“? მისი თამაშები დარჩება.`)) run(() => adminApi.deletePlayer(passcode, p.id))
+  }
+
+  const clearPin = (p) => {
+    if (window.confirm(`მოვხსნათ „${p.name}“-ის PIN-კოდი?`)) run(() => adminApi.clearPlayerPin(passcode, p.id))
+  }
+
+  return (
+    <>
+      <ErrorNote text={error} />
+      <form onSubmit={add} className="western-panel p-4 mb-5 flex gap-2">
+        <input value={name} maxLength={64} onChange={(e) => setName(e.target.value)}
+               placeholder="მოთამაშის სახელი"
+               className="flex-1 px-3 py-2 rounded-lg text-sm" style={inputStyle} />
+        <button type="submit" disabled={busy || !name.trim()}
+                className="western-pill px-4 py-2 text-sm font-bold disabled:opacity-40 inline-flex items-center gap-1"
+                style={{ color: '#eeeae1' }}>
+          <Plus size={14} /> დამატება
+        </button>
+      </form>
+
+      <div className="western-panel p-4">
+        <PanelTitle>მოთამაშეები {players && `(${players.length})`}</PanelTitle>
+        {players === null ? (
+          <p className="text-sm font-typewriter" style={muted}>იტვირთება…</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {players.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 py-2 px-3 rounded-xl" style={inputStyle}>
+                <span className="flex-1 text-sm">{p.name}</span>
+                {p.has_pin && (
+                  <button onClick={() => clearPin(p)} disabled={busy} title="PIN-ის მოხსნა"
+                          className="p-1.5 rounded-lg hover:opacity-70 disabled:opacity-40" style={muted}>
+                    <LockOpen size={15} />
+                  </button>
+                )}
+                <button onClick={() => remove(p)} disabled={busy} title="წაშლა"
+                        className="p-1.5 rounded-lg hover:opacity-70 disabled:opacity-40" style={{ color: '#ef918b' }}>
+                  <Trash2 size={15} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </>
+  )
+}

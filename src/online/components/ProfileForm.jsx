@@ -1,12 +1,7 @@
 import { AvatarPhoto } from "./AvatarImg";
 import { useEffect, useRef, useState } from "react";
 import { Upload, Trash2, ArrowRight, Pencil, Check } from "lucide-react-online";
-import {
-  saveProfile,
-  fileToDataURL,
-  deleteProfile,
-  setActiveProfileId,
-} from "../lib/profiles";
+import { saveProfile, fileToDataURL, deleteProfile } from "../lib/profiles";
 
 const PIN_DIGITS = 4;
 
@@ -82,13 +77,13 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
       const saved = await saveProfile({
         id: editing?.id,
         name,
-        avatar,
+        // An untouched photo is a link to the stored one: leave it as it is.
+        avatar: avatar === (editing?.avatar || null) && editing ? undefined : avatar,
         // Send PIN only when the user actually typed one; otherwise keep
         // the existing hash on the server.
         ...(pin.length === PIN_DIGITS ? { pin } : {}),
         currentPin,
       });
-      setActiveProfileId(saved.id);
       onDone?.(saved);
     } catch (err) {
       setError(`პროფილის შენახვა ვერ მოხერხდა: ${err.message}`);

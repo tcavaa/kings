@@ -53,4 +53,4 @@ function resolveTrick(trick, ledSuit, trumpSuit = null) {
   return winnerSeat;
 }
 
-module.exports = { rankValue, resolveTrick };
+module.exports = { resolveTrick };

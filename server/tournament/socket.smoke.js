@@ -9,7 +9,6 @@
 process.env.PORT = process.env.PORT || '3402';
 require('../index.js');
 
-const path = require('path');
 const { io } = require('socket.io-client');
 
 const URL = `http://localhost:${process.env.PORT}`;

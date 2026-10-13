@@ -9,7 +9,7 @@ import {
 
 // The score keeper (King Score) lives at /score under its own root layout,
 // so getting there is a full page load rather than an in-app view.
-export const SCORE_APP_PATH = "/score";
+const SCORE_APP_PATH = "/score";
 export function openScoreApp() {
   window.location.assign(SCORE_APP_PATH);
 }

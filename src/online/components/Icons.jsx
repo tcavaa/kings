@@ -32,4 +32,3 @@ export function SuitLabel({ suit, size = 14, className = '', style = {} }) {
   )
 }
 
-export { SUIT_NAMES, SUIT_COLOR }

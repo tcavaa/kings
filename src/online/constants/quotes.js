@@ -1,5 +1,5 @@
 // Original philosophical reflections for KING. Shared deterministic selection.
-export const QUOTES = [
+const QUOTES = [
   { text: 'თავისუფლება იწყება იქ, სადაც საკუთარ შიშს აღარ ემორჩილები.', author: 'KING · ფიქრები' },
   { text: 'არჩევანი მხოლოდ მომავალს კი არა, იმასაც ცვლის, ვინც მას აკეთებს.', author: 'KING · ფიქრები' },
   { text: 'დრო არაფერს გვართმევს, რაც მხოლოდ აწმყოში არსებობს.', author: 'KING · ფიქრები' },

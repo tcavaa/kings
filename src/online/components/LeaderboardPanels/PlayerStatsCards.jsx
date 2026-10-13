@@ -1,4 +1,4 @@
-import AvatarImg from "./AvatarImg";
+import AvatarImg from "../AvatarImg";
 const FIELDS = [
   ["roundsLed", "წაყვანილი რაუნდები"],
   ["totalTricks", "აღებული მინუსები"],

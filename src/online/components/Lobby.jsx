@@ -14,7 +14,8 @@ import {
   listProfiles,
   getActiveProfileId,
   clearActiveProfile,
-  markProfileVerified,
+  onProfileSessionLost,
+  verifyPin,
   checkPin,
 } from "../lib/profiles";
 import { api } from "../lib/api";
@@ -46,10 +47,12 @@ export default function Lobby({ onOpenLeaderboard }) {
   const [profileError, setProfileError] = useState(false);
 
   const [profiles, setProfiles] = useState([]);
-  // The "locked-in" profile id (the one the user has already verified on
-  // this device, persisted in localStorage). Never auto-set by the lobby —
-  // it only changes when the user successfully types a PIN.
+  // The "locked-in" profile id (signed in on this device, with a session
+  // token in localStorage). Never auto-set by the lobby — it only changes
+  // when the user picks a profile (and types its PIN, if it has one).
   const [activeId, setActiveId] = useState(() => getActiveProfileId());
+  // The game server refused our session (PIN changed, profile removed).
+  useEffect(() => onProfileSessionLost(() => setActiveId(null)), []);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   // A PIN-protected profile waiting for its PIN before the edit form opens,
@@ -122,7 +125,7 @@ export default function Lobby({ onOpenLeaderboard }) {
   useEffect(() => {
     if (!connected) return undefined;
     refreshLobby();
-    if (active?.name) announcePresence(active.name, active.avatar);
+    if (active?.name) announcePresence(active.name);
   }, [connected, active?.name, active?.avatar, announcePresence, refreshLobby]);
 
   // Championship quota for the active profile. Refetched on profile switch;
@@ -149,13 +152,9 @@ export default function Lobby({ onOpenLeaderboard }) {
 
   const onProfileSaved = async (saved) => {
     await reload();
-    // Newly-created or just-edited profile: the user proved knowledge of
-    // the PIN inside the form (they had to type it on create), so we can
-    // skip the prompt and lock them straight in.
-    if (saved?.id) {
-      markProfileVerified(saved.id);
-      setActiveId(saved.id);
-    }
+    // Newly-created or just-edited profile: saving it signed this device in
+    // (the server needed the PIN to save), so lock straight in.
+    if (saved?.id) setActiveId(getActiveProfileId());
     setShowForm(false);
     setEditing(null);
     setEditPin("");
@@ -175,15 +174,19 @@ export default function Lobby({ onOpenLeaderboard }) {
   // Picking a *different* profile pops the PIN prompt. Clicking the
   // already-active one is a no-op (no need to re-authenticate). Profiles
   // without a PIN are promoted instantly.
-  const pickProfile = (profile) => {
+  const pickProfile = async (profile) => {
     if (!profile?.id) return;
     if (profile.id === activeId) return;
-    if (!profile.has_pin) {
-      markProfileVerified(profile.id);
-      setActiveId(profile.id);
+    if (profile.has_pin) {
+      setPinPending(profile);
       return;
     }
-    setPinPending(profile);
+    try {
+      const out = await verifyPin(profile.id, "");
+      if (out.ok) setActiveId(profile.id);
+    } catch {
+      setProfileError(true);
+    }
   };
 
   const switchProfile = () => {
@@ -197,7 +200,7 @@ export default function Lobby({ onOpenLeaderboard }) {
   const handleCreate = () => {
     if (!active) return;
     // Every table is a league table (the casual "classic" mode is gone).
-    createRoom(active.name, active.avatar, "championship");
+    createRoom(active.name, "championship");
   };
 
   const handleJoin = () => {
@@ -209,7 +212,7 @@ export default function Lobby({ onOpenLeaderboard }) {
     } catch {
       /* ignore quota */
     }
-    joinRoom(code, active.name, active.avatar);
+    joinRoom(code, active.name);
   };
 
   const modes = [
@@ -365,7 +368,6 @@ export default function Lobby({ onOpenLeaderboard }) {
           {mode === "championship" && (
             <PublicRoomPanel
               active={active}
-              mode={mode}
               quota={quota}
               onNeedProfile={openProfile}
             />
@@ -495,7 +497,6 @@ export default function Lobby({ onOpenLeaderboard }) {
             <PinPromptModal
               profile={pinPending}
               onSuccess={({ profile }) => {
-                markProfileVerified(profile.id);
                 setActiveId(profile.id);
                 setPinPending(null);
                 setDialog(null);
