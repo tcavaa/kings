@@ -11,9 +11,9 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const body = await readJson(request, UPLOAD_LIMIT)
     const denied = await requireAdmin(request)
     if (denied) return denied
+    const body = await readJson(request, UPLOAD_LIMIT)
     return json(await store.createSound(body || {}), 201)
   } catch (err) { return sendErr(err) }
 }

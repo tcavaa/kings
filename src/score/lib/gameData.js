@@ -91,18 +91,51 @@ export async function saveGame({ sheetId, players, rounds, durationSeconds }) {
 
 // ── live sheets: games being scored right now, for others to follow ──
 
+// Only this device may change its published sheet: it makes up a random key
+// per sheet and sends it with every write, and the server refuses writes
+// with any other key. Kept in localStorage so a reload can still update the
+// sheet, and in memory when storage is unavailable.
+const SHEET_KEYS = 'king-live-sheet-keys'
+const memoryKeys = {}
+
+function readSheetKeys() {
+  try { return JSON.parse(localStorage.getItem(SHEET_KEYS) || '{}') || {} } catch { return memoryKeys }
+}
+
+function writeSheetKeys(keys) {
+  try { localStorage.setItem(SHEET_KEYS, JSON.stringify(keys)) } catch { Object.assign(memoryKeys, keys) }
+}
+
+function sheetKey(id) {
+  const keys = readSheetKeys()
+  if (!keys[id]) {
+    const bytes = new Uint8Array(24)
+    crypto.getRandomValues(bytes)
+    keys[id] = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('')
+    writeSheetKeys(keys)
+  }
+  return keys[id]
+}
+
 /** Publish this device's sheet (fire and forget — the next change retries). */
 export function publishLiveSheet(id, state) {
   return fetch(`/api/live-sheets/${encodeURIComponent(id)}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Sheet-Key': sheetKey(id) },
     body: JSON.stringify(state),
     keepalive: true,
   }).catch(() => {})
 }
 
 export function removeLiveSheet(id) {
-  return fetch(`/api/live-sheets/${encodeURIComponent(id)}`, { method: 'DELETE', keepalive: true }).catch(() => {})
+  const keys = readSheetKeys()
+  const key = keys[id]
+  if (!key) return Promise.resolve()
+  delete keys[id]
+  writeSheetKeys(keys)
+  return fetch(`/api/live-sheets/${encodeURIComponent(id)}`, {
+    method: 'DELETE', headers: { 'X-Sheet-Key': key }, keepalive: true,
+  }).catch(() => {})
 }
 
 /**

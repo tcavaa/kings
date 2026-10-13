@@ -7,6 +7,7 @@ const express = require('express');
 const http    = require('http');
 const { Server } = require('socket.io');
 
+const store            = require('./db/store');
 const GameManager      = require('./game/GameManager');
 const registerHandlers = require('./socket/handlers');
 const TournamentManager = require('./tournament/TournamentManager');
@@ -62,15 +63,42 @@ io.on('connection', (socket) => {
   registerHandlers(io, socket, gameManager, tournamentManager);
 });
 
-// Restore in-flight rooms from the database on boot so a deploy/restart (or
-// the free instance waking up) doesn't kill active games. Failures here are
-// logged but non-fatal — the DB might just not be configured yet.
-gameManager.hydrateAll().catch((err) => {
-  console.warn('[server] hydrateAll failed:', err.message);
+// Restore in-flight rooms, then the tournaments that own some of them, from
+// the database before taking connections: after a deploy all three players of
+// a table rejoin within a second, and they must find their room already
+// there. Failures are logged but non-fatal — the DB might just not be
+// configured yet.
+async function restore() {
+  try { await gameManager.hydrateAll(); }
+  catch (err) { console.warn('[server] hydrateAll failed:', err.message); }
+  try { await tournamentManager.hydrateAll(); }
+  catch (err) { console.warn('[server] tournament hydrateAll failed:', err.message); }
+}
+
+// A database that doesn't answer mustn't keep the server down: after
+// RESTORE_WAIT_MS it starts anyway and the restore finishes in the background.
+const RESTORE_WAIT_MS = 15 * 1000;
+const restoreWait = new Promise((resolve) => setTimeout(resolve, RESTORE_WAIT_MS).unref());
+
+Promise.race([restore(), restoreWait]).finally(() => {
+  server.listen(PORT, () => {
+    console.log(`[server] King Card Game server listening on port ${PORT}`);
+    console.log(`[server] CORS origin(s): ${RAW_CORS_ORIGIN}`);
+  });
 });
 
-server.listen(PORT, () => {
-  console.log(`[server] King Card Game server listening on port ${PORT}`);
-  console.log(`[server] CORS origin(s): ${RAW_CORS_ORIGIN}`);
-});
-
+// A redeploy sends SIGTERM. Stop taking events, let the room and tournament
+// snapshots still queued reach the database (they are what the next boot
+// restores), then exit.
+let shuttingDown = false;
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[server] ${signal}: saving live games before exit…`);
+  io.close();
+  const flushed = await store.flushLiveWrites(8000).catch(() => false);
+  if (!flushed) console.warn('[server] some live-game snapshots were not saved in time.');
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

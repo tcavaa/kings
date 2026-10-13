@@ -3,9 +3,23 @@ import { json, sendErr } from '@/lib/api/http'
 
 // The bytes of an uploaded clip. Built-ins are static files in /public/sounds
 // and never reach this route.
-export async function GET(_request, { params }) {
+export async function GET(request, { params }) {
   try {
     const { id } = await params
+    const version = await store.getSoundVersion(id)
+    if (!version) return json({ error: 'Sound not found' }, 404)
+    // The catalogue links to `?v=<version>`, and only that URL is cached for
+    // good. Any other `v` (an old one, or a made-up one that would dodge the
+    // CDN) is sent to the current URL instead of re-reading the clip.
+    if (new URL(request.url).searchParams.get('v') !== version) {
+      return new Response(null, {
+        status: 307,
+        headers: {
+          Location: `/api/sounds/${encodeURIComponent(id)}/audio?v=${version}`,
+          'Cache-Control': 'public, max-age=60',
+        },
+      })
+    }
     const clip = await store.getSoundAudio(id)
     if (!clip) return json({ error: 'Sound not found' }, 404)
     return new Response(clip.buffer, {

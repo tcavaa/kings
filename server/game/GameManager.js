@@ -1,16 +1,8 @@
 'use strict';
 
+const { EventEmitter } = require('events');
 const GameState = require('./GameState');
-const store     = require('../db/store');
-
-function generateCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-}
+const { generateCode, sameName, normalizeMode } = require('../lib/util');
 
 // How long an entirely-empty (all players disconnected) room is kept alive
 // in memory before being garbage-collected. The persisted `live_games` row
@@ -19,9 +11,11 @@ function generateCode() {
 // drops the table state — the rejoining player just reattaches to the same
 // in-memory room. The database snapshot is the long-term backup; the timer is
 // the short-term one.
-const ROOM_GRACE_MS = 90 * 1000;
+const ROOM_GRACE_MS = Number(process.env.ROOM_GRACE_MS) || 90 * 1000;   // env: tests only
 
-const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+// A finished room only serves the game-over screen and "Play Again", so it
+// goes after this long whoever is still looking at it.
+const FINISHED_ROOM_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Whether `identity` (see handlers' `_identify`) may take over a seat row: the
@@ -52,310 +46,32 @@ function seatRow(socketId, identity, seat) {
   };
 }
 
-class GameManager {
+/**
+ * Every King room in memory, who sits where, and the game actions on them.
+ *
+ * Events, for the socket layer (this class never talks to sockets):
+ *   'socket-detached' { socketId, roomCode, room, playerName, removed, watchedRoomCode }
+ *       a socket moved on to another room: it must leave the old room's
+ *       channel, and the old room hears that the player left or went offline.
+ *   'room-expired' { roomCode, watchers }
+ *       a room was dropped from memory; `watchers` were still watching it.
+ */
+class GameManager extends EventEmitter {
   constructor() {
+    super();
     this.rooms = new Map();
     this.socketRoomMap = new Map();
     // roomCode -> Timeout: pending "delete if still empty" job.
     this.roomGraceTimers = new Map();
+    // roomCode -> Promise: database loads still running (see tryLoadFromDB).
+    this.roomLoads = new Map();
     // The homepage quick-match rooms currently collecting players — one per
     // game mode. Cleared the moment a table's game starts (or the room dies)
     // so the next sitter opens a fresh table. In-memory only.
     this.quickMatchCodes = { public: null, championship: null };
-    // Watchers, not players. Kept out of `rooms[].players` so nothing in the
-    // game engine can ever deal to them or count them toward a seat, but
-    // tracked here so the chat/voice handlers can still identify them —
-    // those all resolve a sender via socketRoomMap, which a spectator is
-    // deliberately absent from.
     this.spectators = new Map();   // socketId -> { roomCode, tournamentId, name, avatar }
     // Everyone currently on the site, table or not. socketId -> { name, since }
     this.presence = new Map();
-  }
-
-  // ── spectators ────────────────────────────────────────────────────────────
-
-  addSpectator(socketId, roomCode, info = {}) {
-    this.spectators.set(socketId, {
-      roomCode,
-      tournamentId: info.tournamentId || null,
-      name: info.name || 'Spectator',
-      avatar: info.avatar || null,
-    });
-  }
-
-  getSpectator(socketId) {
-    const s = this.spectators.get(socketId);
-    if (!s) return null;
-    // Lazy cleanup: the table may have been torn down while this watcher sat
-    // there. Without this they stay "watching" a room that no longer exists,
-    // and anything they say is relayed into a dead socket room.
-    if (!this.rooms.has(s.roomCode)) {
-      this.spectators.delete(socketId);
-      return null;
-    }
-    return s;
-  }
-
-  /**
-   * Drop everyone watching a table and hand back their socket ids so the
-   * caller can tell them. Used when a game ends or a room is torn down —
-   * a watcher left attached to a dead room shows as permanently "watching"
-   * in presence and can never be cleaned up by anything else.
-   */
-  evictSpectators(roomCode) {
-    const evicted = [];
-    for (const [socketId, s] of this.spectators) {
-      if (s.roomCode === roomCode) { evicted.push(socketId); this.spectators.delete(socketId); }
-    }
-    return evicted;
-  }
-
-  removeSpectator(socketId) {
-    const s = this.spectators.get(socketId);
-    this.spectators.delete(socketId);
-    return s || null;
-  }
-
-  /** How many people are watching a table (for the overview badge). */
-  spectatorCount(roomCode) {
-    let n = 0;
-    for (const s of this.spectators.values()) if (s.roomCode === roomCode) n += 1;
-    return n;
-  }
-
-  // ── presence ──────────────────────────────────────────────────────────────
-  //
-  // Who is on the site right now. Separate from rooms: a player sitting in the
-  // lobby belongs to no room, and that is exactly who this is for. Keyed by
-  // socket, but collapsed by NAME on the way out — two tabs is one person, not
-  // two, and showing them twice on the homepage rail would look broken.
-
-  announcePresence(socketId, name) {
-    const clean = String(name || '').trim();
-    if (!clean) return;
-    this.presence.set(socketId, {
-      name: clean,
-      since: this.presence.get(socketId)?.since || Date.now(),
-    });
-  }
-
-  forgetPresence(socketId) { this.presence.delete(socketId); }
-
-  /**
-   * One entry per person, with what they're currently doing. Status is derived
-   * live from the room/spectator registries rather than stored, so it can't go
-   * stale when someone joins a table without telling the presence layer.
-   */
-  onlineView() {
-    const byName = new Map();
-    for (const [socketId, p] of this.presence) {
-      const key = p.name.toLowerCase();
-
-      let status = 'lobby';
-      let roomCode = null;
-      const watching = this.getSpectator(socketId);   // prunes dead rooms
-      if (watching) {
-        status = 'watching';
-        roomCode = watching.roomCode;
-      } else {
-        const mapping = this.socketRoomMap.get(socketId);
-        const room = mapping ? this.rooms.get(mapping.roomCode) : null;
-        if (room) {
-          roomCode = room.code;
-          status = room.status === 'playing' ? 'playing' : 'waiting';
-        }
-      }
-
-      // A person open in two tabs shows the more interesting state: at a
-      // table beats idling in the lobby.
-      const rank = { playing: 3, waiting: 2, watching: 1, lobby: 0 };
-      const existing = byName.get(key);
-      if (!existing || rank[status] > rank[existing.status]) {
-        byName.set(key, { name: p.name, status, roomCode, since: p.since });
-      }
-    }
-    return [...byName.values()].sort((a, b) => a.since - b.since);
-  }
-
-  /**
-   * Live King tables a stranger could watch — only games actually in
-   * progress; a waiting room has nothing to show.
-   */
-  watchableGames() {
-    const out = [];
-    for (const room of this.rooms.values()) {
-      if (room.status !== 'playing' || !room.gameState) continue;
-      // Nobody home. A room whose players have all dropped sits in memory
-      // through its grace window (and can be rehydrated from live_games after
-      // a restart), so without this the homepage advertises dead tables that
-      // will never move again.
-      if (!room.players.some((p) => p.connected)) continue;
-      const gs = room.gameState;
-      out.push({
-        roomCode: room.code,
-        mode: room.mode || 'public',
-        tournament: room.tournamentId
-          ? { stage: room.tournamentStage || null, table: room.tournamentTable ?? null }
-          : null,
-        round: gs.round,
-        phase: gs.phase,
-        startedAt: room.startedAt || null,
-        watchers: this.spectatorCount(room.code),
-        players: room.players.map((p) => ({
-          name: p.name,
-          avatar: p.avatar || null,
-          seat: p.seat,
-          connected: !!p.connected,
-          score: gs.cumulativeScores?.[p.seat] ?? 0,
-        })),
-      });
-    }
-    return out.sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0));
-  }
-
-  // ── persistence ───────────────────────────────────────────────────────────
-
-  /**
-   * Serialise a room to a plain JSON-friendly object that can be restored
-   * later by `_roomFromSnapshot`. socket ids are preserved but considered
-   * advisory — they're stale the moment the server restarts.
-   */
-  _roomSnapshot(room) {
-    return {
-      code: room.code,
-      status: room.status,
-      mode: room.mode || 'public',
-      isPublic: !!room.isPublic,
-      // Tournament tags travel with the snapshot so a restart mid-bracket
-      // doesn't orphan the table from the tournament watching it.
-      startedAt: room.startedAt || null,
-      tournamentId: room.tournamentId || null,
-      tournamentTable: room.tournamentTable ?? null,
-      tournamentStage: room.tournamentStage || null,
-      // Avatars are short /api/profiles/:id/avatar links, not photos.
-      players: room.players.map((p) => ({
-        id: p.id, name: p.name, avatar: p.avatar || null,
-        seat: p.seat, connected: !!p.connected,
-        profileId: p.profileId || null, ownerKey: p.ownerKey || null,
-      })),
-      gameState: room.gameState ? room.gameState.serialize() : null,
-    };
-  }
-
-  _roomFromSnapshot(snap) {
-    if (!snap || !Array.isArray(snap.players)) return null;
-    const room = {
-      code: snap.code,
-      status: snap.status || 'waiting',
-      // Rows written before game modes existed have no `mode` — they were
-      // all counted as championship games historically, but a *live* legacy
-      // room is safest treated as public so it can't eat a quota slot.
-      mode: snap.mode === 'championship' ? 'championship' : 'public',
-      isPublic: !!snap.isPublic,
-      startedAt: snap.startedAt || null,
-      tournamentId: snap.tournamentId || null,
-      tournamentTable: snap.tournamentTable ?? null,
-      tournamentStage: snap.tournamentStage || null,
-      players: snap.players.map((p) => ({
-        id: p.id || null, name: p.name,
-        // Snapshots written before photos became links carry a base64 photo.
-        avatar: p.avatar && !String(p.avatar).startsWith('data:') ? p.avatar : null,
-        seat: p.seat,
-        profileId: p.profileId || null,
-        ownerKey: p.ownerKey || null,
-        // After a server restart no live socket exists, so everyone starts
-        // disconnected until they re-join with the same room code + name.
-        connected: false,
-        leftAt: Date.now(),
-      })),
-      gameState: snap.gameState ? GameState.fromSnapshot(snap.gameState) : null,
-      // Rematch coordination is transient and never persisted — if the
-      // server restarts, players just press Play Again again.
-      rematchRoomCode: null,
-      rematchJoinedSeats: new Set(),
-    };
-    return room;
-  }
-
-  /**
-   * Fire-and-forget snapshot to the database. Awaits internally but errors are only
-   * logged — the in-memory state has already been updated and broadcast,
-   * losing one snapshot is recoverable.
-   */
-  _persist(roomCode) {
-    const room = this.rooms.get(roomCode);
-    if (!room || room.dbRetired) {
-      // Room was deleted, or the game ended and `retireRoom` already dropped
-      // the snapshot. Either way the live_games row must not come back — a
-      // retired room stays in memory only long enough for "Play Again".
-      store.deleteLiveGame(roomCode).catch((err) => {
-        console.warn(`[GameManager] _persist delete ${roomCode} failed: ${err.message}`);
-      });
-      return;
-    }
-    const snapshot = this._roomSnapshot(room);
-    store.saveLiveGame(roomCode, snapshot).catch((err) => {
-      console.warn(`[GameManager] _persist save ${roomCode} failed: ${err.message}`);
-    });
-  }
-
-  /**
-   * Look the room up in memory; if it's not there, try the database. Designed to be
-   * called from a join-room handler before falling back to "Room not found".
-   */
-  async tryLoadFromDB(roomCode) {
-    if (this.rooms.has(roomCode)) return this.rooms.get(roomCode);
-    let snap;
-    try { snap = await store.loadLiveGame(roomCode); }
-    catch (err) {
-      console.warn(`[GameManager] tryLoadFromDB ${roomCode} failed: ${err.message}`);
-      return null;
-    }
-    if (!snap) return null;
-    if (snap.status === 'finished') {
-      // Leftover row from before finished rooms were retired. Rehydrating it
-      // would put the joiner straight onto a game-over screen — bin it.
-      store.deleteLiveGame(roomCode).catch(() => {});
-      return null;
-    }
-    const room = this._roomFromSnapshot(snap);
-    if (!room) return null;
-    this.rooms.set(roomCode, room);
-    console.log(`[GameManager] Hydrated room ${roomCode} from DB (status=${room.status})`);
-    return room;
-  }
-
-  /**
-   * Called once at server boot. Reloads every persisted live room from the database
-   * so a deploy/restart doesn't kill in-flight games.
-   */
-  async hydrateAll() {
-    // Boot-time housekeeping: clear out finished/abandoned snapshots before
-    // reading the table, so we never resurrect a dead room and the table
-    // doesn't grow without bound.
-    try {
-      const purged = await store.purgeStaleLiveGames();
-      if (purged > 0) console.log(`[GameManager] Purged ${purged} stale live_games row(s).`);
-    } catch (err) {
-      console.warn(`[GameManager] purgeStaleLiveGames failed: ${err.message}`);
-    }
-    let entries;
-    try { entries = await store.listLiveGames(); }
-    catch (err) {
-      console.warn(`[GameManager] hydrateAll failed: ${err.message}`);
-      return 0;
-    }
-    let loaded = 0;
-    for (const { roomCode, snapshot } of entries) {
-      if (this.rooms.has(roomCode)) continue;
-      if (snapshot && snapshot.status === 'finished') continue;
-      const room = this._roomFromSnapshot(snapshot);
-      if (!room) continue;
-      this.rooms.set(roomCode, room);
-      loaded += 1;
-    }
-    if (loaded > 0) console.log(`[GameManager] Hydrated ${loaded} live room(s) from DB.`);
-    return loaded;
   }
 
   // ── room lifecycle ────────────────────────────────────────────────────────
@@ -366,8 +82,56 @@ class GameManager {
     return code;
   }
 
+  /**
+   * A socket is about to take a seat in `nextRoomCode`: let go of whatever it
+   * held before. A seat in a room still collecting players is given up; in a
+   * running or finished game the seat stays for its owner but shows offline,
+   * so the room can be cleaned up once everyone has gone. Watching stops too.
+   * Returns the room it left, or null.
+   */
+  detachSocket(socketId, nextRoomCode = null) {
+    if (!socketId) return null;   // a bracket seat held for an offline entrant
+    const watched = this.removeSpectator(socketId);
+    const watchedRoomCode = watched && watched.roomCode !== nextRoomCode ? watched.roomCode : null;
+    const mapping = this.socketRoomMap.get(socketId);
+    if (!mapping || mapping.roomCode === nextRoomCode) {
+      if (watchedRoomCode) this.emit('socket-detached', { socketId, roomCode: null, room: null, watchedRoomCode });
+      return null;
+    }
+    const { roomCode } = mapping;
+    this.socketRoomMap.delete(socketId);
+    const room = this.rooms.get(roomCode);
+    const player = room?.players.find((p) => p.id === socketId);
+    let removed = false;
+    if (player) {
+      if (room.status === 'waiting') {
+        room.players = room.players.filter((p) => p !== player);
+        removed = true;
+        if (!room.players.length) {
+          this.rooms.delete(roomCode);
+          this.clearPublicRoom(roomCode);
+        }
+      } else {
+        player.connected = false;
+        player.leftAt = Date.now();
+      }
+      if (this.rooms.has(roomCode) && room.players.every((p) => !p.connected)) this.armRoomGrace(roomCode);
+      this._persist(roomCode);
+    }
+    this.emit('socket-detached', {
+      socketId,
+      roomCode,
+      room: this.rooms.get(roomCode) || null,
+      playerName: player?.name || null,
+      removed,
+      watchedRoomCode,
+    });
+    return roomCode;
+  }
+
   createRoom(socketId, identity, mode = 'public') {
     const roomCode = this._generateUniqueCode();
+    this.detachSocket(socketId, roomCode);
     this.rooms.set(roomCode, {
       code: roomCode,
       players: [seatRow(socketId, identity, 0)],
@@ -375,14 +139,14 @@ class GameManager {
       status: 'waiting',
       // 'championship' games count toward the daily quota and feed the
       // score app's seasons; 'public' games are casual.
-      mode: mode === 'championship' ? 'championship' : 'public',
+      mode: normalizeMode(mode),
       // Rematch coordination — populated when a finished room transitions
       // into "waiting for players to click Play Again". Lives only in
       // memory; never persisted.
       rematchRoomCode: null,
       rematchJoinedSeats: new Set(),
     });
-    this.socketRoomMap.set(socketId, { roomCode, seat: 0 });
+    if (socketId) this.socketRoomMap.set(socketId, { roomCode, seat: 0 });
     this._persist(roomCode);
     return { roomCode, seat: 0 };
   }
@@ -400,6 +164,7 @@ class GameManager {
 
     if (existingPlayer) {
       if (!ownsSeat(existingPlayer, identity)) throw new Error('That name is already taken at this table.');
+      this.detachSocket(socketId, roomCode);
       // Cut the old socket's mapping loose so its eventual disconnect
       // event (which we may not even get) can't mutate this player's row.
       if (existingPlayer.id && existingPlayer.id !== socketId) {
@@ -410,9 +175,14 @@ class GameManager {
       existingPlayer.leftAt = null;
       existingPlayer.ownerKey = existingPlayer.ownerKey || identity.ownerKey || null;
       if (identity.avatar) existingPlayer.avatar = identity.avatar;
+      if (existingPlayer.sweepTimer) {
+        clearTimeout(existingPlayer.sweepTimer);
+        existingPlayer.sweepTimer = null;
+      }
       this.socketRoomMap.set(socketId, { roomCode, seat: existingPlayer.seat });
-      // Someone is back — abort any pending "delete empty room" job.
-      this.cancelRoomGrace(roomCode);
+      // Someone is back — abort any pending "delete empty room" job. A
+      // finished room keeps its countdown: it only serves the results screen.
+      if (room.status !== 'finished') this.cancelRoomGrace(roomCode);
       console.log(`[GameManager] ${existingPlayer.name} reconnected to room ${roomCode} as seat ${existingPlayer.seat}`);
       this._persist(roomCode);
       return { seat: existingPlayer.seat, reconnected: true, status: room.status };
@@ -425,6 +195,7 @@ class GameManager {
 
     if (room.players.length >= 3) throw new Error('Room is full.');
 
+    this.detachSocket(socketId, roomCode);
     // Lowest free seat — players can leave a waiting room (or be swept out
     // of the public lobby after a disconnect), leaving gaps that a plain
     // `players.length` would double-assign.
@@ -432,7 +203,7 @@ class GameManager {
     let seat = 0;
     while (takenSeats.has(seat)) seat++;
     room.players.push(seatRow(socketId, identity, seat));
-    this.socketRoomMap.set(socketId, { roomCode, seat });
+    if (socketId) this.socketRoomMap.set(socketId, { roomCode, seat });
     console.log(`[GameManager] ${identity.name} joined room ${roomCode} as seat ${seat}`);
     this._persist(roomCode);
     return { seat, status: room.status };
@@ -461,9 +232,8 @@ class GameManager {
     room.players.splice(playerIdx, 1);
     this.socketRoomMap.delete(socketId);
     if (room.players.length === 0) {
-      this.rooms.delete(roomCode);
+      this._dropRoom(roomCode);
       console.log(`[GameManager] Room ${roomCode} deleted (empty).`);
-      // _persist with no room → deletes the live_games row.
     }
     console.log(`[GameManager] ${playerName} left room ${roomCode}`);
     this._persist(roomCode);
@@ -471,29 +241,27 @@ class GameManager {
   }
 
   /**
-   * Drop the room entirely (e.g. game ended, finished_games row already
-   * stored, no reason to keep the live snapshot around).
+   * Take a room out of memory: its socket mappings, grace timer, homepage
+   * pointer and watchers go with it. Returns the watchers' socket ids.
    */
-  destroyRoom(roomCode) {
+  _dropRoom(roomCode) {
     this.rooms.delete(roomCode);
-    this.evictSpectators(roomCode);
-    store.deleteLiveGame(roomCode).catch(() => {});
+    this.cancelRoomGrace(roomCode);
+    this.clearPublicRoom(roomCode);
+    for (const [socketId, m] of this.socketRoomMap) {
+      if (m.roomCode === roomCode) this.socketRoomMap.delete(socketId);
+    }
+    return this.evictSpectators(roomCode);
   }
 
   /**
-   * The game is over (natural finish or surrender). The room has to stay in
-   * memory for the rematch window, but its `live_games` row is finished
-   * business: the result now lives in `finished_games`, and leaving the
-   * snapshot behind is what used to strand rows in the table forever (and
-   * let a returning player rehydrate into a dead game). Flag the room so no
-   * later `_persist` writes it back, then drop the row.
+   * Drop the room entirely and its live_games row with it (a homepage table
+   * whose last sitter was swept out).
    */
-  retireRoom(roomCode) {
-    const room = this.rooms.get(roomCode);
-    if (room) room.dbRetired = true;
-    store.deleteLiveGame(roomCode).catch((err) => {
-      console.warn(`[GameManager] retireRoom ${roomCode} failed: ${err.message}`);
-    });
+  destroyRoom(roomCode) {
+    const watchers = this._dropRoom(roomCode);
+    this._persist(roomCode);   // no room any more → deletes the row
+    return watchers;
   }
 
   getRoom(roomCode) { return this.rooms.get(roomCode); }
@@ -505,8 +273,7 @@ class GameManager {
     if (!room) throw new Error(`Room ${roomCode} not found.`);
     if (room.players.length !== 3) throw new Error('Need exactly 3 players to start.');
     if (room.status !== 'waiting') throw new Error('Game already started.');
-    const seatedPlayers = room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat }));
-    room.gameState = new GameState(seatedPlayers);
+    room.gameState = new GameState();
     room.status = 'playing';
     // Wall-clock start, so the in-game timer is the same for all three
     // players and survives both a refresh and a server restart. Deriving it
@@ -518,42 +285,35 @@ class GameManager {
     return room.gameState;
   }
 
-  handleSelectGameType(roomCode, seat, typeCode) {
+  // ── game actions ──────────────────────────────────────────────────────────
+  // Each runs one GameState move and saves the room when it went through.
+
+  _mutateGame(roomCode, fn) {
     const room = this.rooms.get(roomCode);
     if (!room || !room.gameState) return { ok: false, error: 'Game not found.' };
-    const result = room.gameState.selectGameType(seat, typeCode);
+    const result = fn(room.gameState);
     if (result.ok) this._persist(roomCode);
     return result;
+  }
+
+  handleSelectGameType(roomCode, seat, typeCode) {
+    return this._mutateGame(roomCode, (gs) => gs.selectGameType(seat, typeCode));
+  }
+
+  handleSelectTrump(roomCode, seat, suit) {
+    return this._mutateGame(roomCode, (gs) => gs.selectTrump(seat, suit));
   }
 
   handleDiscardCards(roomCode, seat, cards) {
-    const room = this.rooms.get(roomCode);
-    if (!room || !room.gameState) return { ok: false, error: 'Game not found.' };
-    const result = room.gameState.discardCards(seat, cards);
-    if (result.ok) this._persist(roomCode);
-    return result;
+    return this._mutateGame(roomCode, (gs) => gs.discardCards(seat, cards));
   }
 
   handlePlayCard(roomCode, seat, card) {
-    const room = this.rooms.get(roomCode);
-    if (!room || !room.gameState) {
-      return {
-        ok: false, error: 'Game not found.',
-        trickComplete: false, trick: null, winnerSeat: null, roundEnds: false,
-        scores: null, cumulativeScores: null, round: 0, isGameOver: false, gameType: null,
-      };
-    }
-    const result = room.gameState.playCard(seat, card);
-    if (result.ok) this._persist(roomCode);
-    return result;
+    return this._mutateGame(roomCode, (gs) => gs.playCard(seat, card));
   }
 
   handleQuitRound(roomCode, quitterSeat) {
-    const room = this.rooms.get(roomCode);
-    if (!room || !room.gameState) return { ok: false, error: 'Game not found.' };
-    const result = room.gameState.endRoundEarly(quitterSeat);
-    if (result.ok) this._persist(roomCode);
-    return result;
+    return this._mutateGame(roomCode, (gs) => gs.endRoundEarly(quitterSeat));
   }
 
   handleNextRound(roomCode, socketId) {
@@ -584,6 +344,22 @@ class GameManager {
     return room.gameState.getStateForPlayer(seat);
   }
 
+  /**
+   * League games this name is in the middle of, or has finished but whose
+   * save hasn't landed yet: the database quota can't see either, so a second
+   * tab or a quick Play Again would otherwise get past the daily limit.
+   * Bracket tables never count.
+   */
+  championshipGamesInFlight(name) {
+    let n = 0;
+    for (const room of this.rooms.values()) {
+      if (room.mode !== 'championship' || room.tournamentId) continue;
+      const counts = room.status === 'playing' || (room.status === 'finished' && !room.saved);
+      if (counts && room.players.some((p) => sameName(p.name, name))) n += 1;
+    }
+    return n;
+  }
+
   markDisconnected(socketId) {
     const mapping = this.socketRoomMap.get(socketId);
     if (!mapping) return null;
@@ -601,7 +377,7 @@ class GameManager {
     this.socketRoomMap.delete(socketId);
     console.log(`[GameManager] Player ${player.name} (seat ${player.seat}) disconnected from room ${mapping.roomCode}`);
     this._persist(mapping.roomCode);
-    return { roomCode: mapping.roomCode, seat: player.seat, playerName: player.name };
+    return { roomCode: mapping.roomCode, seat: player.seat, playerName: player.name, player };
   }
 
   // ── Grace timers ──────────────────────────────────────────────────────────
@@ -614,26 +390,29 @@ class GameManager {
 
   /**
    * Schedule a delete of `roomCode` after ROOM_GRACE_MS *unless* someone
-   * reconnects in the meantime. Idempotent — re-arming resets the clock.
+   * reconnects in the meantime. A finished room goes after
+   * FINISHED_ROOM_TTL_MS whoever is still around. Idempotent — re-arming
+   * resets the clock.
    */
   armRoomGrace(roomCode) {
     this.cancelRoomGrace(roomCode);
+    const finished = this.rooms.get(roomCode)?.status === 'finished';
     const t = setTimeout(() => {
       this.roomGraceTimers.delete(roomCode);
       const room = this.rooms.get(roomCode);
       if (!room) return; // already gone
       // Only delete if the room is still empty — someone may have reconnected
       // and we'd be racing with `cancelRoomGrace`.
-      if (room.players.every((p) => !p.connected)) {
+      if (room.status === 'finished' || room.players.every((p) => !p.connected)) {
         console.log(`[GameManager] Room ${roomCode} grace expired — deleting in-memory copy.`);
-        this.rooms.delete(roomCode);
-        this.evictSpectators(roomCode);
+        const watchers = this._dropRoom(roomCode);
         // A finished room was already retired, so there's no row left. An
         // unfinished one keeps its live_games row so a future join can
         // rehydrate it.
-        if (room.dbRetired) store.deleteLiveGame(roomCode).catch(() => {});
+        if (room.dbRetired) this._persist(roomCode);
+        this.emit('room-expired', { roomCode, watchers });
       }
-    }, ROOM_GRACE_MS);
+    }, finished ? FINISHED_ROOM_TTL_MS : ROOM_GRACE_MS);
     // Don't keep the Node event loop alive just for grace timers — if the
     // process is otherwise idle and ready to exit, the timer shouldn't
     // block shutdown.
@@ -657,14 +436,9 @@ class GameManager {
   // the normal name-based joinRoom path, so a refreshed player can be
   // re-attached to their seat via `rejoin-public`.
 
-  _normalizeQuickMatchMode(mode) {
-    return mode === 'championship' ? 'championship' : 'public';
-  }
-
   /** The waiting quick-match room for a mode, or null if none/stale. */
   quickMatchRoom(mode) {
-    const key = this._normalizeQuickMatchMode(mode);
-    const code = this.quickMatchCodes[key];
+    const code = this.quickMatchCodes[normalizeMode(mode)];
     const room = code ? this.rooms.get(code) : null;
     if (!room || room.status !== 'waiting') return null;
     return room;
@@ -675,32 +449,25 @@ class GameManager {
    * Same-name sitters are re-attached to their existing seat (refresh-safe).
    */
   sitPublic(socketId, identity, emoji = null, mode = 'public') {
-    const key = this._normalizeQuickMatchMode(mode);
-    let code = this.quickMatchCodes[key];
-    let room = code ? this.rooms.get(code) : null;
-    if (!room || room.status !== 'waiting') {
-      // Stale pointer (room started, died, or was GC'd) — start fresh.
-      this.quickMatchCodes[key] = null;
-      room = null;
-      code = null;
-    }
+    const key = normalizeMode(mode);
+    let room = this.quickMatchRoom(key);
+    // A stale pointer (room started, died, or was GC'd) starts a fresh table.
+    if (!room) this.quickMatchCodes[key] = null;
 
     let seat;
     if (!room) {
       const created = this.createRoom(socketId, identity, key);
-      code = created.roomCode;
       seat = created.seat;
-      room = this.rooms.get(code);
+      room = this.rooms.get(created.roomCode);
       room.isPublic = true;
-      this.quickMatchCodes[key] = code;
+      this.quickMatchCodes[key] = room.code;
     } else {
-      const joined = this.joinRoom(code, socketId, identity);
-      seat = joined.seat;
+      seat = this.joinRoom(room.code, socketId, identity).seat;
     }
 
     const player = room.players.find((p) => p.seat === seat);
     if (player && emoji !== undefined) player.emoji = emoji || player.emoji || null;
-    return { roomCode: code, seat, mode: key };
+    return { roomCode: room.code, seat, mode: key };
   }
 
   _quickMatchTableView(mode) {
@@ -734,21 +501,36 @@ class GameManager {
 
   // ── Rematch flow ─────────────────────────────────────────────────────────
   //
-  // After a game ends, the room sits in `status: 'finished'` for a short
-  // grace window (see armRoomGrace on the handlers side). Any player on the
-  // game-over screen can press "Play Again" — the first such click creates a
-  // fresh room with that player as seat 0, every subsequent click from the
-  // same finished room is forwarded into the same new room via joinRoom().
-  // The old room learns who has signed up so the game-over UI on other
-  // clients can render a "wants to play again" badge above each joined seat.
+  // After a game ends, the room sits in `status: 'finished'` for a while (see
+  // armRoomGrace). Any player on the game-over screen can press "Play Again" —
+  // the first such click creates a fresh room with that player as seat 0,
+  // every subsequent click from the same finished room is forwarded into the
+  // same new room via joinRoom(). The old room learns who has signed up so
+  // the game-over UI on other clients can render a "wants to play again"
+  // badge above each joined seat.
   //
-  // Returns { newRoomCode, seat, joinedOldSeats: number[] } on success, or
-  // { error: string } on validation failure.
+  // Returns { newRoomCode, seat, joinedOldSeats: number[], repeat? } on
+  // success, or { error: string } on validation failure.
   requestRematch(socketId, identity) {
     const mapping = this.socketRoomMap.get(socketId);
     if (!mapping) return { error: 'You are not in a room.' };
-    const oldRoom = this.rooms.get(mapping.roomCode);
-    if (!oldRoom) return { error: 'Room not found.' };
+    const current = this.rooms.get(mapping.roomCode);
+    if (!current) return { error: 'Room not found.' };
+
+    // A second tap after the first one already moved this socket into the
+    // rematch room: answer it the same way again.
+    if (current.status === 'waiting' && current.rematchOf) {
+      const oldRoom = this.rooms.get(current.rematchOf);
+      return {
+        newRoomCode: current.code,
+        seat: mapping.seat,
+        joinedOldSeats: oldRoom ? [...oldRoom.rematchJoinedSeats].sort((a, b) => a - b) : [],
+        oldRoomCode: current.rematchOf,
+        repeat: true,
+      };
+    }
+
+    const oldRoom = current;
     if (oldRoom.status !== 'finished') return { error: 'Game is not finished yet.' };
     const oldSeat = mapping.seat;
 
@@ -766,11 +548,9 @@ class GameManager {
       newRoomCode = result.roomCode;
       seat = result.seat;
       oldRoom.rematchRoomCode = newRoomCode;
+      this.rooms.get(newRoomCode).rematchOf = oldRoom.code;
     } else {
-      // Subsequent clicks: join the existing rematch room. joinRoom
-      // handles "same name reconnecting" gracefully — including the
-      // edge case where the clicker is already in the new room (which
-      // happens if they double-tap Play Again).
+      // Subsequent clicks: join the existing rematch room.
       const newRoom = this.rooms.get(newRoomCode);
       if (!newRoom) {
         // The rematch room was destroyed between clicks (e.g. the
@@ -779,8 +559,7 @@ class GameManager {
         oldRoom.rematchRoomCode = null;
         return this.requestRematch(socketId, identity);
       }
-      const joinResult = this.joinRoom(newRoomCode, socketId, identity);
-      seat = joinResult.seat;
+      seat = this.joinRoom(newRoomCode, socketId, identity).seat;
     }
 
     oldRoom.rematchJoinedSeats.add(oldSeat);
@@ -789,9 +568,12 @@ class GameManager {
       newRoomCode,
       seat,
       joinedOldSeats: [...oldRoom.rematchJoinedSeats].sort((a, b) => a - b),
+      oldRoomCode: oldRoom.code,
     };
   }
 }
+
+Object.assign(GameManager.prototype, require('./presence'), require('./roomPersistence'));
 
 module.exports = GameManager;
 module.exports.ownsSeat = ownsSeat;

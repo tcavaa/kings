@@ -142,6 +142,11 @@ export function tableReducer(state, action) {
         leaderSeat: action.leaderSeat,
         gamePhase: action.phase,
         usedTypes: action.usedTypes,
+        // Watchers get no `hand-dealt`, so the new round's counts and reset
+        // come from here (players get the same again from `hand-dealt`).
+        ...(action.cardCounts && { cardCounts: action.cardCounts }),
+        chosenGameType: null,
+        centerCards: [],
       }
 
     case 'game-type-selected':

@@ -1,6 +1,7 @@
 'use strict';
 
 const { GAME_TYPES } = require('../game/constants');
+const { randomInt } = require('../lib/util');
 
 // A tournament is always 3 semifinal tables at most, and the final always
 // seats exactly 3. Everything below is derived from those two facts.
@@ -52,7 +53,8 @@ function tableCandidates(table) {
  * Rank two candidates. Higher score first; on a tie the player who took fewer
  * penalty points (less negative) goes ahead. The final fallback keeps the sort
  * deterministic so the same inputs always produce the same bracket — important
- * because this runs again after a server restart rehydrates a tournament.
+ * because a tournament restored after a restart (see TournamentManager.hydrateAll)
+ * draws its final from the same recorded results.
  */
 function compareCandidates(a, b) {
   if (b.score !== a.score) return b.score - a.score;
@@ -102,18 +104,21 @@ function pickFinalists(tables = []) {
   };
 }
 
-/** Fisher-Yates, so seeding is genuinely uniform rather than sort-ish. */
-function shuffle(list, rand = Math.random) {
+/**
+ * Fisher-Yates, so seeding is genuinely uniform rather than sort-ish. Draws
+ * from the secure generator unless a test passes its own `rand` ([0, 1)).
+ */
+function shuffle(list, rand = null) {
   const arr = [...list];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(rand() * (i + 1));
+    const j = rand ? Math.floor(rand() * (i + 1)) : randomInt(i + 1);
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
 }
 
 /** Randomly split entrants into tables of 3. 6 players → 2, 9 → 3. */
-function seedTables(players, rand = Math.random) {
+function seedTables(players, rand = null) {
   if (!VALID_SIZES.includes(players.length)) {
     throw new Error(`A tournament needs exactly ${VALID_SIZES.join(' or ')} players.`);
   }

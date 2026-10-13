@@ -10,9 +10,10 @@ let sql = null;
  * logs a warning — the store turns that into the same "DB not configured"
  * error (HTTP 503) the MySQL build used to give.
  *
- * DATABASE_URL is the Supabase connection string. Use the pooler URL
- * (Supavisor, IPv4): transaction mode (:6543) for Vercel functions, either
- * mode for the long-running game server.
+ * DATABASE_URL is the Supabase connection string: the transaction pooler
+ * (Supavisor, IPv4, port 6543), the same URL for the Vercel functions and the
+ * game server. Transaction mode can't hold prepared statements, hence
+ * `prepare: false`.
  * @returns {import('postgres').Sql | null}
  */
 function getSql() {
@@ -49,4 +50,17 @@ function getSql() {
   return sql;
 }
 
-module.exports = { getSql };
+/** The client, or a 503-tagged error when the database isn't configured. */
+function db() {
+  const s = getSql();
+  if (!s) {
+    const err = new Error(
+      'Database is not configured. Set DATABASE_URL in your environment, then apply supabase/migrations.'
+    );
+    err.code = 'DB_NOT_CONFIGURED';
+    throw err;
+  }
+  return s;
+}
+
+module.exports = { getSql, db };

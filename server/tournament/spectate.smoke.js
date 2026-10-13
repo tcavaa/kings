@@ -8,51 +8,29 @@
 // there while recording EVERY event the spectator receives. Any card that
 // isn't on the table showing up in that recording is a failure.
 //
-// Run: PORT=3404 node tournament/spectate.smoke.js
+// Run: DATABASE_URL=postgres://localhost/kings_test PORT=3404 node tournament/spectate.smoke.js
 
-process.env.PORT = process.env.PORT || '3404';
-require('../index.js');
+const { startServer, connectClient, waitFor, sleep, check, summary, run } = require('../test/harness');
 
-const { io } = require('socket.io-client');
+const URL = startServer(3404);
+const same = (a, b) => a.rank === b.rank && a.suit === b.suit;
 
-const URL = `http://localhost:${process.env.PORT}`;
-let passed = 0, failed = 0;
-const check = (name, cond, extra = '') => {
-  if (cond) { passed += 1; console.log(`  ok  ${name}`); }
-  else { failed += 1; console.error(`FAIL  ${name} ${extra}`); }
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function client(name) {
-  return new Promise((resolve) => {
-    const s = io(URL, { transports: ['websocket'], forceNew: true });
-    s.playerName = name;
-    s.received = [];          // every event, for the leak audit
-    s.hand = [];
-    s.state = null;
-    s.chat = [];
-    s.errs = [];
-    s.onAny((event, payload) => s.received.push({ event, payload }));
-    s.on('error', (e) => s.errs.push(e));
-    s.on('room-joined', (p) => { s.roomCode = p.roomCode; s.seat = p.seat; });
-    s.on('hand-dealt', (p) => { s.hand = p.hand || []; s.state = p; });
-    s.on('hand-updated', (p) => { s.hand = p.hand || []; });
-    s.on('game-state', (p) => { s.state = p; if (p.hand) s.hand = p.hand; });
-    // card-played carries currentTurn/ledSuit, which is how the test knows
-    // whose turn it is and what suit must be followed.
-    s.on('card-played', (p) => {
-      s.currentTurn = p.currentTurn; s.ledSuit = p.ledSuit;
-      if (p.seat === s.seat) s.hand = s.hand.filter((c) => !(c.rank === p.card.rank && c.suit === p.card.suit));
-    });
-    s.on('trick-complete', (p) => { s.currentTurn = p.nextLeader ?? p.winnerSeat; s.ledSuit = null; });
-    s.on('cards-discarded', (p) => { s.currentTurn = p.currentTurn; s.phase = p.phase; });
-    s.on('game-type-selected', (p) => { s.phase = p.phase; s.currentTurn = p.currentTurn; });
-    s.on('tournament-joined', (p) => { s.tournament = p; });
-    s.on('tournament-state', (p) => { s.tournament = p; });
-    s.on('spectate-started', (p) => { s.spectating = p; });
-    s.on('chat-message', (p) => { s.chat.push(p); });
-    s.on('connect', () => resolve(s));
+async function client(name) {
+  const s = await connectClient(URL, { name });
+  s.hand = [];
+  s.on('room-joined', (p) => { s.roomCode = p.roomCode; s.seat = p.seat; });
+  s.on('hand-dealt', (p) => { s.hand = p.hand || []; s.leaderSeat = p.leaderSeat; });
+  s.on('hand-updated', (p) => { s.hand = p.hand || []; });
+  s.on('game-state', (p) => { if (p.hand?.length) s.hand = p.hand; });
+  // card-played carries currentTurn/ledSuit, which is how the test knows
+  // whose turn it is and what suit must be followed.
+  s.on('card-played', (p) => {
+    s.currentTurn = p.currentTurn; s.ledSuit = p.ledSuit;
+    if (p.seat === s.seat) s.hand = s.hand.filter((c) => !same(c, p.card));
   });
+  s.on('trick-complete', (p) => { s.currentTurn = p.nextTurn; s.ledSuit = null; });
+  s.on('cards-discarded', (p) => { s.currentTurn = p.currentTurn; });
+  return s;
 }
 
 /** Deep scan for anything that looks like a playing card. */
@@ -70,19 +48,19 @@ function findCards(value, trail = '') {
   return hits;
 }
 
-(async () => {
+run(async () => {
   const names = ['სპეკ-1', 'სპეკ-2', 'სპეკ-3', 'სპეკ-4', 'სპეკ-5', 'სპეკ-6'];
   const cs = [];
   for (const n of names) cs.push(await client(n));
 
   cs[0].emit('tournament-create', { playerName: names[0], size: 6 });
-  await sleep(400);
-  const code = cs[0].tournament.code;
+  await waitFor(() => cs[0].last('tournament-joined'));
+  const code = cs[0].last('tournament-joined').code;
   for (let i = 1; i < 6; i++) {
     cs[i].emit('tournament-join', { code, playerName: names[i] });
-    await sleep(150);
+    await waitFor(() => cs[i].last('tournament-joined'));
   }
-  await sleep(1400);
+  await waitFor(() => cs.every((c) => c.hand.length));
 
   const tables = [...new Set(cs.map((c) => c.roomCode))];
   check('two tables were drawn', tables.length === 2, `got ${tables.length}`);
@@ -92,75 +70,77 @@ function findCards(value, trail = '') {
 
   // Finish table A so its players are free to watch.
   tableA[0].emit('propose-quit', { kind: 'game' });
-  await sleep(250);
+  await waitFor(() => tableA[1].last('quit-proposal') && tableA[2].last('quit-proposal'));
   tableA[1].emit('vote-quit', { accept: true });
   tableA[2].emit('vote-quit', { accept: true });
-  await sleep(900);
+  await waitFor(() => tableA.every((c) => c.last('game-over')));
 
   // ── attach a watcher to the still-running table B ───────────────────────
   const watcher = tableA[0];
-  watcher.received.length = 0;            // audit only what arrives from here
+  watcher.events.length = 0;            // audit only what arrives from here
   watcher.emit('tournament-spectate', { roomCode: tables[1], playerName: watcher.playerName });
-  await sleep(600);
+  await waitFor(() => watcher.last('spectate-started') && watcher.last('game-state'));
+  const state = watcher.last('game-state');
 
-  check('spectating was accepted', !!watcher.spectating, JSON.stringify(watcher.errs));
-  check('watcher got the table roster', watcher.spectating?.players?.length === 3);
-  check('watcher received a masked state', watcher.state?.spectator === true);
-  check('masked state has no hand', Array.isArray(watcher.state?.hand) && watcher.state.hand.length === 0);
+  check('spectating was accepted', !!watcher.last('spectate-started'), JSON.stringify(watcher.errors));
+  check('watcher got the table roster', watcher.last('spectate-started')?.players?.length === 3);
+  check('watcher received a masked state', state?.spectator === true);
+  check('masked state has no hand', Array.isArray(state?.hand) && state.hand.length === 0);
   check('masked state hides the prikup',
-    Array.isArray(watcher.state?.centerCards) && watcher.state.centerCards.length === 0);
+    Array.isArray(state?.centerCards) && state.centerCards.length === 0);
   check('watcher still sees card counts',
-    watcher.state?.cardCounts && Object.keys(watcher.state.cardCounts).length === 3);
-  check('watcher sees the scores', !!watcher.state?.cumulativeScores);
+    state?.cardCounts && Object.keys(state.cardCounts).length === 3);
+  check('watcher sees the scores', !!state?.cumulativeScores);
 
   // You may not watch your own table.
   const selfWatch = tableB[0];
-  selfWatch.errs.length = 0;
+  selfWatch.errors.length = 0;
   selfWatch.emit('tournament-spectate', { roomCode: tables[1], playerName: selfWatch.playerName });
-  await sleep(300);
-  check('cannot spectate the table you are playing at', selfWatch.errs.length > 0);
+  check('cannot spectate the table you are playing at', await waitFor(() => selfWatch.errors.length > 0));
 
   // An outsider may not watch at all.
   const outsider = await client('outsider');
   outsider.emit('tournament-spectate', { roomCode: tables[1], playerName: 'outsider' });
-  await sleep(300);
-  check('a non-entrant is refused', outsider.errs.length > 0 && !outsider.spectating);
+  check('a non-entrant is refused',
+    await waitFor(() => outsider.errors.length > 0) && !outsider.last('spectate-started'));
   outsider.close();
 
   // ── play real cards at table B while the watcher records ────────────────
   // The felt has to actually have cards on it, otherwise the leak audit below
   // is checking nothing. 'Q' is a non-trump type, so the flow is
-  // type_selection → discard (leader sheds 2) → playing.
-  const leader = tableB.find((c) => c.seat === c.state?.leaderSeat) || tableB[0];
+  // type_selection → discard (leader sheds 2, never a queen) → playing.
+  const leader = tableB.find((c) => c.seat === c.leaderSeat) || tableB[0];
   leader.emit('select-game-type', { typeCode: 'Q' });
-  await sleep(500);
-  leader.emit('discard-cards', { cards: leader.hand.slice(0, 2) });
-  await sleep(600);
+  await waitFor(() => leader.hand.length === 12);
+  leader.emit('discard-cards', { cards: leader.hand.filter((c) => c.rank !== 'Q').slice(0, 2) });
+  await waitFor(() => tableB.every((c) => c.currentTurn !== undefined));
 
   const bySeat = new Map(tableB.map((c) => [c.seat, c]));
   let played = 0;
   for (let i = 0; i < 12; i++) {
     // Whoever is on turn plays a legal card: follow the led suit if able.
-    const turn = tableB.map((c) => c.currentTurn).find((t) => t !== undefined && t !== null);
-    const actor = bySeat.get(turn);
-    if (!actor || !actor.hand.length) { await sleep(200); continue; }
-    const led = tableB.map((c) => c.ledSuit).find((l) => l);
+    const actor = bySeat.get(tableB[0].currentTurn);
+    if (!actor || !actor.hand.length) { await sleep(100); continue; }
+    const led = tableB[0].ledSuit;
     const card = (led && actor.hand.find((c) => c.suit === led)) || actor.hand[0];
+    const seen = tableB[0].all('card-played').length + tableB[0].all('trick-complete').length
+      + tableB[0].all('round-complete').length;
     actor.emit('play-card', { card });
     played += 1;
-    await sleep(300);
+    await waitFor(() => tableB[0].all('card-played').length + tableB[0].all('trick-complete').length
+      + tableB[0].all('round-complete').length > seen || actor.errors.length);
+    if (tableB[0].last('round-complete')) break;
   }
-  await sleep(900);
+  await sleep(300);
   check('cards were actually played at the watched table', played >= 6, `played ${played}`);
 
   // ── the audit ───────────────────────────────────────────────────────────
   const leaks = [];
   let sawTableAction = false;
-  for (const { event, payload } of watcher.received) {
+  for (const { event, payload } of watcher.events) {
     if (event === 'card-played' || event === 'trick-complete') sawTableAction = true;
     // Cards legitimately on the table.
-    if (['card-played', 'trick-complete', 'round-complete', 'game-over',
-         'game-state', 'last-trick'].includes(event)) {
+    if (['card-played', 'trick-complete', 'round-complete', 'game-over', 'game-state'].includes(event)) {
       // still check these for a `hand` specifically
       const p = payload || {};
       if (Array.isArray(p.hand) && p.hand.length) leaks.push({ event, why: 'hand', n: p.hand.length });
@@ -181,35 +161,28 @@ function findCards(value, trail = '') {
   check('watcher saw live table action', sawTableAction);
   check('NO cards leaked to the watcher', leaks.length === 0,
     `\n        ${JSON.stringify(leaks.slice(0, 6), null, 2)}`);
-  check('watcher was never dealt a hand', watcher.hand.length === 0,
-    `has ${watcher.hand.length} cards`);
+  check('watcher was never dealt a hand', !watcher.events.some((e) => e.event === 'hand-dealt'));
 
   // ── watchers can talk ───────────────────────────────────────────────────
   const listener = tableB[0];
-  listener.chat.length = 0;
+  const heardBefore = listener.all('chat-message').length;
   watcher.emit('chat-message', { message: 'გამარჯობა მაგიდიდან' });
-  await sleep(400);
-  const heard = listener.chat.find((m) => m.name === watcher.playerName);
-  check('watcher chat reaches the table', !!heard, JSON.stringify(listener.chat));
+  await waitFor(() => listener.all('chat-message').length > heardBefore);
+  const heard = listener.all('chat-message').find((m) => m.name === watcher.playerName);
+  check('watcher chat reaches the table', !!heard, JSON.stringify(listener.all('chat-message')));
   check('watcher chat is flagged as a spectator', heard?.spectator === true);
   check('watcher chat carries no seat', heard?.seat === null);
 
   // ── detaching ───────────────────────────────────────────────────────────
   watcher.emit('stop-watching');
-  await sleep(300);
-  listener.chat.length = 0;
-  const before = watcher.received.length;
+  await waitFor(() => watcher.last('spectate-stopped'));
+  const before = watcher.events.length;
   tableB[1].emit('chat-message', { message: 'after detach' });
-  await sleep(400);
-  const gotAfter = watcher.received
-    .slice(before)
-    .filter((e) => e.event === 'chat-message').length;
+  await waitFor(() => tableB[0].all('chat-message').some((m) => m.message === 'after detach'));
+  await sleep(200);
+  const gotAfter = watcher.events.slice(before).filter((e) => e.event === 'chat-message').length;
   check('detached watcher stops receiving the table', gotAfter === 0, `got ${gotAfter}`);
 
-  console.log(`\n${passed} passed, ${failed} failed`);
   cs.forEach((c) => c.close());
-  process.exit(failed ? 1 : 0);
-})().catch((err) => {
-  console.error('spectate test threw:', err);
-  process.exit(1);
+  summary();
 });

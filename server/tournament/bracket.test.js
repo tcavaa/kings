@@ -1,20 +1,16 @@
 'use strict';
 
 // Advancement rules for the tournament bracket. Pure functions, no sockets and
-// no database — run with: node tournament/bracket.test.js
+// no database — run with: node --test tournament/bracket.test.js
 
+const test = require('node:test');
+const assert = require('node:assert/strict');
 const {
   penaltyPoints, pickFinalists, seedTables, shuffle, VALID_SIZES,
 } = require('./bracket');
 
-let passed = 0, failed = 0;
-const check = (name, cond, extra = '') => {
-  if (cond) { passed += 1; console.log(`  ok  ${name}`); }
-  else { failed += 1; console.error(`FAIL  ${name} ${extra}`); }
-};
-const eq = (name, actual, expected) =>
-  check(name, JSON.stringify(actual) === JSON.stringify(expected),
-    `\n        expected ${JSON.stringify(expected)}\n        actual   ${JSON.stringify(actual)}`);
+const check = (name, cond, extra = '') => assert.ok(cond, `${name} ${extra}`);
+const eq = (name, actual, expected) => assert.deepEqual(actual, expected, name);
 
 /**
  * Build a finished-table record of the shape `reportResult` receives.
@@ -51,8 +47,7 @@ function table(tableIndex, spec) {
 
 const names = (r) => r.finalists.map((f) => f.name);
 
-console.log('— penaltyPoints only counts avoidance rounds —');
-{
+test('penaltyPoints only counts avoidance rounds', () => {
   const rd = [
     { gameType: 'T',  scores: { 0: -12 } },   // negative → counts
     { gameType: 'K',  scores: { 0: -40 } },   // negative → counts
@@ -62,10 +57,9 @@ console.log('— penaltyPoints only counts avoidance rounds —');
   eq('missing seat is 0', penaltyPoints(2, rd), 0);
   eq('no rounds is 0', penaltyPoints(0, []), 0);
   eq('unknown game type ignored', penaltyPoints(0, [{ gameType: 'ZZ', scores: { 0: -5 } }]), 0);
-}
+});
 
-console.log('— 6 players, no ties: 2 winners + best loser —');
-{
+test('6 players, no ties: 2 winners + best loser', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 30 }, { name: 'B', score: 10 }, { name: 'C', score: -5 }]),
     table(1, [{ name: 'D', score: 20 }, { name: 'E', score: 15 }, { name: 'F', score: 0 }]),
@@ -76,20 +70,18 @@ console.log('— 6 players, no ties: 2 winners + best loser —');
     r.standings.find((s) => s.name === 'E').wildcard === true);
   check('A is not a wildcard',
     r.standings.find((s) => s.name === 'A').wildcard === false);
-}
+});
 
-console.log('— a table winner is never displaced by a higher-scoring loser —');
-{
+test('a table winner is never displaced by a higher-scoring loser', () => {
   // B loses table 0 with 25 but out-scores table 1's winner D on 5.
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 30 }, { name: 'B', score: 25 }, { name: 'C', score: -5 }]),
     table(1, [{ name: 'D', score: 5 }, { name: 'E', score: 2 }, { name: 'F', score: 0 }]),
   ]);
   eq('both winners seated, loser takes the wildcard', names(r), ['A', 'D', 'B']);
-}
+});
 
-console.log('— the specified double-tie case: 25/25 vs 5/5 —');
-{
+test('the specified double-tie case: 25/25 vs 5/5', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 25, penalty: -30 }, { name: 'B', score: 25, penalty: -40 }, { name: 'C', score: -10 }]),
     table(1, [{ name: 'D', score: 5, penalty: -60 }, { name: 'E', score: 5, penalty: -20 }, { name: 'F', score: -30 }]),
@@ -99,19 +91,17 @@ console.log('— the specified double-tie case: 25/25 vs 5/5 —');
     r.standings.find((s) => s.name === 'E').rank < r.standings.find((s) => s.name === 'D').rank);
   check('no wildcard — four winners filled the seats',
     r.finalists.every((f) => f.isWinner));
-}
+});
 
-console.log('— penalty tiebreak decides a straight two-way tie —');
-{
+test('penalty tiebreak decides a straight two-way tie', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 40 }, { name: 'B', score: 1 }, { name: 'C', score: 0 }]),
     table(1, [{ name: 'D', score: 10, penalty: -70 }, { name: 'E', score: 10, penalty: -10 }, { name: 'F', score: 3 }]),
   ]);
   eq('less-negative D/E ordering', names(r), ['A', 'E', 'D']);
-}
+});
 
-console.log('— 9 players, no ties: the three winners —');
-{
+test('9 players, no ties: the three winners', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 30 }, { name: 'B', score: 10 }, { name: 'C', score: -5 }]),
     table(1, [{ name: 'D', score: 20 }, { name: 'E', score: 15 }, { name: 'F', score: 0 }]),
@@ -119,10 +109,9 @@ console.log('— 9 players, no ties: the three winners —');
   ]);
   eq('exactly the winners, ranked', names(r), ['A', 'D', 'G']);
   check('no wildcard in a 9-player bracket', r.finalists.every((f) => f.isWinner));
-}
+});
 
-console.log('— 9 players with a tied table: four winners for three seats —');
-{
+test('9 players with a tied table: four winners for three seats', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 30 }, { name: 'B', score: 5 }, { name: 'C', score: -5 }]),
     table(1, [{ name: 'D', score: 20, penalty: -50 }, { name: 'E', score: 20, penalty: -15 }, { name: 'F', score: 0 }]),
@@ -131,20 +120,18 @@ console.log('— 9 players with a tied table: four winners for three seats —')
   eq('top three winners by score then penalty', names(r), ['A', 'E', 'D']);
   check('G won a table but ranked out',
     r.standings.find((s) => s.name === 'G').advanced === false);
-}
+});
 
-console.log('— a three-way tied table —');
-{
+test('a three-way tied table', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 10, penalty: -10 }, { name: 'B', score: 10, penalty: -20 }, { name: 'C', score: 10, penalty: -30 }]),
     table(1, [{ name: 'D', score: 40 }, { name: 'E', score: 2 }, { name: 'F', score: 1 }]),
   ]);
   eq('D plus the two cleanest of the tied trio', names(r), ['D', 'A', 'B']);
   eq('still exactly three', r.finalists.length, 3);
-}
+});
 
-console.log('— determinism —');
-{
+test('determinism', () => {
   const build = () => [
     table(0, [{ name: 'A', score: 10, penalty: -5 }, { name: 'B', score: 10, penalty: -5 }, { name: 'C', score: 0 }]),
     table(1, [{ name: 'D', score: 10, penalty: -5 }, { name: 'E', score: 3 }, { name: 'F', score: 1 }]),
@@ -154,10 +141,9 @@ console.log('— determinism —');
   const b = names(pickFinalists(build()));
   eq('same inputs give the same bracket', a, b);
   eq('three finalists even when fully tied', a.length, 3);
-}
+});
 
-console.log('— seeding —');
-{
+test('seeding', () => {
   const six = Array.from({ length: 6 }, (_, i) => ({ name: `P${i}` }));
   const nine = Array.from({ length: 9 }, (_, i) => ({ name: `P${i}` }));
   eq('6 players → 2 tables', seedTables(six).map((t) => t.length), [3, 3]);
@@ -185,7 +171,4 @@ console.log('— seeding —');
   const src = [1, 2, 3, 4, 5];
   shuffle(src);
   eq('shuffle leaves the source untouched', src, [1, 2, 3, 4, 5]);
-}
-
-console.log(`\n${passed} passed, ${failed} failed`);
-process.exit(failed ? 1 : 0);
+});

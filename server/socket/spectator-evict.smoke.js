@@ -1,62 +1,70 @@
 'use strict';
 
-// Watchers must be released when the table they are watching ends.
+// Watchers must be released when the table they are watching ends — at game
+// over, and when every player has left and the room's grace window runs out.
 //
 // Left attached, they show as permanently 'watching' a room that no longer
 // exists, with no way back to the lobby and their chat relayed into a dead
 // socket room.
 //
-// Run: PORT=3522 node socket/spectator-evict.smoke.js
+// Run: DATABASE_URL=postgres://localhost/kings_test PORT=3522 node socket/spectator-evict.smoke.js
 
-process.env.PORT = process.env.PORT || '3522';
-require('../index.js');
+process.env.ROOM_GRACE_MS = '1000';
+const { startServer, connectClient, waitFor, check, summary, run } = require('../test/harness');
 
-const { io } = require('socket.io-client');
+const URL = startServer(3522);
 
-const URL = `http://localhost:${process.env.PORT}`;
+run(async () => {
+  const mk = (name) => connectClient(URL, { name });
+  const online = (s) => s.last('online-players') || [];
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let pass=0, fail=0;
-const check=(n,c,e='')=>{ if(c){pass++;console.log('  ok  '+n);} else {fail++;console.error('FAIL  '+n+' '+e);} };
-const mk = n => new Promise(res => {
-  const s=io(URL,{transports:['websocket'],forceNew:true});
-  s.n=n; s.online=[]; s.stopped=null;
-  s.on('online-players', l => s.online = l);
-  s.on('live-games', l => s.live = l);
-  s.on('spectate-started', p => s.spectating = p);
-  s.on('spectate-stopped', p => s.stopped = p || {});
-  s.on('room-created', p => s.roomCode = p.roomCode);
-  s.on('room-joined', p => s.roomCode = p.roomCode);
-  s.on('connect', ()=>res(s));
-});
+  /** Three players at a running table, and a watcher on it. */
+  async function watchedTable(tag) {
+    const [a, b, c, w] = [await mk(`${tag}-A`), await mk(`${tag}-B`), await mk(`${tag}-C`), await mk(`${tag}-მაყურ`)];
+    for (const s of [a, b, c, w]) s.emit('announce-presence', { playerName: s.playerName });
+    a.emit('create-room', { playerName: a.playerName, mode: 'public' });
+    await waitFor(() => a.last('room-created'));
+    const room = a.last('room-created').roomCode;
+    b.emit('join-room', { roomCode: room, playerName: b.playerName });
+    c.emit('join-room', { roomCode: room, playerName: c.playerName });
+    await waitFor(() => a.last('player-joined')?.players.length === 3);
+    a.emit('start-game');
+    await waitFor(() => a.last('hand-dealt'));
+    w.emit('watch-game', { roomCode: room, playerName: w.playerName });
+    await waitFor(() => w.last('spectate-started'));
+    return { a, b, c, w, room };
+  }
 
-(async () => {
-  const [a,b,c,w] = [await mk('ევ-A'), await mk('ევ-B'), await mk('ევ-C'), await mk('ევ-მაყურ')];
-  for (const s of [a,b,c,w]) { s.emit('announce-presence', { playerName: s.n }); await sleep(100); }
-  a.emit('create-room', { playerName: a.n, mode: 'public' }); await sleep(400);
-  b.emit('join-room', { roomCode: a.roomCode, playerName: b.n });
-  c.emit('join-room', { roomCode: a.roomCode, playerName: c.n }); await sleep(400);
-  a.emit('start-game'); await sleep(700);
-
-  w.emit('watch-game', { roomCode: a.roomCode, playerName: w.n }); await sleep(600);
-  check('watching started', !!w.spectating);
+  // ── game over ──
+  const t1 = await watchedTable('ევ');
+  const lobby = await mk('ევ-ლობი');
+  lobby.emit('announce-presence', { playerName: lobby.playerName });
+  check('watching started', !!t1.w.last('spectate-started'));
   check('presence says watching',
-    w.online.find(p=>p.name==='ევ-მაყურ')?.status === 'watching');
+    await waitFor(() => online(lobby).find((p) => p.name === 'ევ-მაყურ')?.status === 'watching'));
 
-  // End the game.
-  a.emit('propose-quit', { kind: 'game' }); await sleep(250);
-  b.emit('vote-quit', { accept: true }); c.emit('vote-quit', { accept: true });
-  await sleep(1200);
+  t1.a.emit('propose-quit', { kind: 'game' });
+  await waitFor(() => t1.b.last('quit-proposal'));
+  t1.b.emit('vote-quit', { accept: true });
+  t1.c.emit('vote-quit', { accept: true });
 
-  check('watcher was sent home when the game ended', !!w.stopped, JSON.stringify(w.stopped));
-  check('and told why', w.stopped?.reason === 'game-over');
-  w.emit('lobby-info'); await sleep(400);
-  const me = w.online.find(p=>p.name==='ევ-მაყურ');
+  check('watcher was sent home when the game ended', await waitFor(() => t1.w.last('spectate-stopped')),
+    JSON.stringify(t1.w.last('spectate-stopped')));
+  check('and told why', t1.w.last('spectate-stopped')?.reason === 'game-over');
+  t1.w.emit('lobby-info');
+  await waitFor(() => online(t1.w).length);
+  const me = online(t1.w).find((p) => p.name === 'ევ-მაყურ');
   check('presence no longer says watching', me?.status !== 'watching', JSON.stringify(me));
   check('presence points at no room', !me?.roomCode, JSON.stringify(me));
-  check('the finished game is off the live list', (w.live||[]).length === 0, JSON.stringify(w.live));
+  check('the finished game is off the live list', (t1.w.last('live-games') || []).length === 0,
+    JSON.stringify(t1.w.last('live-games')));
 
-  console.log(`\n${pass} passed, ${fail} failed`);
-  [a,b,c,w].forEach(s=>s.close());
-  process.exit(fail?1:0);
-})();
+  // ── everyone leaves, the room expires ──
+  const t2 = await watchedTable('გრ');
+  t2.a.close(); t2.b.close(); t2.c.close();
+  check('a watcher is told when an abandoned room is dropped',
+    await waitFor(() => t2.w.last('spectate-stopped'), 5000), JSON.stringify(t2.w.last('spectate-stopped')));
+  check('and why', t2.w.last('spectate-stopped')?.reason === 'closed');
+
+  summary();
+});

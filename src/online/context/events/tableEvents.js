@@ -35,9 +35,9 @@ export function registerTableEvents(socket, ctx) {
     ctx.clearGameOverTimer()
   })
 
-  socket.on('round-started', ({ round, leaderSeat, phase, usedTypes }) => {
+  socket.on('round-started', ({ round, leaderSeat, phase, usedTypes, cardCounts }) => {
     ctx.clearTrickTimers()
-    dispatch({ type: 'round-started', round, leaderSeat, phase, usedTypes })
+    dispatch({ type: 'round-started', round, leaderSeat, phase, usedTypes, cardCounts })
     ctx.setQuitProposal(null)
   })
 
