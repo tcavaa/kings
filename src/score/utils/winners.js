@@ -7,6 +7,8 @@
 // champions are stored joined, so those are still split. The online API
 // (King Online) sends a `winners` array next to the legacy single `winner`.
 
+import { winnerNames } from '../../../server/games/results.js'
+
 const SEP = ' & '
 
 /** Join tied winner names into the stored winner_name string. */
@@ -39,14 +41,10 @@ export function isTieResult(resultOrName) {
 
 /**
  * Winner names of an online-API game. New API payloads carry `winners`
- * (array of { seat, name, score }); old ones only `winner`.
+ * (array of { seat, name, score }); old ones only `winner`. The same reading
+ * as the server's and King Online's (server/games/results.js).
  */
-export function onlineWinnerNames(game) {
-  if (Array.isArray(game?.winners) && game.winners.length) {
-    return game.winners.map(w => w?.name).filter(Boolean)
-  }
-  return game?.winner?.name ? [game.winner.name] : []
-}
+export const onlineWinnerNames = winnerNames
 
 /** Did `name` win this online game (including shared/tied wins)? */
 export function isOnlineWinner(game, name) {

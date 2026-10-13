@@ -19,45 +19,28 @@
 // ჩაწერა read its games back unchanged.
 
 const crypto = require('crypto');
-const { ALL_TYPE_CODES: GAME_TYPES } = require('../game/constants');
+const {
+  GAME_TYPE_CODES: GAME_TYPES, UNIT_FIELD, gameTypeRule, roundScores, lastTwoWinners,
+} = require('../game/gameTypes');
 const { badRequest: invalid } = require('../lib/httpError');
 
-const TAKEN_FIELD = {
-  Q: 'queensTaken', J: 'jacksTaken', H: 'heartsTaken',
-  T: 'tricksTaken', P1: 'tricksTaken', P2: 'tricksTaken', P3: 'tricksTaken',
-};
 const SEP = ' & ';
 
-// How ჩაწერა scores a round (src/score/constants/gameTypes.js and
-// computeScoresForRound in src/score/utils/scoring.js): a 'single' type costs
-// its target the points, a 'count' type pays every player per unit taken,
-// and the units handed out always add up to the type's total.
-const SHEET_SCORING = {
-  K:  { kind: 'single', points: -40 },
-  Q:  { kind: 'count', perUnit: -10, units: 4 },
-  J:  { kind: 'count', perUnit: -10, units: 4 },
-  H:  { kind: 'count', perUnit: -5, units: 8 },
-  L2: { kind: 'count', perUnit: -20, units: 2 },
-  T:  { kind: 'count', perUnit: -4, units: 10 },
-  P1: { kind: 'count', perUnit: 8, units: 10 },
-  P2: { kind: 'count', perUnit: 8, units: 10 },
-  P3: { kind: 'count', perUnit: 8, units: 10 },
-};
+// ჩაწერა scores a round by the shared rules (game/gameTypes.js): a 'single'
+// type costs its target the points, a 'count' type pays every player per
+// unit taken, and the units handed out always add up to the type's total.
 
 /** A round's scores per player id, worked out from what the sheet recorded. */
 function scoresForRound(round, ids) {
-  const rule = SHEET_SCORING[round.gameTypeCode];
-  const scores = {};
+  const rule = gameTypeRule(round.gameTypeCode);
   if (rule.kind === 'single') {
     if (round.singleTargetPlayerId == null) throw invalid('Invalid round target.');
-    for (const id of ids) scores[id] = id === round.singleTargetPlayerId ? rule.points : 0;
-    return scores;
+    return roundScores(rule.code, ids, { target: round.singleTargetPlayerId });
   }
   const counts = round.countsByPlayerId || {};
   const handedOut = ids.reduce((sum, id) => sum + (counts[id] || 0), 0);
-  if (handedOut !== rule.units) throw invalid('Invalid round counts.');
-  for (const id of ids) scores[id] = (counts[id] || 0) * rule.perUnit;
-  return scores;
+  if (handedOut !== rule.totalUnits) throw invalid('Invalid round counts.');
+  return roundScores(rule.code, ids, { counts });
 }
 
 /** { [playerId]: v } → { [seat]: v } (null stays null). */
@@ -68,15 +51,6 @@ function toSeats(obj, seatOf) {
     if (seatOf.has(id)) out[seatOf.get(id)] = v;
   }
   return out;
-}
-
-/** The last two tricks' winners, rebuilt from "how many of the last 2 each took". */
-function lastTwoWinners(counts) {
-  const winners = [];
-  for (const [seat, n] of Object.entries(counts || {})) {
-    for (let i = 0; i < n; i++) winners.push(Number(seat));
-  }
-  return winners;
 }
 
 function roundDetailsOf(rounds, seatOf, seats) {
@@ -96,7 +70,7 @@ function roundDetailsOf(rounds, seatOf, seats) {
       counts,
       targetSeat,
     };
-    if (TAKEN_FIELD[r.gameTypeCode] && counts) d[TAKEN_FIELD[r.gameTypeCode]] = counts;
+    if (UNIT_FIELD[r.gameTypeCode] && counts) d[UNIT_FIELD[r.gameTypeCode]] = counts;
     if (r.gameTypeCode === 'L2' && counts) d.trickWinners = lastTwoWinners(counts);
     if (r.gameTypeCode === 'K') d.kingOfHeartsTakenBy = targetSeat;
     return d;

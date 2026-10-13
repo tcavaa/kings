@@ -1,6 +1,8 @@
 // Round entry and running totals, shared by the round form, the last-round
-// edit, the charts and the live-sheet list. (They sit next to scoring.js
-// rather than in it while that file is being merged with King Online's.)
+// edit, the charts and the live-sheet list. The totals themselves are
+// worked out by shared/totals.js, which King Online's charts use too.
+
+import { totalsOf, runningTotals } from '../../../shared/totals.js'
 
 /** A typed or stepped card count as a whole number of at least 0. */
 export function normalizeCount(value) {
@@ -29,25 +31,12 @@ export function validateRound(type, countsByPlayerId, singleTargetPlayerId) {
   return ''
 }
 
-// Rounds can come from another phone's live sheet, so a missing round or
-// score counts as 0 rather than breaking the sum.
-const scoreIn = (round, id) => {
-  const v = round?.scores?.[id]
-  return typeof v === 'number' && Number.isFinite(v) ? v : 0
-}
-
-/** { [playerId]: total } over the given rounds. */
+/** { [playerId]: total } over the given rounds (shared/totals.js). */
 export function totalsByPlayer(players, rounds) {
-  const totals = Object.fromEntries(players.map(p => [p.id, 0]))
-  ;(rounds || []).forEach(r => players.forEach(p => { totals[p.id] += scoreIn(r, p.id) }))
-  return totals
+  return totalsOf(players.map(p => p.id), rounds)
 }
 
 /** The running totals after each round: [{ [playerId]: total }, ...]. */
 export function cumulativeTotals(players, rounds) {
-  const running = Object.fromEntries(players.map(p => [p.id, 0]))
-  return (rounds || []).map(r => {
-    players.forEach(p => { running[p.id] += scoreIn(r, p.id) })
-    return { ...running }
-  })
+  return runningTotals(players.map(p => p.id), rounds)
 }

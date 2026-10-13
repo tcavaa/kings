@@ -7,10 +7,10 @@ import {
   strokeRoundRect,
 } from "../lib/bake.js";
 import { CARD_W, CARD_H } from "../layout.js";
+import { SUIT_SYMBOLS } from "../../constants/suits.js";
 
 export { CARD_W, CARD_H };
 
-const SUIT_SYMBOLS = { H: "♥", D: "♦", S: "♠", C: "♣" };
 const SUIT_COLORS = {
   H: "#b44636",
   D: "#b44636",

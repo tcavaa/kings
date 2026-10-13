@@ -4,7 +4,7 @@ import {
   Legend, ResponsiveContainer, ReferenceLine,
 } from 'recharts'
 import { computeGameStats, computeScoresByType, getGameAwards, TYPE_ROWS } from '../utils/analytics'
-import { computePerGameAchievements } from '../utils/achievements'
+import { computePerGameAchievements, countCodes } from '../utils/achievements'
 import { CardTypeIcon } from '../utils/gameIcons'
 import { useChartTheme } from '../utils/chartTheme'
 import AchievementBadges from './AchievementBadges'
@@ -22,11 +22,7 @@ export default function GameAnalytics({ players, rounds, participants }) {
     const maps = {}
     players.forEach(p => {
       const codes = perGameAchievements[p.id] || []
-      if (!codes.length) return
-      maps[p.id] = codes.reduce((acc, code) => {
-        acc[code] = (acc[code] || 0) + 1
-        return acc
-      }, {})
+      if (codes.length) maps[p.id] = countCodes(codes)
     })
     return maps
   }, [players, perGameAchievements])

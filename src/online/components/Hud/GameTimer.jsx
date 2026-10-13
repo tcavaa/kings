@@ -1,16 +1,10 @@
 import { memo, useEffect, useState } from 'react'
 import { Timer } from 'lucide-react-online'
 import { useGame } from '../../context/GameContext'
+import { formatDuration } from '../../../../shared/duration.js'
 
 /** ms → M:SS, rolling over to H:MM:SS only once a game actually passes an hour. */
-function format(ms) {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const s = total % 60
-  const m = Math.floor(total / 60) % 60
-  const h = Math.floor(total / 3600)
-  const pad = (n) => String(n).padStart(2, '0')
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`
-}
+const format = (ms) => formatDuration(Math.floor(ms / 1000))
 
 /**
  * How long this game has been running.

@@ -6,6 +6,7 @@
 const { db } = require('./connection');
 const { createMirror, iso } = require('./mirror');
 const { fromScoreSheet } = require('../games/scoreSheet');
+const { winnerNames, emptyRoundStats, addRoundStats } = require('../games/results');
 const { badRequest } = require('../lib/httpError');
 
 // Every DATETIME the MySQL build wrote was wall-clock time on the cPanel box
@@ -306,12 +307,7 @@ function rowToGame(row, parsed) {
 async function getLifetimeStats(name, mode = 'all', type = 'all') {
   if (!name) throw badRequest('name is required');
   const rows = await gameEntries(mode, type);
-  const out = {
-    name,
-    gamesPlayed: 0, wins: 0, totalScore: 0,
-    kingsOfHearts: 0, queens: 0, jacks: 0, hearts: 0,
-    totalTricks: 0, roundsLed: 0,
-  };
+  const out = { name, gamesPlayed: 0, wins: 0, totalScore: 0, ...emptyRoundStats() };
   for (const row of rows) {
     const parsed = barePayload(row);
     if (!parsed.ok) continue;
@@ -319,21 +315,11 @@ async function getLifetimeStats(name, mode = 'all', type = 'all') {
     const me = (payload.players || []).find((p) => p.name === name);
     if (!me) continue;
     out.gamesPlayed += 1;
-    // Tie-aware: a game may have several winners (payload.winners). Fall
-    // back to the single winner_name column for rows saved before ties.
-    const winnerNames = Array.isArray(payload.winners) && payload.winners.length
-      ? payload.winners.map((w) => w.name)
-      : [row.winner_name];
-    if (winnerNames.includes(name)) out.wins += 1;
+    // Tie-aware: a game may have several winners (payload.winners). Rows
+    // saved before ties only have the winner_name column.
+    if (winnerNames({ winners: payload.winners, winner_name: row.winner_name }).includes(name)) out.wins += 1;
     out.totalScore += me.score ?? 0;
-    for (const d of payload.roundDetails || []) {
-      if (d.leaderSeat === me.seat) out.roundsLed += 1;
-      out.totalTricks += d.tricksTaken?.[me.seat] ?? 0;
-      if (d.gameType === 'Q') out.queens += d.queensTaken?.[me.seat] ?? 0;
-      if (d.gameType === 'J') out.jacks  += d.jacksTaken?.[me.seat]  ?? 0;
-      if (d.gameType === 'H') out.hearts += d.heartsTaken?.[me.seat] ?? 0;
-      if (d.gameType === 'K' && d.kingOfHeartsTakenBy === me.seat) out.kingsOfHearts += 1;
-    }
+    for (const d of payload.roundDetails || []) addRoundStats(out, d, me.seat);
   }
   return out;
 }

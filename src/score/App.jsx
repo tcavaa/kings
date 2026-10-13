@@ -17,7 +17,7 @@ import { sheetReducer, EMPTY_SHEET, targetRoundsOf } from './lib/sheetReducer.js
 import LiveSheets from './components/LiveSheets.jsx'
 import { useSeasons } from './hooks/useSeasons'
 import { applyThemeToBody } from './utils/themes'
-import { formatDuration } from './utils/time'
+import { formatDuration } from '../../shared/duration.js'
 import { readStorage, writeStorage } from './utils/storage'
 import { totalsByPlayer } from './utils/rounds'
 import { RefreshCw, Trash2, Timer, ArrowLeft } from 'lucide-react'

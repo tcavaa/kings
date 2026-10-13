@@ -1,7 +1,7 @@
 import { Timer } from 'lucide-react'
 import ScoreChart from './ScoreChart'
 import GameAnalytics from './GameAnalytics'
-import { formatDuration } from '../utils/time'
+import { formatDuration } from '../../../shared/duration.js'
 
 export default function GameDetailPage({ detail, result, onBack }) {
   const { players, rounds } = detail

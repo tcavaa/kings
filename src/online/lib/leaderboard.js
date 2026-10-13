@@ -3,21 +3,17 @@
 // hide newly-saved games until the user manually refreshes.
 
 import { api } from './api'
+import { winnerNames } from '../../../server/games/results.js'
 
 export const listGames = (limit = 50) => api.listGames(limit)
 
 /**
- * Every winner of a game — ties produce several. Older records only carry
- * the single `winner`, so fall back to a 1-element list.
+ * Did `name` win this game (including shared/tied wins)? Every winner of a
+ * tie counts; older records only carry the single `winner`
+ * (server/games/results.js reads both).
  */
-export function winnersOf(game) {
-  if (Array.isArray(game?.winners) && game.winners.length) return game.winners
-  return game?.winner ? [game.winner] : []
-}
-
-/** Did `name` win this game (including shared/tied wins)? */
 export function isWinnerName(game, name) {
-  return winnersOf(game).some(w => w?.name === name)
+  return winnerNames(game).includes(name)
 }
 
 /**

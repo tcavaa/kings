@@ -61,7 +61,7 @@ export default function GameTypeSelector() {
             <button
               key={type.code}
               style={{ "--contract-color": type.color }}
-              className={type.pointPerUnit > 0 ? "is-positive" : "is-negative"}
+              className={type.pointsPerUnit > 0 ? "is-positive" : "is-negative"}
               aria-pressed={selected === type.code}
               onClick={() => setSelected(type.code)}
             >
@@ -73,8 +73,8 @@ export default function GameTypeSelector() {
                 <small>{type.description}</small>
               </span>
               <b>
-                {type.pointPerUnit > 0 ? "+" : ""}
-                {type.pointPerUnit}
+                {type.pointsPerUnit > 0 ? "+" : ""}
+                {type.pointsPerUnit}
                 <small>× {type.totalUnits}</small>
               </b>
               <span className="k-radio">

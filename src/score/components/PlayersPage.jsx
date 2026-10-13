@@ -5,7 +5,8 @@ import TrophyIcon from './TrophyIcon'
 import TypeFilter, { useTypeFilter } from './TypeFilter'
 import AchievementBadges from './AchievementBadges'
 import { computeAllLifetimeAchievements } from '../utils/achievements'
-import { isWinnerOf, isChampionName } from '../utils/winners'
+import { isChampionName } from '../utils/winners'
+import { standingsOf } from '../utils/seasonStandings'
 
 export default function PlayersPage({ onBack, currentChampion }) {
   // One list with King Online. Players are added and removed in /admin.
@@ -14,19 +15,11 @@ export default function PlayersPage({ onBack, currentChampion }) {
   const [type, setType] = useTypeFilter()
   const { results, details: allDetails } = useMemo(() => gamesOfType(data, type), [data, type])
 
-  const stats = useMemo(() => {
-    const map = {}
-    players.forEach((p) => { map[p.name] = { games: 0, wins: 0, totalScore: 0 } })
-    results.forEach((r) => {
-      r.participants.forEach((participant) => {
-        if (!map[participant.name]) return
-        map[participant.name].games++
-        map[participant.name].totalScore += participant.score
-        if (isWinnerOf(r, participant.name)) map[participant.name].wins++
-      })
-    })
-    return map
-  }, [players, results])
+  // { [name]: { games, wins, totalScore } } — tie-aware, like the season tables.
+  const stats = useMemo(
+    () => Object.fromEntries(standingsOf(results).map(r => [r.name, r])),
+    [results]
+  )
 
   const lifetimeAchievements = useMemo(
     () => computeAllLifetimeAchievements(allDetails, results),

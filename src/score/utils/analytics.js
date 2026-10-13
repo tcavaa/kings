@@ -1,5 +1,9 @@
-import { GAME_TYPES } from '../constants/gameTypes'
+import { GAME_TYPE_CODES, gameTypeRule } from '../../../server/game/gameTypes.js'
 import { isWinnerOf } from './winners'
+import { totalsByPlayer } from './rounds'
+
+// { K: v, Q: v, …, P3: v } — one entry per game type.
+const byType = (make) => Object.fromEntries(GAME_TYPE_CODES.map(code => [code, make()]))
 
 // Icons for these rows come from utils/gameIcons.jsx (CardTypeIcon by code);
 // chart labels use the plain `label` text.
@@ -19,11 +23,11 @@ export const TYPE_ROWS = [
 export function computeGameStats(players, rounds) {
   const stats = {}
   players.forEach(p => {
-    stats[p.id] = { K: 0, Q: 0, J: 0, H: 0, L2: 0, T: 0, P1: 0, P2: 0, P3: 0 }
+    stats[p.id] = byType(() => 0)
   })
   rounds.forEach(round => {
     const { gameTypeCode: code, countsByPlayerId, singleTargetPlayerId } = round
-    const type = GAME_TYPES.find(t => t.code === code)
+    const type = gameTypeRule(code)
     if (!type) return
     if (type.kind === 'count' && countsByPlayerId) {
       players.forEach(p => {
@@ -40,7 +44,7 @@ export function computeGameStats(players, rounds) {
 export function computeScoresByType(players, rounds) {
   const result = {}
   players.forEach(p => {
-    result[p.id] = { K: 0, Q: 0, J: 0, H: 0, L2: 0, T: 0, P1: 0, P2: 0, P3: 0 }
+    result[p.id] = byType(() => 0)
   })
   rounds.forEach(round => {
     if (!round.scores) return
@@ -95,22 +99,18 @@ export function computeGlobalStats(allDetails, allResults) {
     const result = resultById.get(game_result_id)
     const gameStats = computeGameStats(players, rounds)
 
-    const totals = {}
-    players.forEach(p => { totals[p.id] = 0 })
-    rounds.forEach(r => {
-      if (r.scores) players.forEach(p => { totals[p.id] += r.scores[p.id] || 0 })
-    })
+    const totals = totalsByPlayer(players, rounds)
 
     players.forEach(p => {
       if (!map[p.id]) {
-        map[p.id] = { name: p.name, gamesPlayed: 0, wins: 0, seconds: 0, totalScore: 0, K: 0, Q: 0, J: 0, H: 0, L2: 0, T: 0, P1: 0, P2: 0, P3: 0 }
+        map[p.id] = { name: p.name, gamesPlayed: 0, wins: 0, seconds: 0, totalScore: 0, ...byType(() => 0) }
       }
       const m = map[p.id]
       m.gamesPlayed++
       m.totalScore += totals[p.id] || 0
       if (result && isWinnerOf(result, p.name)) m.wins++
       const gs = gameStats[p.id] || {}
-      ;['K','Q','J','H','L2','T','P1','P2','P3'].forEach(k => { m[k] += gs[k] || 0 })
+      GAME_TYPE_CODES.forEach(k => { m[k] += gs[k] || 0 })
     })
 
     // Second place = the player with the 2nd-highest total score in this game
@@ -159,11 +159,7 @@ export function computeComparison(selected, allDetails, allResults = []) {
     if (detail.type === 'online') onlineShared++
     else localShared++
 
-    const totals = {}
-    players.forEach(p => { totals[p.id] = 0 })
-    rounds.forEach(r => {
-      if (r.scores) players.forEach(p => { totals[p.id] += r.scores[p.id] || 0 })
-    })
+    const totals = totalsByPlayer(players, rounds)
 
     const result = resultById.get(game_result_id)
     selected.forEach(s => {
@@ -214,7 +210,7 @@ export function computeTypeEfficiency(allDetails) {
     players.forEach(p => {
       const name = p.name
       if (!playerGames[name]) {
-        playerGames[name] = { K: [], Q: [], J: [], H: [], L2: [], T: [], P1: [], P2: [], P3: [] }
+        playerGames[name] = byType(() => [])
       }
     })
     rounds.forEach(round => {

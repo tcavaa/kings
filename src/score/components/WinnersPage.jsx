@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Globe, Trophy, Crown, Handshake, Timer } from 'lucide-react'
-import { formatDuration } from '../utils/time'
+import { formatDuration } from '../../../shared/duration.js'
 import { useGameData } from '../lib/gameData'
 import { usePaged } from '../hooks/usePaged'
 import GameDetailPage from './GameDetailPage'

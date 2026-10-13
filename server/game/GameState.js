@@ -3,17 +3,18 @@
 const { createDeck, shuffle, deal } = require('./Deck');
 const { resolveTrick } = require('./TrickResolver');
 const { calculate } = require('./ScoreCalculator');
-const { ALL_TYPE_CODES, TOTAL_ROUNDS } = require('./constants');
+const { ALL_TYPE_CODES, TOTAL_ROUNDS, CARDS_PER_PLAYER } = require('./constants');
 const { TRUMP_TYPES, canDiscard, playError } = require('./rules');
+const { GAME_TYPE_RULES, gameTypeRule } = require('./gameTypes');
 
-// Full-round point totals per game type, used when a round is quit early via
+// Full-round point totals per game type (every unit's points: -40 for each
+// penalty type, +80 for a Plus round), used when a round is quit early via
 // a unanimous "quit round" vote: on negative hands the quitter absorbs the
 // entire penalty; on positive hands the quitter forfeits their share and the
 // other two players split the total evenly.
-const QUIT_ROUND_TOTALS = {
-  K: -40, Q: -40, J: -40, H: -40, L2: -40, T: -40,
-  P1: 80, P2: 80, P3: 80,
-};
+const QUIT_ROUND_TOTALS = Object.fromEntries(
+  GAME_TYPE_RULES.map((t) => [t.code, t.totalUnits * t.pointsPerUnit])
+);
 
 function cardsEqual(a, b) {
   return a.rank === b.rank && a.suit === b.suit;
@@ -435,29 +436,21 @@ class GameState {
   }
 
   _checkRoundEnd() {
+    // K, Q, J and H end as soon as every unit of the type has been taken
+    // (gameTypes.js says how many); the rest play all 10 tricks.
+    const all = (taken) => (taken[0] || 0) + (taken[1] || 0) + (taken[2] || 0)
+      >= gameTypeRule(this.chosenGameType).totalUnits;
     switch (this.chosenGameType) {
       case 'K':
         return this.kingOfHeartsTakenBy !== null;
       case 'Q':
-        return (
-          (this.queensTaken[0] || 0) +
-          (this.queensTaken[1] || 0) +
-          (this.queensTaken[2] || 0) >= 4
-        );
+        return all(this.queensTaken);
       case 'J':
-        return (
-          (this.jacksTaken[0] || 0) +
-          (this.jacksTaken[1] || 0) +
-          (this.jacksTaken[2] || 0) >= 4
-        );
+        return all(this.jacksTaken);
       case 'H':
-        return (
-          (this.heartsTaken[0] || 0) +
-          (this.heartsTaken[1] || 0) +
-          (this.heartsTaken[2] || 0) >= 8
-        );
+        return all(this.heartsTaken);
       default:
-        return this.trickWinners.length >= 10;
+        return this.trickWinners.length >= CARDS_PER_PLAYER;
     }
   }
 

@@ -12,6 +12,7 @@ import {
   countCodes,
 } from "../../utils/achievements";
 import { computeGameStats } from "../../utils/gameStats";
+import { runningTotals } from "../../../../shared/totals.js";
 
 /** Detail page for one finished game. */
 export default function GameDetail({ game, onBack }) {
@@ -28,18 +29,14 @@ export default function GameDetail({ game, onBack }) {
   const details = game.roundDetails || [];
 
   // Running cumulative score per round.
-  const progression = useMemo(() => {
-    const running = {};
-    playerList.forEach((p) => (running[p.seat] = 0));
-    return details.map((d) => {
-      const point = { round: d.round };
-      playerList.forEach((p) => {
-        running[p.seat] = (running[p.seat] || 0) + (d.scores?.[p.seat] ?? 0);
-        point[p.seat] = running[p.seat];
-      });
-      return point;
-    });
-  }, [details, playerList]);
+  const progression = useMemo(
+    () =>
+      runningTotals(playerList.map((p) => p.seat), details).map((totals, i) => ({
+        round: details[i].round,
+        ...totals,
+      })),
+    [details, playerList],
+  );
 
   // Per-player stats, by the per-round-type rule (see utils/gameStats).
   const stats = useMemo(

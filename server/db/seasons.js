@@ -8,6 +8,7 @@
 const { db } = require('./connection');
 const { iso } = require('./mirror');
 const { gameEntries, barePayload } = require('./games');
+const { winnerNames, inSeason, seasonTable, championOf } = require('../games/results');
 const { badRequest } = require('../lib/httpError');
 
 const SEASON_THEMES = ['casual', 'summer', 'mountain', 'christmas'];
@@ -26,28 +27,28 @@ async function currentSeason(sql = db()) {
   return { open, start: new Date(start) };
 }
 
-/** Wins per player since `start`, and the champion(s) ("A & B" on a tie). */
+/**
+ * Wins per player since `start`, and the champion(s) ("A & B" on a tie), by
+ * the season rule both apps show their season tables with
+ * (games/results.js).
+ */
 async function seasonStandings(start) {
-  const startMs = start.getTime();
-  const wins = new Map();
+  const games = [];
   let firstGameMs = null;
   for (const e of await gameEntries('all', 'all')) {
-    if (e.playedAtMs <= startMs) continue;
     if (e.type !== 'live' && e.is_championship !== 1) continue;
+    if (!inSeason(e.playedAtMs, start)) continue;
     firstGameMs = firstGameMs === null ? e.playedAtMs : Math.min(firstGameMs, e.playedAtMs);
     const parsed = barePayload(e);
-    const names = parsed.ok && Array.isArray(parsed.value.winners) && parsed.value.winners.length
-      ? parsed.value.winners.map((w) => w.name)
-      : [e.winner_name];
-    for (const name of new Set(names.filter(Boolean))) wins.set(name, (wins.get(name) || 0) + 1);
+    games.push({
+      playedAt: e.playedAtMs,
+      type: e.type,
+      winners: winnerNames({ winners: parsed.ok ? parsed.value.winners : null, winner_name: e.winner_name }),
+    });
   }
-  const table = [...wins].map(([name, count]) => ({ name, wins: count }))
-    .sort((a, b) => b.wins - a.wins || a.name.localeCompare(b.name));
-  const best = table[0]?.wins;
-  const champion = table.length
-    ? table.filter((r) => r.wins === best).map((r) => r.name).sort().join(' & ')
-    : null;
-  return { table, champion, firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
+  // Only the winners are listed: /admin shows who is ahead.
+  const table = seasonTable(games, start).map(({ name, wins }) => ({ name, wins }));
+  return { table, champion: championOf(table), firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
 }
 
 /** /admin: what ending the season now would record. */

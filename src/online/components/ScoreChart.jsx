@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useGame } from "../context/GameContext";
 import ProgressionChart from "./LeaderboardPanels/ProgressionChart";
+import { runningTotals } from "../../../shared/totals.js";
 
 /** The current game's running totals, round by round. */
 export default function ScoreChart() {
@@ -10,17 +11,13 @@ export default function ScoreChart() {
     () => [...players].sort((a, b) => a.seat - b.seat),
     [players],
   );
-  const rows = useMemo(() => {
-    const running = {};
-    return roundScores.map((rs) => {
-      const point = { round: rs.round };
-      sortedPlayers.forEach((p) => {
-        running[p.seat] = (running[p.seat] ?? 0) + (rs.scores?.[p.seat] ?? 0);
-        point[p.seat] = running[p.seat];
-      });
-      return point;
-    });
-  }, [roundScores, sortedPlayers]);
+  const rows = useMemo(
+    () =>
+      runningTotals(sortedPlayers.map((p) => p.seat), roundScores).map(
+        (totals, i) => ({ round: roundScores[i].round, ...totals }),
+      ),
+    [roundScores, sortedPlayers],
+  );
 
   if (!players.length || roundScores.length === 0)
     return (

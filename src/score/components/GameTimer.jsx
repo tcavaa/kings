@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Timer } from 'lucide-react'
-import { formatDuration } from '../utils/time'
+import { formatDuration } from '../../../shared/duration.js'
 
 /**
  * Floating game clock. Starts ticking the moment a game starts (startedAt

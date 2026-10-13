@@ -8,10 +8,9 @@
 // same for a person in every game of either kind (names that aren't a profile
 // get `guest:<name>`).
 
-import { GAME_TYPES } from '../constants/gameTypes.js'
+import { gameTypeRule, unitCountsOf } from '../../../server/game/gameTypes.js'
+import { winnerNames } from '../../../server/games/results.js'
 import { joinWinnerNames } from '../utils/winners.js'
-
-const KIND = Object.fromEntries(GAME_TYPES.map(t => [t.code, t.kind]))
 
 const bySeatToIds = (obj, idAtSeat) => obj == null
   ? null
@@ -67,7 +66,7 @@ export function onlineGameToLegacy(game, idOfName) {
   const ps = [...(game.players || [])].sort((a, b) => a.seat - b.seat)
   const idBySeat = new Map(ps.map(p => [p.seat, idOfName(p.name)]))
   const idAt = seat => idBySeat.get(seat)
-  const winners = (game.winners?.length ? game.winners : game.winner ? [game.winner] : []).map(w => w.name)
+  const winners = winnerNames(game)
   const result = {
     id: game.id,
     played_at: game.playedAt,
@@ -78,21 +77,11 @@ export function onlineGameToLegacy(game, idOfName) {
   }
   if (!game.roundDetails?.length) return { result, detail: null }
   const rounds = game.roundDetails.map(rd => {
-    const kind = KIND[rd.gameType]
+    const kind = gameTypeRule(rd.gameType)?.kind
     let counts = null
     if (kind === 'count') {
-      counts = {}
-      const l2 = {}
-      if (rd.gameType === 'L2') (rd.trickWinners || []).slice(-2).forEach(s => { l2[s] = (l2[s] || 0) + 1 })
-      ps.forEach(p => {
-        const s = p.seat
-        counts[idAt(s)] =
-          rd.gameType === 'Q' ? rd.queensTaken?.[s] ?? 0
-          : rd.gameType === 'J' ? rd.jacksTaken?.[s] ?? 0
-          : rd.gameType === 'H' ? rd.heartsTaken?.[s] ?? 0
-          : rd.gameType === 'L2' ? l2[s] ?? 0
-          : rd.tricksTaken?.[s] ?? 0   // T, P1–P3
-      })
+      const bySeat = unitCountsOf(rd) || {}
+      counts = Object.fromEntries(ps.map(p => [idAt(p.seat), bySeat[p.seat] ?? 0]))
     }
     return {
       scores: Object.fromEntries(ps.map(p => [idAt(p.seat), rd.scores?.[p.seat] ?? 0])),

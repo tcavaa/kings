@@ -1,17 +1,20 @@
 'use strict';
 
+const { GAME_TYPE_CODES, gameTypeRule } = require('./gameTypes');
+
 const RANKS = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const SUITS = ['H', 'D', 'S', 'C'];
 
-// All 9 game types every player must play (3 players × 9 = 27 rounds total)
-const GAME_TYPES = {
+// All 9 game types every player must play (3 players × 9 = 27 rounds total).
+// How each one scores lives in gameTypes.js; `positiveScoring` is read from
+// there so the two can't disagree.
+const GAME_TYPE_INFO = {
   K: {
     code: 'K',
     name: 'King of Hearts',
     description: 'Avoid taking the King of Hearts trick. -40 points.',
     scoring: 'king_of_hearts',
     earlyEnd: true,
-    positiveScoring: false,
   },
   Q: {
     code: 'Q',
@@ -19,7 +22,6 @@ const GAME_TYPES = {
     description: 'Avoid taking queens. -10 points per queen.',
     scoring: 'queens',
     earlyEnd: true,
-    positiveScoring: false,
   },
   J: {
     code: 'J',
@@ -27,7 +29,6 @@ const GAME_TYPES = {
     description: 'Avoid taking jacks. -10 points per jack.',
     scoring: 'jacks',
     earlyEnd: true,
-    positiveScoring: false,
   },
   H: {
     code: 'H',
@@ -35,7 +36,6 @@ const GAME_TYPES = {
     description: 'Avoid taking hearts. -5 points per heart.',
     scoring: 'hearts',
     earlyEnd: true,
-    positiveScoring: false,
   },
   L2: {
     code: 'L2',
@@ -43,7 +43,6 @@ const GAME_TYPES = {
     description: 'Avoid winning the last two tricks. -20 points per trick.',
     scoring: 'last_two',
     earlyEnd: false,
-    positiveScoring: false,
   },
   T: {
     code: 'T',
@@ -51,7 +50,6 @@ const GAME_TYPES = {
     description: 'Avoid taking tricks. -4 points per trick.',
     scoring: 'tricks',
     earlyEnd: false,
-    positiveScoring: false,
   },
   P1: {
     code: 'P1',
@@ -59,7 +57,6 @@ const GAME_TYPES = {
     description: 'Take as many tricks as possible. +8 points per trick.',
     scoring: 'positive_tricks',
     earlyEnd: false,
-    positiveScoring: true,
   },
   P2: {
     code: 'P2',
@@ -67,7 +64,6 @@ const GAME_TYPES = {
     description: 'Take as many tricks as possible. +8 points per trick.',
     scoring: 'positive_tricks',
     earlyEnd: false,
-    positiveScoring: true,
   },
   P3: {
     code: 'P3',
@@ -75,12 +71,16 @@ const GAME_TYPES = {
     description: 'Take as many tricks as possible. +8 points per trick.',
     scoring: 'positive_tricks',
     earlyEnd: false,
-    positiveScoring: true,
   },
 };
 
+const GAME_TYPES = Object.fromEntries(GAME_TYPE_CODES.map((code) => [code, {
+  ...GAME_TYPE_INFO[code],
+  positiveScoring: gameTypeRule(code).pointsPerUnit > 0,
+}]));
+
 // Ordered list of all type codes for tracking usage
-const ALL_TYPE_CODES = ['K', 'Q', 'J', 'H', 'L2', 'T', 'P1', 'P2', 'P3'];
+const ALL_TYPE_CODES = GAME_TYPE_CODES;
 
 // Total number of rounds in a full game (9 types × 3 players)
 const TOTAL_ROUNDS = 27;

@@ -54,7 +54,10 @@ app/                    Next.js App Router
   api/                  REST routes (were King Online's Express routes)
 src/online/             King Online client (React + Phaser + Tailwind), unchanged
 src/score/              King Score client (React + plain CSS), unchanged
+shared/                 game logic both clients use (achievements, win probability, totals)
 server/                 Socket.IO game server (Render) — game/socket/tournament
+  game/gameTypes.js     the nine game types and their scoring — server and both clients
+  games/results.js      winners, per-round stats, season tables — server and both clients
   db/                   Postgres store, shared with the Next.js API routes
 lib/api/http.js         request/response plumbing for the API routes
 supabase/migrations/    King Online schema for Postgres
@@ -70,6 +73,12 @@ King Online stays on the libraries it was built with: recharts 2 and
 lucide-react 1.14 are installed side by side with the score app's recharts 3
 and lucide-react 1.25, as `recharts-online` / `lucide-react-online`.
 `react-is` is pinned to 19 so recharts 2 renders under React 19.
+
+Game rules live once: code only the clients share is in `shared/`; code the
+game server needs too sits under `server/` (Render deploys only that folder)
+and the clients import it from there, like `server/game/rules.js`. Each app
+keeps its own wording (King Online is Georgian, King Score English), icons
+and look on top.
 
 ## Environment variables
 

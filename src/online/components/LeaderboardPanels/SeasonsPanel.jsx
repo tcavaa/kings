@@ -11,7 +11,8 @@ import {
   Legend,
 } from "recharts-online";
 import { api } from "../../lib/api";
-import { aggregatePlayers, isWinnerName } from "../../lib/leaderboard";
+import { isWinnerName } from "../../lib/leaderboard";
+import { inSeason, seasonTable, winnerNames } from "../../../../server/games/results.js";
 import AvatarImg from "../AvatarImg";
 import { signed, winRate, averageScore } from "../../utils/format";
 import {
@@ -25,10 +26,23 @@ import {
 
 // Seasons are King Score's: each has a start, an end (none while it runs)
 // and a champion. A season counts league games — online ones and the ones
-// recorded at a table — exactly like the score app's season tables.
+// recorded at a table — by the rule the server crowns the champion with,
+// the same one the score app's season tables use (server/games/results.js).
 const RACE_PLAYERS = 5;
 const fmt = (d) =>
   new Date(d).toLocaleDateString("ka-GE", { day: "2-digit", month: "short", year: "numeric" });
+
+/** The season's table rows, with each player's photo from their games. */
+function standingsOf(games) {
+  const avatars = new Map();
+  for (const g of games) {
+    for (const p of g.players || []) if (p.avatar && !avatars.has(p.name)) avatars.set(p.name, p.avatar);
+  }
+  const table = seasonTable(
+    games.map((g) => ({ playedAt: g.playedAt, type: g.type, players: g.players, winners: winnerNames(g) })),
+  );
+  return table.map((r) => ({ ...r, gamesPlayed: r.games, avatar: avatars.get(r.name) || null }));
+}
 
 function Standings({ players, champion }) {
   if (!players.length) return <p className="k-data-empty">ამ სეზონში თამაში ჯერ არ არის.</p>;
@@ -133,20 +147,15 @@ export default function SeasonsPanel({ games }) {
   // A season starts where its row says, or where the last one ended.
   const currentStart = current?.started_at || past[0]?.ended_at || null;
   const currentGames = useMemo(
-    () => (currentStart ? league.filter((g) => new Date(g.playedAt) > new Date(currentStart)) : []),
+    () => (currentStart ? league.filter((g) => inSeason(g.playedAt, currentStart)) : []),
     [league, currentStart],
   );
-  const currentPlayers = useMemo(() => aggregatePlayers(currentGames), [currentGames]);
+  const currentPlayers = useMemo(() => standingsOf(currentGames), [currentGames]);
   const pastRows = useMemo(
     () =>
       past.map((s) => {
-        const from = new Date(s.started_at);
-        const to = new Date(s.ended_at);
-        const sGames = league.filter((g) => {
-          const t = new Date(g.playedAt);
-          return t >= from && t <= to;
-        });
-        return { season: s, games: sGames, players: aggregatePlayers(sGames) };
+        const sGames = league.filter((g) => inSeason(g.playedAt, s.started_at, s.ended_at));
+        return { season: s, games: sGames, players: standingsOf(sGames) };
       }),
     [past, league],
   );
