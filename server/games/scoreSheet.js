@@ -153,12 +153,15 @@ function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, reso
   if (ids.some((id) => typeof id !== 'string' || !id) || new Set(ids).size !== ids.length) {
     throw invalid('Players must be distinct.');
   }
-  const slots = ids.map((id) => {
-    const profile = resolve(id);
+  const slots = players.map(({ id, name }) => {
+    // resolve(id, name): the profile, a name-only player ({ id: null, name })
+    // for someone removed while the sheet was open, or null.
+    const profile = resolve(id, name);
     if (!profile) throw invalid('Unknown player — reload the player list.');
-    return { id, name: profile.name, profileId: profile.id };
+    return { id, name: profile.name, profileId: profile.id || null };
   });
-  if (new Set(slots.map((s) => s.profileId)).size !== slots.length) throw invalid('Players must be distinct.');
+  const who = slots.map((s) => s.profileId || `name:${s.name.toLowerCase()}`);
+  if (new Set(who).size !== slots.length) throw invalid('Players must be distinct.');
   // A finished sheet: every player led every game type once.
   if (!Array.isArray(rounds) || rounds.length !== ids.length * GAME_TYPES.length) {
     throw invalid('The game is not finished: every player leads every game type once.');

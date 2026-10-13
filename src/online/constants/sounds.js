@@ -5,7 +5,9 @@
 // seed for that table and the offline fallback used by `lib/soundRegistry`
 // when /api/sounds can't be reached, so the built-in clips keep working with
 // no database at all. Read the catalogue through `getSounds()`, not from
-// here.
+// here. It is a frozen copy of the original catalogue, kept in step with
+// supabase/seed.sql and the server's fallback list (server/socket/social.js);
+// new clips are only ever added through /admin.
 //
 //   id    — filename (client/public/sounds/<id>.mp3) + play-sound wire id
 //   glyph — single character drawn on the compact canvas buttons

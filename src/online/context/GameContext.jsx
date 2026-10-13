@@ -147,7 +147,7 @@ export function GameProvider({ children }) {
       // reconnect paths resync on their own when we're back.
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
       if (!ctx.canSend()) return
-      refs.socket.current.emit('request-state')
+      ctx.requestState()
     }, 9000)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps

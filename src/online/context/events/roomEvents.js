@@ -60,10 +60,16 @@ export function registerRoomEvents(socket, ctx) {
     }
   })
 
-  socket.on('player-joined', ({ players: p }) => ctx.setPlayers(p))
+  // Roster events name their room: one from a table we've since left (its
+  // last events can still arrive) must not overwrite this table's players.
+  const otherRoom = (code) => !!code && code !== refs.roomCode.current
+
+  socket.on('player-joined', ({ players: p, roomCode }) => {
+    if (!otherRoom(roomCode)) ctx.setPlayers(p)
+  })
   // player-left's roster carries no photos or connection flags; keep the
   // ones we already have for players who are still there.
-  socket.on('player-left', ({ players: p }) => ctx.setPlayers(prev => (p || []).map(np => {
+  socket.on('player-left', ({ players: p, roomCode }) => otherRoom(roomCode) || ctx.setPlayers(prev => (p || []).map(np => {
     const old = prev.find(o => o.seat === np.seat && o.name === np.name)
     return old ? { ...old, ...np } : np
   })))
@@ -73,12 +79,14 @@ export function registerRoomEvents(socket, ctx) {
   // socket.io-client does for free) goes unnoticed. One timer per player,
   // so two drops close together are both shown and one coming back doesn't
   // hide the other.
-  socket.on('player-disconnected', ({ playerName, players: p }) => {
+  socket.on('player-disconnected', ({ playerName, players: p, roomCode }) => {
+    if (otherRoom(roomCode)) return
     if (p) ctx.setPlayers(p)
     if (playerName) ctx.markDisconnected(playerName)
   })
 
-  socket.on('player-reconnected', ({ playerName, players: p }) => {
+  socket.on('player-reconnected', ({ playerName, players: p, roomCode }) => {
+    if (otherRoom(roomCode)) return
     // No toast here — if the rejoin happens inside the grace window the
     // user never saw a drop in the first place, and a stray "reconnected"
     // banner would just confuse them.

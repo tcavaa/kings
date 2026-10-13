@@ -51,6 +51,13 @@ export function connectGameSocket(ctx, url = SOCKET_URL) {
   })
   refs.socket.current = socket
 
+  // Remember the table version of every game event (see ctx.requestState).
+  socket.onAny((_event, payload) => {
+    if (payload && typeof payload.version === 'number') {
+      refs.stateVersion.current = { room: refs.roomCode.current, version: payload.version }
+    }
+  })
+
   socket.on('connect', () => {
     ctx.setConnected(true)
     // Always refresh the homepage public-table snapshot on (re)connect.
@@ -134,7 +141,7 @@ export function connectGameSocket(ctx, url = SOCKET_URL) {
     // second is plenty.
     if (now - lastResyncAt < 1000) return
     lastResyncAt = now
-    socket.emit('request-state')
+    ctx.requestState()
   }
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onResumeVisibility)

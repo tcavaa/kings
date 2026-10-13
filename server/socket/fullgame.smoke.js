@@ -57,12 +57,7 @@ const byCard = (a, b) => (SUIT_ORDER.indexOf(a.suit) - SUIT_ORDER.indexOf(b.suit
   || (RANK_ORDER.indexOf(a.rank) - RANK_ORDER.indexOf(b.rank));
 const same = (a, b) => a.rank === b.rank && a.suit === b.suit;
 
-function canDiscard(type, c) {
-  if (type === 'K' || type === 'H') return c.suit !== 'H';
-  if (type === 'Q') return c.rank !== 'Q';
-  if (type === 'J') return c.rank !== 'J';
-  return true;
-}
+const { canDiscard } = require(path.join(SERVER_DIR, 'game', 'rules.js'));
 
 function bot(name) {
   return new Promise((resolve) => {

@@ -181,7 +181,7 @@ function App() {
     try {
       await saveGame({
         sheetId,
-        players: players.map((p) => ({ id: p.id })),
+        players: players.map((p) => ({ id: p.id, name: p.name })),
         rounds,
         durationSeconds: durationSeconds ?? undefined,
       })

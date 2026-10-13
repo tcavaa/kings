@@ -243,22 +243,25 @@ async function saveScoreSheetGame(body) {
   if (ids.length) {
     for (const p of await db()`SELECT id, name FROM profiles WHERE id = ANY(${ids})`) byId.set(p.id, p);
   }
-  const unknown = ids.filter((id) => !byId.has(id));
-  if (unknown.length) {
-    // A game started before the player lists were merged still carries
-    // ჩაწერა's old player ids; those map to profiles through online_name.
-    const [{ schema } = {}] = await db()`
-      SELECT table_schema AS schema FROM information_schema.tables
-       WHERE table_name = 'players' AND table_schema IN ('public', 'legacy') LIMIT 1`;
-    if (schema) {
-      const rows = await db()`
-        SELECT pl.id::text AS old_id, pr.id, pr.name
-          FROM ${db()(`${schema}.players`)} pl JOIN profiles pr ON pr.name = pl.online_name
-         WHERE pl.id::text = ANY(${unknown})`;
-      for (const r of rows) byId.set(r.old_id, { id: r.id, name: r.name });
+  // A player removed (or renamed away) while the sheet was open is matched by
+  // the name the sheet shows, and failing that kept by name alone, like the
+  // old imported games — the game still saves.
+  const names = (Array.isArray(body?.players) ? body.players : [])
+    .filter((p) => p && typeof p.id === 'string' && !byId.has(p.id) && typeof p.name === 'string')
+    .map((p) => p.name.trim().slice(0, 64)).filter(Boolean);
+  const byName = new Map();
+  if (names.length) {
+    for (const p of await db()`
+      SELECT id, name FROM profiles WHERE lower(name) = ANY(${names.map((n) => n.toLowerCase())})`) {
+      byName.set(p.name.toLowerCase(), p);
     }
   }
-  const row = fromScoreSheet(body, (id) => byId.get(id) || null);
+  const row = fromScoreSheet(body, (id, name) => {
+    if (byId.has(id)) return byId.get(id);
+    const clean = typeof name === 'string' ? name.trim().slice(0, 64) : '';
+    if (!clean) return null;
+    return byName.get(clean.toLowerCase()) || { id: null, name: clean };
+  });
   await db()`
     INSERT INTO finished_games
       (id, type, played_at, winner_name, winner_seat, winner_score, is_championship, payload)

@@ -170,3 +170,14 @@ test("a leader can't play the same game type twice", () => {
   const twice = sheet.rounds.map((r, i) => (i === sheet.rounds.length - 1 ? opening[0] : r));
   assert.throws(() => fromScoreSheet({ ...sheet, rounds: twice }, resolve), /same game type twice/);
 });
+
+test("a player removed while the sheet was open is saved by name", () => {
+  const named = { ...sheet, players: sheet.players.map((p) => ({ ...p, name: p.id === "p_4" ? "Dato" : undefined })) };
+  const resolveGone = (id, name) => (id === "p_4" ? { id: null, name } : profiles.get(id) || null);
+  const row = fromScoreSheet(named, resolveGone);
+  const dato = row.payload.players.find((p) => p.name === "Dato");
+  assert.equal(dato.profileId, null);
+  assert.equal(dato.score, totals[3]);
+  // Without a name to fall back on it's still refused.
+  assert.throws(() => fromScoreSheet(sheet, (id) => (id === "p_4" ? null : profiles.get(id))), /Unknown player/);
+});

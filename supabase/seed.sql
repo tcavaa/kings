@@ -2,7 +2,9 @@
 -- project). Production got its catalogue — including every uploaded clip —
 -- from the one-off MySQL import, so this is a no-op
 -- there: like the MySQL seed it only runs while the table is empty, so a
--- clip an admin deletes from /admin never comes back.
+-- clip an admin deletes from /admin never comes back. Frozen: the same clips
+-- as src/online/constants/sounds.js and the server's fallback list
+-- (server/socket/social.js); new clips are added through /admin only.
 insert into public.sounds (id, label, glyph, color, source, sort_order)
 select v.id, v.label, v.glyph, v.color, 'builtin', v.sort_order
 from (values

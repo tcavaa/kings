@@ -24,6 +24,10 @@ export function createGameRefs() {
     // no quit vote is running (snapshots don't carry one).
     snapshotAfterRejoin: ref(false),
     playPending: ref(false),
+    // The table version of the last game event we applied, and its room: a
+    // background resync at that version gets a short "up to date" reply
+    // instead of the whole table.
+    stateVersion: ref(null),
     trickTimers: ref([]),
     // The switch to the results screen, a moment after game-over. Cancelled
     // by anything that moves us to another table first (the tournament final).
@@ -85,6 +89,15 @@ export function createGameCtx({ refs, dispatch, chat, unlockAudio, playClip, set
     identity: (name = refs.myName.current) => ({
       playerName: name, profileToken: getProfileToken(),
     }),
+
+    // Watchdog / tab-resume resync. Sends our table version so an unchanged
+    // table costs a one-line reply. (A rejected play resyncs without it: our
+    // optimistic hand differs from the server's even at the same version.)
+    requestState: () => {
+      const v = refs.stateVersion.current
+      refs.socket.current?.emit('request-state',
+        v && v.room === refs.roomCode.current ? { version: v.version } : {})
+    },
 
     seatName: (seat, list = refs.players.current) =>
       (list || []).find(p => p.seat === seat)?.name || `მოთამაშე ${seat}`,
