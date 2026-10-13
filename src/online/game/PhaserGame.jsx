@@ -1,8 +1,17 @@
 import { memo, useEffect, useRef } from "react";
-import Phaser from "phaser";
+import Phaser from "./phaser";
 import { PreloadScene } from "./scenes/PreloadScene";
-import { GameScene, layoutFor, isPortraitBox, sceneSize } from "./scenes/GameScene";
+import { GameScene } from "./scenes/GameScene";
+import { layoutFor, isPortraitBox, sceneSize } from "./layout";
 import { EventBus } from "./EventBus";
+import { armShuffleSound } from "./lib/shuffleSound";
+
+// Frame rate while nothing on the table moves (GameScene lifts the limit
+// during animations). Phaser's limiter waits until a full 1000/limit ms has
+// passed, so 32 (31.25 ms) lands on every 2nd frame at 60 Hz, every 3rd at
+// 90 Hz and every 4th at 120 Hz: a steady 30 fps. Exactly 30 would miss by a
+// hair now and then and stutter down to 20.
+const IDLE_FPS = 32;
 
 function PhaserGame({ gameState, onCardPlay }) {
   const containerRef = useRef(null);
@@ -36,6 +45,7 @@ function PhaserGame({ gameState, onCardPlay }) {
         autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       disableContextMenu: true,
+      fps: { limit: IDLE_FPS },
     };
 
     gameRef.current = new Phaser.Game(config);
@@ -52,24 +62,26 @@ function PhaserGame({ gameState, onCardPlay }) {
     EventBus.emit("state-update", gameState);
   }, [gameState]);
 
-  // Re-fit the FIT-scaled canvas whenever the *visible* viewport changes.
-  // Phaser's built-in 'resize' listener tracks the layout viewport, which on
-  // mobile doesn't update when browser chrome shows/hides or on some
-  // orientation flips — leaving the canvas sized to the old (taller) box and
-  // clipping the bottom of the table. visualViewport fires on exactly those
-  // changes, so refreshing the scale manager here keeps the table at 100%.
+  // Re-fit the FIT-scaled canvas as soon as the *visible* viewport changes.
+  // Phaser listens to window resize and orientation itself, and otherwise
+  // re-reads the container's size every 500 ms. On mobile, browser chrome
+  // showing/hiding moves only the visual viewport, so flag the scale manager
+  // to re-read on the next frame instead of waiting for that poll. (It only
+  // refits, and the table only repaints, if the container size changed.)
   useEffect(() => {
-    const refresh = () => gameRef.current?.scale?.refresh();
     const vv = typeof window !== "undefined" ? window.visualViewport : null;
-    window.addEventListener("resize", refresh);
-    window.addEventListener("orientationchange", refresh);
-    vv?.addEventListener("resize", refresh);
-    return () => {
-      window.removeEventListener("resize", refresh);
-      window.removeEventListener("orientationchange", refresh);
-      vv?.removeEventListener("resize", refresh);
+    if (!vv) return;
+    const recheck = () => {
+      const scale = gameRef.current?.scale;
+      if (scale) scale.dirty = true;
     };
+    vv.addEventListener("resize", recheck);
+    return () => vv.removeEventListener("resize", recheck);
   }, []);
+
+  // The deal's shuffle sound has to be unlocked by a tap before a deal can
+  // play it (iOS); listen for the player's taps while the table is up.
+  useEffect(() => armShuffleSound(), []);
 
   // Whenever the GameScene finishes mounting (initial create, scene
   // restart, HMR), replay the most recent state we have. Without this
@@ -93,8 +105,8 @@ function PhaserGame({ gameState, onCardPlay }) {
   // scene-ready replay can lose that race when assets are cached and the scene
   // boots almost instantly. Re-pushing the freshest snapshot a few times
   // across the boot window guarantees the table paints the moment the scene
-  // is alive — whichever push lands first after it becomes active wins, the
-  // rest are cheap no-op repaints of identical state.
+  // is alive — whichever push lands first after it becomes active wins; the
+  // scene skips the rest, since they carry the snapshot it already drew.
   useEffect(() => {
     const push = () => {
       if (lastStateRef.current)

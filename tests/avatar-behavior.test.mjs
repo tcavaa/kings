@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   AvatarTextureCache,
-  avatarCoverSize,
+  coverSquare,
 } from "../src/online/game/lib/AvatarTextureCache.js";
 import { withCurrentAvatars } from "../src/online/lib/playerAvatars.js";
 function setup() {
@@ -11,7 +11,7 @@ function setup() {
   let paints = 0;
   const cache = new AvatarTextureCache(
     {
-      addImage: (key, img) => textures.set(key, img.src),
+      addCanvas: (key, canvas) => textures.set(key, canvas.src),
       exists: (key) => textures.has(key),
       remove: (key) => textures.delete(key),
     },
@@ -21,6 +21,8 @@ function setup() {
       images.push(img);
       return img;
     },
+    // Stands in for the rounded-square cut, which needs a DOM canvas.
+    (img) => ({ src: img.src }),
   );
   const player = { seat: 0, name: "Player", avatar: "first" };
   return { cache, player, images, textures, paints: () => paints };
@@ -81,9 +83,10 @@ test("a broken photo is not requested on every game update; a new source retries
   t.cache.resolve({ ...t.player, avatar: "new" });
   assert.equal(t.images.length, 2);
 });
-test("portrait and landscape images cover a square without stretching", () => {
-  assert.deepEqual(avatarCoverSize(100, 200, 60), { width: 60, height: 120 });
-  assert.deepEqual(avatarCoverSize(200, 100, 60), { width: 120, height: 60 });
+test("portrait and landscape photos are cut to their centred square", () => {
+  assert.deepEqual(coverSquare(100, 200), { x: 0, y: 50, size: 100 });
+  assert.deepEqual(coverSquare(200, 100), { x: 50, y: 0, size: 100 });
+  assert.deepEqual(coverSquare(64, 64), { x: 0, y: 0, size: 64 });
 });
 test("rankings use current photos and explicit removals without changing saved scores", () => {
   const games = [

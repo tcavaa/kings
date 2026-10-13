@@ -4,8 +4,7 @@ const { createDeck, shuffle, deal } = require('./Deck');
 const { resolveTrick } = require('./TrickResolver');
 const { calculate } = require('./ScoreCalculator');
 const { ALL_TYPE_CODES, TOTAL_ROUNDS } = require('./constants');
-
-const TRUMP_TYPES = new Set(['P1', 'P2', 'P3']);
+const { TRUMP_TYPES, canDiscard, playError } = require('./rules');
 
 // Full-round point totals per game type, used when a round is quit early via
 // a unanimous "quit round" vote: on negative hands the quitter absorbs the
@@ -18,20 +17,6 @@ const QUIT_ROUND_TOTALS = {
 
 function cardsEqual(a, b) {
   return a.rank === b.rank && a.suit === b.suit;
-}
-
-function canDiscard(gameType, card) {
-  switch (gameType) {
-    case 'K':
-    case 'H':
-      return card.suit !== 'H';
-    case 'Q':
-      return card.rank !== 'Q';
-    case 'J':
-      return card.rank !== 'J';
-    default:
-      return true;
-  }
 }
 
 class GameState {
@@ -259,49 +244,14 @@ class GameState {
       return { valid: false, error: 'Card not in hand.' };
     }
 
-    const isLeading = this.currentTrick.length === 0;
-
-    if (isLeading && (this.chosenGameType === 'K' || this.chosenGameType === 'H')) {
-      if (card.suit === 'H') {
-        const hasNonHeart = hand.some((c) => c.suit !== 'H');
-        if (hasNonHeart) {
-          return { valid: false, error: 'Cannot lead a heart unless you only have hearts.' };
-        }
-      }
-    }
-
-    if (!isLeading && this.ledSuit) {
-      const hasSuit = hand.some((c) => c.suit === this.ledSuit);
-      if (hasSuit) {
-        // Following-suit rule: if you have the led suit, you must play it.
-        if (card.suit !== this.ledSuit) {
-          return { valid: false, error: `Must follow suit: ${this.ledSuit}.` };
-        }
-      } else {
-        // Cannot follow suit — additional forced-play rules kick in.
-
-        // 'K' (No King of Hearts): if the player still holds K♥, they have to
-        // dump it on this trick. Without this rule the K♥ holder can sit on
-        // it forever, defeating the round.
-        if (this.chosenGameType === 'K') {
-          const hasKingOfHearts    = hand.some((c) => c.rank === 'K' && c.suit === 'H');
-          const playingKingOfHearts = card.rank === 'K' && card.suit === 'H';
-          if (hasKingOfHearts && !playingKingOfHearts) {
-            return { valid: false, error: 'You must play the King of Hearts when you cannot follow suit.' };
-          }
-        }
-
-        // P1/P2/P3 (Pluses) with a chosen trump suit: if you have any trump
-        // and can't follow led suit, you must trump in. Standard "trick-
-        // taking with trumps" rule.
-        if (this.trumpSuit && TRUMP_TYPES.has(this.chosenGameType)) {
-          const hasTrump = hand.some((c) => c.suit === this.trumpSuit);
-          if (hasTrump && card.suit !== this.trumpSuit) {
-            return { valid: false, error: 'Must play a trump card when you cannot follow suit.' };
-          }
-        }
-      }
-    }
+    const error = playError(card, {
+      hand,
+      leading: this.currentTrick.length === 0,
+      ledSuit: this.ledSuit,
+      chosenGameType: this.chosenGameType,
+      trumpSuit: this.trumpSuit,
+    });
+    if (error) return { valid: false, error };
 
     return { valid: true };
   }
