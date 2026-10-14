@@ -94,6 +94,21 @@ function unitCountsOf(round) {
   return (field && round[field]) || null;
 }
 
+// The cards that cost points in a card round: K♥ in King, every queen,
+// every jack, every heart. Minus (T), Last two (L2) and the pluses are about
+// tricks, not cards, so no card is a penalty card there.
+const PENALTY_CARD = {
+  K: (c) => c.rank === 'K' && c.suit === 'H',
+  Q: (c) => c.rank === 'Q',
+  J: (c) => c.rank === 'J',
+  H: (c) => c.suit === 'H',
+};
+
+/** Whether `card` costs points in a round of type `code`. */
+function isPenaltyCard(code, card) {
+  return !!card && !!PENALTY_CARD[code]?.(card);
+}
+
 module.exports = {
   GAME_TYPE_RULES,
   GAME_TYPE_CODES,
@@ -101,6 +116,7 @@ module.exports = {
   PLUS_CODES,
   UNIT_FIELD,
   gameTypeRule,
+  isPenaltyCard,
   roundScores,
   unitCountsOf,
   lastTwoCounts,

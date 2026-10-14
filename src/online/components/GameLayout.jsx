@@ -1,9 +1,21 @@
 import "../styles/game-light.css";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+} from "react";
 import { Swords, Eye } from "lucide-react";
 import { useGame, useChat } from "../context/GameContext";
 import { EventBus } from "../game/EventBus";
 import PhaserGame from "../game/PhaserGame";
+import "../game/three/three.css";
+import ThreeBoundary from "../game/three/ThreeBoundary";
+const ThreeGame = lazy(() => import("../game/three/ThreeGame"));
 import GameTypeSelector from "./GameTypeSelector";
 import TrumpSelector from "./TrumpSelector";
 import DiscardSelector from "./DiscardSelector";
@@ -64,9 +76,28 @@ export default function GameLayout() {
   // and the round-end modal shows the identical sentence.
   const roundQuote = quoteForRound(roomCode, round);
 
+  const [viewMode, setViewMode] = useState(() => {
+    try {
+      return window.innerWidth >= 900 &&
+        localStorage.getItem("king:view-mode") === "3d"
+        ? "3d"
+        : "2d";
+    } catch {
+      return "2d";
+    }
+  });
+  const changeView = useCallback((mode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("king:view-mode", mode);
+    } catch {
+      /* optional preference */
+    }
+  }, []);
   const [drawer, setDrawer] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [soundsOpen, setSoundsOpen] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(null); // null | 'round' | 'game'
   const [bracketOpen, setBracketOpen] = useState(false);
 
@@ -227,25 +258,62 @@ export default function GameLayout() {
     <div
       className={`k-game-screen ${canSpeak ? "has-sounds" : ""} fixed top-0 left-0 right-0 h-screen-dvh overflow-hidden safe-area-pad`}
     >
-      <PhaserGame
-        gameState={gameState}
-        chatBubbles={bubblesWithTyping}
-        onCardPlay={handleCardPlay}
-      />
+      {viewMode === "3d" ? (
+        <ThreeBoundary onExit={() => changeView("2d")}>
+          <Suspense
+            fallback={
+              <div
+                className="absolute inset-0 flex items-center justify-center"
+                style={{ background: "#142b27", color: "#f0e4cd" }}
+              >
+                3D ოთახი იტვირთება…
+                <button
+                  className="k-view-toggle"
+                  onClick={() => changeView("2d")}
+                >
+                  2D რეჟიმი
+                </button>
+              </div>
+            }
+          >
+            <ThreeGame
+              gameState={gameState}
+              chatBubbles={bubblesWithTyping}
+              onExit={() => changeView("2d")}
+              onMenu={toggleMenu}
+              onChat={toggleChat}
+              onSounds={() => setSoundsOpen((open) => !open)}
+            />
+          </Suspense>
+        </ThreeBoundary>
+      ) : (
+        <PhaserGame
+          gameState={gameState}
+          chatBubbles={bubblesWithTyping}
+          onCardPlay={handleCardPlay}
+        />
+      )}
+      {viewMode === "2d" && (
+        <button className="k-view-toggle" onClick={() => changeView("3d")}>
+          3D რეჟიმი
+        </button>
+      )}
 
-      <TopBar
-        waiting={
-          leaderBusy
-            ? { name: leaderName, label: leaderBusyLabel }
-            : showWaiting
-              ? { name: turnName, label: "სვლას" }
-              : null
-        }
-        onToggleRounds={() => openDrawer("matrix")}
-        onToggleMenu={toggleMenu}
-        onToggleScores={openScores}
-        onToggleChat={toggleChat}
-      />
+      {viewMode === "2d" && (
+        <TopBar
+          waiting={
+            leaderBusy
+              ? { name: leaderName, label: leaderBusyLabel }
+              : showWaiting
+                ? { name: turnName, label: "სვლას" }
+                : null
+          }
+          onToggleRounds={() => openDrawer("matrix")}
+          onToggleMenu={toggleMenu}
+          onToggleScores={openScores}
+          onToggleChat={toggleChat}
+        />
+      )}
 
       {/* Tournament chrome. Deliberately a LEFT-aligned column rather than
           centred: the middle of that band now belongs to the clock, and the
@@ -298,13 +366,13 @@ export default function GameLayout() {
       )}
 
       {bracketOpen && <BracketOverview onClose={() => setBracketOpen(false)} />}
-      <ScoreBoardPanel onOpen={openScores} />
-      <ActionPanel onLastTrick={openLast} />
+      {viewMode === "2d" && <ScoreBoardPanel onOpen={openScores} />}
+      {viewMode === "2d" && <ActionPanel onLastTrick={openLast} />}
 
       {/* Per-round poet line, hanging centre-top below the round tracker.
           Offset clears both the TopBar pills (~56px) and the transient
           "waiting for X" chip (80–116px) so nothing overlaps. */}
-      {roundQuote && (
+      {viewMode === "2d" && roundQuote && (
         <div
           className="k-game-quote absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none select-none text-center px-4 hide-on-phone-landscape"
           style={{
@@ -333,16 +401,18 @@ export default function GameLayout() {
           right into the gap where the old in-canvas grid used to be. The
           wrapper is pointer-events-none so only the button itself is clickable
           (the modal manages its own full-screen layer). */}
-      <div className="k-game-audio absolute z-20 pointer-events-none">
-        <SoundBoard />
-      </div>
+      {(viewMode === "2d" || soundsOpen) && (
+        <div className="k-game-audio absolute z-20 pointer-events-none">
+          <SoundBoard />
+        </div>
+      )}
 
       <DisconnectBanner />
 
-      {showTypeSelector && <GameTypeSelector />}
-      {showTrumpSelector && <TrumpSelector />}
-      {showDiscard && <DiscardSelector />}
-      {showRoundResult && <RoundResult />}
+      {viewMode === "2d" && showTypeSelector && <GameTypeSelector />}
+      {viewMode === "2d" && showTrumpSelector && <TrumpSelector />}
+      {viewMode === "2d" && showDiscard && <DiscardSelector />}
+      {viewMode === "2d" && showRoundResult && <RoundResult />}
 
       <QuitModal
         confirmKind={confirmQuit}

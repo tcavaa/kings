@@ -1,6 +1,7 @@
 import Phaser from "../phaser.js";
 import { createFaceUpCard } from "../objects/Card.js";
 import { relSeat } from "../layout.js";
+import { isPenaltyCard } from "../../../../server/game/gameTypes.js";
 
 const cardId = ({ seat, card }) => `${seat}:${card.rank}${card.suit}`;
 
@@ -138,17 +139,16 @@ export class TrickView {
 
   /**
    * The winner's reaction, as the cards land: a ring pulses out of their
-   * avatar, red with a shake and flash when the trick cost them the K♥ in
-   * the King of Hearts round.
+   * avatar, red with a shake and flash when the trick hands them a penalty
+   * card (K♥ in King, a queen, a jack or a heart in those rounds). Minus,
+   * Last two and the pluses keep the gold ring.
    */
   react(winnerSeat, trick, state, L) {
-    const tookKingHearts =
-      state.chosenGameType === "K" &&
-      (trick || []).some((t) => t.card?.rank === "K" && t.card?.suit === "H");
+    const tookPenalty = (trick || []).some((t) => isPenaltyCard(state.chosenGameType, t.card));
     this.scene.time.delayedCall(450, () => {
       if (!this.scene.sys?.isActive()) return;
-      this._pulse(winnerSeat, tookKingHearts ? 0xd4574d : 0xf0c75a, state, L);
-      if (tookKingHearts) this._shake(L);
+      this._pulse(winnerSeat, tookPenalty ? 0xd4574d : 0xf0c75a, state, L);
+      if (tookPenalty) this._shake(L);
     });
   }
 

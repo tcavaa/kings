@@ -275,3 +275,15 @@ test("a season's champions are a list, so a tie never splits a name", async () =
   assert.equal(isChampionName(["Ana", "Tom & Jerry"], "Tom & Jerry"), true);
   assert.equal(isChampionName(["Ana", "Tom & Jerry"], "Tom"), false);
 });
+
+test("penalty cards are K♥ in King, queens, jacks and hearts — none in the trick rounds", () => {
+  const { isPenaltyCard } = require("../server/game/gameTypes.js");
+  const c = (rank, suit) => ({ rank, suit });
+  assert.equal(isPenaltyCard("K", c("K", "H")), true);
+  assert.equal(isPenaltyCard("K", c("K", "S")), false);
+  assert.equal(isPenaltyCard("Q", c("Q", "D")), true);
+  assert.equal(isPenaltyCard("J", c("J", "C")), true);
+  assert.equal(isPenaltyCard("H", c("7", "H")), true);
+  assert.equal(isPenaltyCard("H", c("7", "S")), false);
+  for (const code of ["T", "L2", "P1", "P2", "P3"]) assert.equal(isPenaltyCard(code, c("Q", "H")), false);
+});

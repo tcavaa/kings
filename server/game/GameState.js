@@ -5,7 +5,7 @@ const { resolveTrick } = require('./TrickResolver');
 const { calculate } = require('./ScoreCalculator');
 const { ALL_TYPE_CODES, TOTAL_ROUNDS, CARDS_PER_PLAYER } = require('./constants');
 const { TRUMP_TYPES, canDiscard, playError } = require('./rules');
-const { GAME_TYPE_RULES, gameTypeRule } = require('./gameTypes');
+const { GAME_TYPE_RULES, gameTypeRule, isPenaltyCard } = require('./gameTypes');
 
 // Full-round point totals per game type (every unit's points: -40 for each
 // penalty type, +80 for a Plus round), used when a round is quit early via
@@ -312,10 +312,10 @@ class GameState {
     this.trickWinners.push(winnerSeat);
 
     for (const { card: c } of completedTrick) {
-      if (c.rank === 'Q') this.queensTaken[winnerSeat]++;
-      if (c.rank === 'J') this.jacksTaken[winnerSeat]++;
-      if (c.suit === 'H') this.heartsTaken[winnerSeat]++;
-      if (c.rank === 'K' && c.suit === 'H') this.kingOfHeartsTakenBy = winnerSeat;
+      if (isPenaltyCard('Q', c)) this.queensTaken[winnerSeat]++;
+      if (isPenaltyCard('J', c)) this.jacksTaken[winnerSeat]++;
+      if (isPenaltyCard('H', c)) this.heartsTaken[winnerSeat]++;
+      if (isPenaltyCard('K', c)) this.kingOfHeartsTakenBy = winnerSeat;
     }
 
     this.lastTrick = { winnerSeat, trick: completedTrick.slice(), trickNumber: this.trickNumber };
