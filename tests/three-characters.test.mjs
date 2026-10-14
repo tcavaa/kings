@@ -25,7 +25,7 @@ test("the Blender-built cast is rigged and carries every clip the table plays", 
     const data = glb(`${gender}.glb`);
     assert.ok(data.skins.length > 0);
     const nodes = data.nodes.map((n) => n.name);
-    for (const name of ["head", "lids", "hand_L", "hand_R", "head_mesh", "hair", "body"])
+    for (const name of ["head", "lids", "hand_L", "hand_R", "head_mesh", "hair", "hair_b", "body"])
       assert.ok(nodes.includes(name), `${gender}: ${name}`);
     const clips = data.animations.map((a) => a.name);
     for (const clip of ["idle", "think", "play", "win", "lose"])
@@ -39,6 +39,9 @@ test("the room and first-person hands ship as self-contained GLBs", () => {
   const names = room.nodes.map((n) => n.name);
   for (const name of ["table_felt", "chair_left", "chair_right", "bookcase", "crown_inlay"])
     assert.ok(names.includes(name), name);
+  assert.ok(
+    readFileSync(new URL("../public/models/king3d/face-male-b.png", import.meta.url)).length > 10000,
+  );
   const hands = glb("hands.glb").nodes.map((n) => n.name);
   assert.ok(hands.includes("hand_left") && hands.includes("hand_right"));
   assert.ok(

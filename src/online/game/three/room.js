@@ -7,8 +7,8 @@ export const WORLD_SCALE = 1.4;
 export const ASSETS = "/models/king3d";
 // Opponent armchairs, in scene units (blender/room.py SEATS × WORLD_SCALE).
 export const SEATS = {
-  1: { position: [-1.26, 0, -1.54], rotation: 0.686 },
-  2: { position: [1.26, 0, -1.54], rotation: -0.686 },
+  1: { position: [-0.972, 0, -1.158], rotation: 0.698 },
+  2: { position: [0.972, 0, -1.158], rotation: -0.698 },
 };
 
 const loader = new GLTFLoader();
@@ -87,10 +87,11 @@ export function buildRoom(scene, onReady) {
         o.castShadow = !/ceiling|beam|floor|rug|wain|paper|crown$/.test(o.name);
         o.receiveShadow = true;
         const m = o.material;
-        if (m?.map) m.map.anisotropy = 4;
+        // Chunky PS2-era texels, like the reference shots.
+        if (m?.map) m.map.magFilter = THREE.NearestFilter;
         if (/shade|bulb/.test(m?.name || "")) m.toneMapped = false;
         // Keep the baize a deep billiard green under the bright fill.
-        if (m?.name === "felt") m.color.setHex(0xb8c4bc);
+        if (m?.name === "felt") m.color.setHex(0x93ab9e);
       });
       room.add(model);
       onReady?.();

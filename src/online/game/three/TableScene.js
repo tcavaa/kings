@@ -14,6 +14,7 @@ import {
   SERIF,
   SUITS,
   CARD_H,
+  CARD_W,
 } from "./primitives";
 import { relativeSeat } from "./characters";
 import { isPlayableCard } from "../lib/playable";
@@ -28,25 +29,29 @@ import {
 import { GAME_TYPES } from "../../constants/gameTypes";
 
 const key = (c) => `${c.rank}-${c.suit}`;
-const FELT_Y = 1.045;
-const EYE = new THREE.Vector3(0, 1.86, 2.02);
-const AIM = new THREE.Vector3(0, 1.18, -1.1);
+const FELT_Y = 1.05;
+// Seated at the near edge, eyes ~45 cm above the baize, looking across at
+// the two opponents (blender/room.py: table apothem 0.84 m, × 1.4).
+const EYE = new THREE.Vector3(0, 1.64, 1.46);
+const AIM = new THREE.Vector3(0, 1.12, -0.6);
+// The hand fan: held low left, upright, faces to the camera.
+const FAN = { position: [-0.15, 1.26, 0.92], rotation: [-0.36, 0.3, -0.06], scale: 0.52 };
 // Suit shown on each round tile, as on the reference board.
 const TILE_SUIT = { K: "S", Q: "H", J: "C", H: "D", L2: "S", T: "H", P1: "C", P2: "D", P3: "S" };
 // Where a seat's cards come from / go to (scene units).
 const atSeat = (rel) =>
   rel === 0
-    ? new THREE.Vector3(-0.35, 1.45, 1.75)
+    ? new THREE.Vector3(-0.2, 1.4, 1.1)
     : rel === 1
-      ? new THREE.Vector3(-1.15, 1.55, -1.35)
-      : new THREE.Vector3(1.15, 1.55, -1.35);
+      ? new THREE.Vector3(-0.72, 1.45, -0.85)
+      : new THREE.Vector3(0.72, 1.45, -0.85);
 // Each seat's played card lands on its own side of the trick.
 const trickSpot = (rel) =>
   rel === 0
-    ? new THREE.Vector3(0.02, FELT_Y + 0.012, 0.32)
+    ? new THREE.Vector3(0.02, FELT_Y + 0.012, 0.16)
     : rel === 1
-      ? new THREE.Vector3(-0.36, FELT_Y + 0.006, -0.18)
-      : new THREE.Vector3(0.36, FELT_Y + 0.009, -0.22);
+      ? new THREE.Vector3(-0.2, FELT_Y + 0.006, -0.14)
+      : new THREE.Vector3(0.22, FELT_Y + 0.009, -0.16);
 const pad = (n) => String(n).padStart(2, "0");
 
 export class TableScene {
@@ -260,28 +265,35 @@ export class TableScene {
     const { left, right } = this.hands.userData;
     if (!left || !right) return;
     const still = this.reducedMotion;
-    // Left hand under the fan; it follows the fan's pivot.
-    left.position.copy(this.fanPivot || new THREE.Vector3(-0.42, 1.3, 1.22));
-    left.position.y += still ? 0 : Math.sin(t * 1.4) * 0.004;
-    left.rotation.set(-0.5, 0.28, 0.1);
+    // Left hand grips the fan's lower left, thumb over the faces.
+    const fan = this.fanGroup;
+    if (fan) {
+      fan.updateMatrixWorld();
+      // The card bottoms sit in the palm: the grip point is ~7 cm (real) up.
+      left.position.copy(fan.localToWorld(new THREE.Vector3(-0.14, 0.06, 0.01)));
+      // hands.glb shares the fan's frame: up the cards +Y, faces +Z.
+      fan.getWorldQuaternion(left.quaternion);
+    }
+    left.visible = !!fan;
+    if (!still) left.position.y += Math.sin(t * 1.4) * 0.003;
     // Right hand rests on the felt edge and reaches toward what was clicked.
     const rest = this.bookGroup
-      ? new THREE.Vector3(0.82, FELT_Y + 0.1, 0.78)
-      : new THREE.Vector3(0.38, FELT_Y + 0.07, 0.92);
+      ? new THREE.Vector3(0.62, FELT_Y + 0.08, 0.86)
+      : new THREE.Vector3(0.26, FELT_Y + 0.045, 0.66);
     const reach = Math.max(0, (this.reachUntil || 0) - t);
     const k = Math.sin((Math.min(reach, 0.55) / 0.55) * Math.PI);
     const target = rest.clone().lerp(this.reachPoint, k * 0.55);
     if (!this.reachPoint.lengthSq()) target.copy(rest);
     right.position.lerp(target, still ? 1 : Math.min(1, dt * 14));
     if (!still) right.position.y += Math.sin(t * 1.2 + 1) * 0.003;
-    right.rotation.set(-0.12, -0.25, 0);
+    right.rotation.set(-0.05, 0.35, -0.25);
   }
   resize() {
     const { width, height } = this.host.getBoundingClientRect();
     const aspect = width / Math.max(height, 1);
     this.camera.aspect = aspect;
     // Narrow screens widen the lens so both opponents stay in view.
-    this.camera.fov = aspect < 1.2 ? 74 : aspect < 1.5 ? 64 : 58;
+    this.camera.fov = aspect < 1.2 ? 70 : aspect < 1.5 ? 60 : 53;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }
@@ -409,6 +421,7 @@ export class TableScene {
     this.controls = [];
     this.tweens = [];
     this.handCards = [];
+    this.fanGroup = null;
     this.hover = null;
     this.bookGroup = null;
     dispose(this.dynamic);
@@ -448,7 +461,7 @@ export class TableScene {
     });
     // The deck: a stack of backs at the leader's left.
     const deck = new THREE.Group();
-    deck.position.set(-0.86, FELT_Y, 0.2);
+    deck.position.set(-0.6, FELT_Y, 0.12);
     deck.rotation.y = 0.25;
     this.dynamic.add(deck);
     const stack = s.gamePhase === "playing" ? 3 : 8;
@@ -462,7 +475,7 @@ export class TableScene {
       (s.centerCards || []).forEach((c, i) => {
         const mesh = card(this.dynamic, c);
         mesh.rotation.set(-Math.PI / 2, 0, (i - 0.5) * 0.08);
-        mesh.position.set(-0.15 + i * 0.3, FELT_Y + 0.006, -0.2);
+        mesh.position.set(-0.1 + i * 0.2, FELT_Y + 0.006, -0.12);
       });
     const trick = this.last
       ? s.lastTrickResult?.trick || []
@@ -517,20 +530,22 @@ export class TableScene {
     const s = this.state;
     const hand = s.hand || [];
     const pivot = new THREE.Group();
-    pivot.position.set(-0.42, 1.3, 1.22);
-    pivot.rotation.set(-0.5, 0.28, 0.1);
-    pivot.scale.setScalar(0.78);
+    pivot.position.set(...FAN.position);
+    pivot.rotation.set(...FAN.rotation);
+    pivot.scale.setScalar(FAN.scale);
     this.dynamic.add(pivot);
-    this.fanPivot = pivot.position;
-    const spread = Math.min(0.13, 1.25 / Math.max(hand.length, 1));
+    this.fanGroup = pivot;
+    // Spread sideways like a real hand: every card shows its corner index,
+    // a slight turn and a shallow arc, rather than a tight radial fan.
+    const step = CARD_W * Math.min(0.36, 3.4 / Math.max(hand.length - 1, 1) / 1);
     hand.forEach((c, i) => {
       const offset = i - (hand.length - 1) / 2;
       const arm = new THREE.Group();
-      arm.rotation.z = -offset * spread;
-      arm.position.set(offset * 0.012, 0, i * 0.0045);
+      arm.rotation.z = -offset * 0.045;
+      arm.position.set(offset * step, -offset * offset * 0.0018, i * 0.0022);
       pivot.add(arm);
       const mesh = card(arm, c);
-      mesh.position.y = CARD_H * 0.42;
+      mesh.position.y = CARD_H * 0.5;
       const selected = (s.selectedDiscards || []).some(
         (d) => key(d) === key(c),
       );
@@ -588,8 +603,9 @@ export class TableScene {
   kingSign() {
     const s = this.state;
     const g = new THREE.Group();
-    g.position.set(-1.08, FELT_Y, -0.3);
-    g.rotation.y = 0.42;
+    g.position.set(-0.74, FELT_Y, -0.02);
+    g.rotation.y = 0.55;
+    g.scale.setScalar(0.62);
     this.dynamic.add(g);
     const tilt = 0.32,
       w = 0.62,
@@ -642,8 +658,9 @@ export class TableScene {
   scoreStand() {
     const s = this.state;
     const g = new THREE.Group();
-    g.position.set(1.1, FELT_Y, -0.26);
-    g.rotation.y = -0.42;
+    g.position.set(0.78, FELT_Y, -0.06);
+    g.rotation.y = -0.55;
+    g.scale.setScalar(0.6);
     this.dynamic.add(g);
     const w = 0.66,
       h = 0.44;
@@ -750,9 +767,9 @@ export class TableScene {
   selectionTray() {
     const s = this.state,
       tray = new THREE.Group();
-    tray.position.set(0.36, FELT_Y + 0.13, 0.44);
-    tray.rotation.set(-1.0, -0.12, 0);
-    tray.scale.setScalar(0.86);
+    tray.position.set(0.3, FELT_Y + 0.07, 0.36);
+    tray.rotation.set(-1.12, -0.1, 0);
+    tray.scale.setScalar(0.56);
     this.dynamic.add(tray);
     const W = 1.0,
       H = 0.86;
@@ -878,9 +895,9 @@ export class TableScene {
     const s = this.state;
     const g = new THREE.Group();
     this.bookGroup = g;
-    g.position.set(0.5, FELT_Y + 0.26, 0.72);
-    g.rotation.set(-0.95, -0.2, -0.08);
-    g.scale.setScalar(0.7);
+    g.position.set(0.36, FELT_Y + 0.2, 0.86);
+    g.rotation.set(-0.95, -0.2, -0.06);
+    g.scale.setScalar(0.5);
     this.dynamic.add(g);
     const W = 0.92,
       H = 1.0;

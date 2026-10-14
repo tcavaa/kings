@@ -195,8 +195,8 @@ export function drawCrown(ctx, x, y, s) {
   ctx.fill();
   ctx.fillRect(x - s, y + s * 0.52, s * 2, s * 0.18);
 }
-export const CARD_W = 0.235,
-  CARD_H = 0.34;
+export const CARD_W = 0.16,
+  CARD_H = 0.232;
 const cardBody = new THREE.BoxGeometry(CARD_W, CARD_H, 0.006);
 const cardPlane = new THREE.PlaneGeometry(CARD_W * 0.995, CARD_H * 0.995);
 const edgeMaterial = new THREE.MeshStandardMaterial({

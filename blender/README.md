@@ -6,7 +6,7 @@ script and re-run it; no hand-made `.blend` files are involved.
 | Script          | Output                       | What                                                          |
 | --------------- | ---------------------------- | ------------------------------------------------------------- |
 | `room.py`       | `room.glb`                   | Club room, octagonal table, armchairs, bookcase, lamps, rug   |
-| `characters.py` | `male.glb`, `female.glb`     | Rigged seated players: clips idle/think/play/win/lose         |
+| `characters.py` | `male.glb`, `female.glb`, `face-male-b.png` | Rigged seated players: clips idle/think/play/win/lose |
 | `hands.py`      | `hands.glb`                  | First-person hands (left grips the fan, right points)         |
 | `tbilisi.py`    | `tbilisi.jpg`                | Dusk panorama: Mtatsminda, TV tower, Narikala, Mtkvari        |
 
@@ -27,5 +27,8 @@ Conventions the runtime (`src/online/game/three/`) relies on:
   recoloured per seat or gender at runtime.
 - Blinking slides the `lids` bone forward rather than scaling it, because
   scaled skinned normals turn black.
+- The two male faces (Nika, Gio) are built from the reference shots in
+  `ref/`: the visible half of each 3/4 face is mirrored into a front view and
+  mapped onto the head's cylindrical UVs (landmarks in `REFERENCE_FACES`).
 - A player's uploaded face (profile → 3D character) is attached to the `head`
   bone, and `head_mesh` and `hair` are hidden.

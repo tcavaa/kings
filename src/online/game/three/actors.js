@@ -6,16 +6,29 @@ import { ASSETS, WORLD_SCALE, loadGLB } from "./room";
 
 // Default looks per seat so the two opponents never match (the reference
 // shots: one in a charcoal shirt with black hair, one in white with brown).
+// Seat 1 is "Nika" (black slicked hair, charcoal shirt), seat 2 "Gio"
+// (brown side parting, white shirt, his own face texture).
 const OUTFITS = {
   male: [
-    { shirt: 0x3a3d42, pants: 0x24262b, hair: 0x15110e },
-    { shirt: 0xe9e4d8, pants: 0x3b3a36, hair: 0x4a2c18 },
+    { shirt: 0x3c3f45, pants: 0x24262b, hair: 0x1a1512, style: "hair" },
+    { shirt: 0xeee8da, pants: 0x3b3a36, hair: 0x5a3820, style: "hair_b", faceMap: "face-male-b.png" },
   ],
   female: [
-    { shirt: 0x7a2e3a, pants: 0x1e2026, hair: 0x2b1a12 },
-    { shirt: 0x284a6a, pants: 0x23252c, hair: 0x6a4024 },
+    { shirt: 0x7a2e3a, pants: 0x1e2026, hair: 0x2b1a12, style: "hair" },
+    { shirt: 0x284a6a, pants: 0x23252c, hair: 0x6a4024, style: "hair_b" },
   ],
 };
+const faceMaps = new Map();
+function faceMap(file) {
+  if (!faceMaps.has(file)) {
+    const map = new THREE.TextureLoader().load(`${ASSETS}/${file}`);
+    map.colorSpace = THREE.SRGBColorSpace;
+    map.flipY = false; // glTF UV convention, like the embedded face
+    map.magFilter = THREE.NearestFilter;
+    faceMaps.set(file, map);
+  }
+  return faceMaps.get(file);
+}
 const tmp = new THREE.Vector3(),
   tmp2 = new THREE.Vector3(),
   look = new THREE.Vector3(),
@@ -67,20 +80,19 @@ export class Actor {
         o.material = o.material.clone();
         const name = o.material.name;
         if (outfit[name] != null) o.material.color.setHex(outfit[name]);
-        // Faces read better a touch darker under the bright club lights.
-        if (name === "face" || name === "skin" || name === "eyelid")
-          o.material.color.multiplyScalar(0.82);
-        if (name === "hair" || name === "face") {
-          // The face texture carries painted hair; tint only the shell.
-          if (name === "hair") o.material.color.setHex(0xffffff);
+        if (name === "face" && outfit.faceMap) {
+          o.material.map = faceMap(outfit.faceMap);
+          o.material.needsUpdate = true;
         }
+        // PS2-style chunky texels, like the reference shots.
+        if (o.material.map) o.material.map.magFilter = THREE.NearestFilter;
+        // One hairstyle per seat.
+        if (/^hair/.test(o.name)) o.visible = o.name === outfit.style;
       });
       this.bones = {};
       model.traverse((o) => {
         if (o.isBone) this.bones[o.name] = o;
       });
-      // GTA-style proportions: a slightly oversized head reads across the table.
-      this.bones.head?.scale.setScalar(1.14);
       this.lidsRest = null;
       this.rest = {};
       for (const name of ["head", "neck", "lids"])
@@ -109,10 +121,13 @@ export class Actor {
       this.cards = new THREE.Group();
       this.root.add(this.cards);
       for (let i = 0; i < 6; i++) {
-        const c = card(this.cards, null, true);
-        c.scale.setScalar(0.42);
-        c.position.set((i - 2.5) * 0.026, Math.abs(i - 2.5) * -0.004, i * 0.002);
-        c.rotation.z = (i - 2.5) * -0.16;
+        const arm = new THREE.Group();
+        arm.rotation.z = (i - 2.5) * -0.12;
+        arm.position.z = i * 0.0012;
+        const c = card(arm, null, true);
+        c.scale.setScalar(0.62);
+        c.position.y = 0.06;
+        this.cards.add(arm);
       }
       if (this.headUrl) await this.attachHead(this.headUrl, version);
     } catch (e) {
@@ -156,7 +171,7 @@ export class Actor {
       holder.add(head);
       anchor.add(holder);
       this.customHead = holder;
-      for (const name of ["head_mesh", "hair"]) {
+      for (const name of ["head_mesh", "hair", "hair_b"]) {
         const mesh = this.model.getObjectByName(name);
         if (mesh) mesh.visible = false;
       }
@@ -264,8 +279,8 @@ export class Actor {
         r.getWorldPosition(tmp2);
         tmp.lerp(tmp2, 0.5);
         this.root.worldToLocal(tmp);
-        this.cards.position.copy(tmp).add(new THREE.Vector3(0, 0.07, -0.03));
-        this.cards.rotation.set(-0.25, Math.PI, 0);
+        this.cards.position.copy(tmp).add(new THREE.Vector3(0, -0.005, -0.02));
+        this.cards.rotation.set(0.12, Math.PI, 0);
       }
       this.cards.children.forEach((c, i) => {
         c.visible = i < Math.max(1, Math.min(6, Math.ceil(count / 2)));
@@ -301,6 +316,8 @@ export function createHands(parent, onReady) {
           if (o.isMesh) {
             o.castShadow = true;
             o.material = o.material.clone();
+            // Seen from every side as the hands reach and turn.
+            o.material.side = THREE.DoubleSide;
           }
         });
         mesh.scale.setScalar(WORLD_SCALE);
@@ -320,8 +337,8 @@ export function dressHands(hands, gender) {
     o.material.color.setHex(
       o.material.name === "skin"
         ? female
-          ? 0xd9a07c
-          : 0xc08a64
+          ? 0xb88462
+          : 0xa06a48
         : o.material.name === "sleeve"
           ? female
             ? 0x6e2a36
@@ -330,5 +347,5 @@ export function dressHands(hands, gender) {
     );
   });
   for (const side of [hands.userData.left, hands.userData.right])
-    side?.scale.setScalar(female ? 0.9 : 1);
+    side?.scale.setScalar(female ? 0.8 : 0.88);
 }

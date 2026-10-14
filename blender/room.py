@@ -21,7 +21,8 @@ from lib import (OUT, apply_transforms, blend, blur, box, canvas, cyl, ellipse, 
 
 reset()
 TABLE_H = 0.745
-HALF_W, HALF_D = 1.12, 0.86  # octagon half extents
+HALF_W = HALF_D = 0.84  # regular octagon: apothem of the outer rim
+REG = 1 - math.tan(math.pi / 8)  # chamfer giving equal sides
 
 # ── painted textures ────────────────────────────────────────────────────────
 
@@ -262,41 +263,58 @@ def bevelled_slab(name, pts, z, h, material, bevel=0.0):
     return ob
 
 
-rim = add(bevelled_slab("table_rim", octagon(HALF_W, HALF_D), TABLE_H - 0.075, 0.075, WOOD, 0.02))
+# Polished rim raised above the baize, a gold edge, the felt, an inlaid line.
+rim = add(bevelled_slab("table_rim", octagon(HALF_W, HALF_D, REG), TABLE_H - 0.075, 0.073, WOOD, 0.02))
 planar_uv(rim, scale=0.7)
-add(bevelled_slab("table_gold", octagon(HALF_W - 0.13, HALF_D - 0.13), TABLE_H - 0.004, 0.006, GOLD))
-felt = add(bevelled_slab("table_felt", octagon(HALF_W - 0.155, HALF_D - 0.155), TABLE_H - 0.002, 0.008, FELT))
+add(bevelled_slab("table_gold", octagon(HALF_W - 0.115, HALF_D - 0.115, REG), TABLE_H - 0.004, 0.006, GOLD))
+# The raised, rounded wooden bumper around the baize, one piece per side.
+outer = octagon(HALF_W, HALF_D, REG)
+for i in range(8):
+    (x0, y0), (x1, y1) = outer[i], outer[(i + 1) % 8]
+    mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+    nx, ny = mx / math.hypot(mx, my), my / math.hypot(mx, my)
+    seg = box(f"bumper{i}", (math.dist((x0, y0), (x1, y1)) + 0.02, 0.11, 0.03),
+              (mx - nx * 0.055, my - ny * 0.055, TABLE_H + 0.01), WOOD, rot=(0, 0, math.atan2(y1 - y0, x1 - x0)), bevel=0.012)
+    planar_uv(seg, scale=0.7)
+    add(seg)
+felt = add(bevelled_slab("table_felt", octagon(HALF_W - 0.125, HALF_D - 0.125, REG), TABLE_H - 0.002, 0.008, FELT))
 planar_uv(felt, scale=1.2)
-# A thin inlaid gold line inside the felt, like the reference.
-inner = octagon(HALF_W - 0.3, HALF_D - 0.3)
+inner = octagon(HALF_W - 0.17, HALF_D - 0.17, REG)
 for i in range(len(inner)):
     (x0, y0), (x1, y1) = inner[i], inner[(i + 1) % len(inner)]
-    add(box(f"inlay{i}", (math.dist((x0, y0), (x1, y1)), 0.01, 0.002), ((x0 + x1) / 2, (y0 + y1) / 2, TABLE_H + 0.0065),
+    add(box(f"inlay{i}", (math.dist((x0, y0), (x1, y1)), 0.008, 0.002), ((x0 + x1) / 2, (y0 + y1) / 2, TABLE_H + 0.0065),
             GOLD, rot=(0, 0, math.atan2(y1 - y0, x1 - x0))))
 # Apron, pedestal and feet.
-add(bevelled_slab("table_apron", octagon(HALF_W - 0.12, HALF_D - 0.12), TABLE_H - 0.2, 0.13, WOOD))
-add(cyl("pedestal", 0.22, 0.3, 0.5, (0, 0, 0.32), WOOD, segs=8))
+add(bevelled_slab("table_apron", octagon(HALF_W - 0.08, HALF_D - 0.08, REG), TABLE_H - 0.2, 0.13, WOOD))
+add(cyl("pedestal", 0.18, 0.26, 0.5, (0, 0, 0.32), WOOD, segs=8))
 for k in range(4):
     a = k * math.pi / 2 + math.pi / 4
-    add(box(f"foot{k}", (0.9, 0.14, 0.09), (math.cos(a) * 0.4, math.sin(a) * 0.4, 0.05), WOOD, rot=(0, 0, a)))
+    add(box(f"foot{k}", (0.8, 0.12, 0.08), (math.cos(a) * 0.35, math.sin(a) * 0.35, 0.05), WOOD, rot=(0, 0, a)))
 
-# The gold crown inlaid in the felt, far side of the table.
+# The gold crown inlaid in the felt, centre far side.
+CROWN_Y, CS = 0.22, 0.62
 crown = [(-0.2, 0), (0.2, 0), (0.22, 0.03), (0.26, 0.15), (0.13, 0.07), (0.1, 0.18), (0.0, 0.08), (-0.1, 0.18),
          (-0.13, 0.07), (-0.26, 0.15), (-0.22, 0.03)]
-c = add(prism("crown_inlay", crown, 0.003, (0, 0.3, TABLE_H + 0.006), GOLD))
+c = add(prism("crown_inlay", [(x * CS, y * CS) for x, y in crown], 0.003, (0, CROWN_Y, TABLE_H + 0.006), GOLD))
 for x, y in ((-0.26, 0.15), (-0.1, 0.18), (0.1, 0.18), (0.26, 0.15), (0, 0.205)):
-    add(cyl(f"crown_jewel{x}", 0.018, 0.018, 0.003, (x, 0.3 + y, TABLE_H + 0.0075), GOLD, segs=8))
-add(box("crown_band", (0.4, 0.03, 0.003), (0, 0.29, TABLE_H + 0.0075), GOLD))
+    add(cyl(f"crown_jewel{x}", 0.012, 0.012, 0.003, (x * CS, CROWN_Y + y * CS, TABLE_H + 0.0075), GOLD, segs=8))
+add(box("crown_band", (0.4 * CS, 0.02, 0.003), (0, CROWN_Y - 0.006, TABLE_H + 0.0075), GOLD))
 
-# Brass ashtrays at the corners and a glass of whisky.
-for name, (x, y) in (("ashtray_l", (-0.88, -0.4)), ("ashtray_r", (0.9, 0.42))):
-    add(cyl(name, 0.1, 0.11, 0.04, (x, y, TABLE_H + 0.02), BRASS, segs=10))
-    add(cyl(name + "_in", 0.075, 0.075, 0.01, (x, y, TABLE_H + 0.037), DARK, segs=10))
-add(cyl("glass", 0.042, 0.036, 0.1, (0.82, 0.18, TABLE_H + 0.05), GLASS, segs=10))
-add(cyl("whisky", 0.039, 0.035, 0.045, (0.82, 0.18, TABLE_H + 0.026), WHISKY, segs=10))
+# Brass ashtrays at the far corners; a whisky glass and cognac on the right.
+for name, (x, y) in (("ashtray_l", (-0.6, 0.3)), ("ashtray_r", (0.6, 0.3))):
+    add(cyl(name, 0.075, 0.082, 0.035, (x, y, TABLE_H + 0.018), BRASS, segs=10))
+    add(cyl(name + "_in", 0.056, 0.056, 0.01, (x, y, TABLE_H + 0.032), DARK, segs=10))
+add(cyl("glass", 0.036, 0.031, 0.085, (0.62, -0.08, TABLE_H + 0.043), GLASS, segs=10))
+add(cyl("whisky", 0.033, 0.03, 0.04, (0.62, -0.08, TABLE_H + 0.022), WHISKY, segs=10))
+add(cyl("table_bottle", 0.045, 0.045, 0.2, (0.64, 0.08, TABLE_H + 0.1), BOTTLE, segs=8))
+add(cyl("table_bottle_shoulder", 0.045, 0.016, 0.05, (0.64, 0.08, TABLE_H + 0.225), BOTTLE, segs=8))
+add(cyl("table_bottle_neck", 0.016, 0.015, 0.07, (0.64, 0.08, TABLE_H + 0.285), BOTTLE, segs=6))
+add(cyl("table_bottle_label", 0.046, 0.046, 0.07, (0.64, 0.08, TABLE_H + 0.09), LABEL, segs=8, cap=False))
 
 # ── armchairs for the two opponents ────────────────────────────────────────
-SEATS = {"left": (-0.9, 1.1), "right": (0.9, 1.1)}
+# 10 and 2 o'clock, 0.28 m behind the rim (blender/characters.py rests the
+# forearms on an edge at that distance).
+SEATS = {"left": (-0.694, 0.827), "right": (0.694, 0.827)}
 
 
 def armchair(name, x, y):
