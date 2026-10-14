@@ -5,8 +5,11 @@
 
 const store = require('../db/store');
 
+// profileId lets the 3D table fetch each player's look (gender, head model);
+// profile ids are public already (the profile list, photo links).
 const playerView = (p) => ({
   id: p.id, name: p.name, avatar: p.avatar || null, seat: p.seat, connected: p.connected !== false,
+  profileId: p.profileId || null,
 });
 const playersView = (players = []) => players.map(playerView);
 

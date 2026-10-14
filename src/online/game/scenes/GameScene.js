@@ -63,6 +63,7 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this._repaint();
+      this._emitGeometry();
     };
     this.scale.on("resize", this._onResize);
 
@@ -133,9 +134,26 @@ export class GameScene extends Phaser.Scene {
     // CREATE fires after Phaser changes the scene from CREATING to RUNNING.
     // Replaying synchronously inside create() only caches state and can leave
     // the table blank when asset loading outlasts React's startup timers.
-    this.events.once(Phaser.Scenes.Events.CREATE, () =>
-      EventBus.emit("scene-ready"),
-    );
+    this.events.once(Phaser.Scenes.Events.CREATE, () => {
+      EventBus.emit("scene-ready");
+      this._emitGeometry();
+    });
+  }
+
+  /**
+   * Where the felt's top edge is on screen, in CSS px from the top of the
+   * viewport. The round quote hangs above the table and uses this to stay
+   * off the felt (or step aside when there's no room above it).
+   */
+  _emitGeometry() {
+    const canvas = this.game.canvas;
+    if (!canvas || !this.L) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.height) return;
+    const sy = rect.height / this.scale.height;
+    EventBus.emit("table-geometry", {
+      feltTop: rect.top + (this.L.felt.top - this.cameras.main.scrollY) * sy,
+    });
   }
 
   /**

@@ -2,52 +2,48 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  CHARACTERS,
-  characterFor,
   relativeSeat,
   validGLB,
 } from "../src/online/game/three/characters.js";
 
-test("three seats receive stable distinct characters across reconnects and perspectives", () => {
-  for (const room of ["ABC123", "DESIGN-ROOM", "ROOM42"]) {
-    const ids = [0, 1, 2].map((seat) => characterFor(room, seat).id);
-    assert.equal(new Set(ids).size, 3);
+test("relative seats put me at 0 and the others at 1 and 2 from every perspective", () => {
+  for (const seat of [0, 1, 2])
     assert.deepEqual(
-      ids,
-      [0, 1, 2].map((seat) => characterFor(room, seat).id),
+      [0, 1, 2].map((s) => relativeSeat(s, seat)).sort(),
+      [0, 1, 2],
     );
-    for (const seat of [0, 1, 2])
-      assert.deepEqual(
-        [0, 1, 2].map((s) => relativeSeat(s, seat)).sort(),
-        [0, 1, 2],
-      );
-  }
-  assert.equal(CHARACTERS.filter((c) => c.id.startsWith("female")).length, 3);
-  assert.equal(CHARACTERS.filter((c) => c.id.startsWith("male")).length, 3);
 });
-test("bundled characters contain real meshes, skeletons and sitting animations", () => {
-  for (const character of CHARACTERS) {
-    const bytes = readFileSync(
-      new URL(`../public${character.url}`, import.meta.url),
-    );
-    assert.equal(bytes.toString("utf8", 0, 4), "glTF");
-    const data = JSON.parse(
-      bytes.toString("utf8", 20, 20 + bytes.readUInt32LE(12)),
-    );
-    assert.ok(data.meshes.length > 0);
+const glb = (name) => {
+  const bytes = readFileSync(
+    new URL(`../public/models/king3d/${name}`, import.meta.url),
+  );
+  assert.equal(bytes.toString("utf8", 0, 4), "glTF");
+  return JSON.parse(bytes.toString("utf8", 20, 20 + bytes.readUInt32LE(12)));
+};
+test("the Blender-built cast is rigged and carries every clip the table plays", () => {
+  for (const gender of ["male", "female"]) {
+    const data = glb(`${gender}.glb`);
     assert.ok(data.skins.length > 0);
-    assert.ok(data.animations.some((a) => a.name === "sit"));
-    for (const image of data.images || [])
-      if (image.uri)
-        assert.ok(
-          readFileSync(
-            new URL(
-              `../public/models/characters/${image.uri}`,
-              import.meta.url,
-            ),
-          ).length,
-        );
+    const nodes = data.nodes.map((n) => n.name);
+    for (const name of ["head", "lids", "hand_L", "hand_R", "head_mesh", "hair", "body"])
+      assert.ok(nodes.includes(name), `${gender}: ${name}`);
+    const clips = data.animations.map((a) => a.name);
+    for (const clip of ["idle", "think", "play", "win", "lose"])
+      assert.ok(clips.includes(clip), `${gender}: ${clip}`);
+    // Textures are embedded, nothing is fetched from elsewhere.
+    for (const image of data.images || []) assert.equal(image.uri, undefined);
   }
+});
+test("the room and first-person hands ship as self-contained GLBs", () => {
+  const room = glb("room.glb");
+  const names = room.nodes.map((n) => n.name);
+  for (const name of ["table_felt", "chair_left", "chair_right", "bookcase", "crown_inlay"])
+    assert.ok(names.includes(name), name);
+  const hands = glb("hands.glb").nodes.map((n) => n.name);
+  assert.ok(hands.includes("hand_left") && hands.includes("hand_right"));
+  assert.ok(
+    readFileSync(new URL("../public/models/king3d/tbilisi.jpg", import.meta.url)).length > 100000,
+  );
 });
 function binary(json) {
   let text = JSON.stringify(json);
@@ -63,6 +59,7 @@ function binary(json) {
 }
 test("custom GLB validation rejects corrupt files and external asset references", () => {
   assert.equal(validGLB(new ArrayBuffer(8)), false);
+  assert.equal(validGLB(new ArrayBuffer(3 * 1024 * 1024)), false);
   assert.equal(
     validGLB(binary({ scenes: [{}], buffers: [{ byteLength: 0 }] })),
     true,

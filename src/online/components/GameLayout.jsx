@@ -76,6 +76,24 @@ export default function GameLayout() {
   // and the round-end modal shows the identical sentence.
   const roundQuote = quoteForRound(roomCode, round);
 
+  // The quote hangs below the "waiting for…" pill and above the felt. On a
+  // short screen there's no room between the two, so it steps aside rather
+  // than sit on the table. GameScene reports where the felt starts.
+  const quoteRef = useRef(null);
+  const [feltTop, setFeltTop] = useState(null);
+  const [quoteFits, setQuoteFits] = useState(true);
+  useEffect(() => {
+    const onGeometry = (g) => setFeltTop(g.feltTop);
+    EventBus.on("table-geometry", onGeometry);
+    return () => EventBus.off("table-geometry", onGeometry);
+  }, []);
+  useLayoutEffect(() => {
+    const el = quoteRef.current;
+    if (!el || feltTop == null) return setQuoteFits(true);
+    const box = el.getBoundingClientRect();
+    setQuoteFits(box.top + box.height + 6 <= feltTop);
+  }, [feltTop, roundQuote?.text]);
+
   const [viewMode, setViewMode] = useState(() => {
     try {
       return window.innerWidth >= 900 &&
@@ -294,12 +312,6 @@ export default function GameLayout() {
         />
       )}
       {viewMode === "2d" && (
-        <button className="k-view-toggle" onClick={() => changeView("3d")}>
-          3D რეჟიმი
-        </button>
-      )}
-
-      {viewMode === "2d" && (
         <TopBar
           waiting={
             leaderBusy
@@ -312,6 +324,7 @@ export default function GameLayout() {
           onToggleMenu={toggleMenu}
           onToggleScores={openScores}
           onToggleChat={toggleChat}
+          onView3D={() => changeView("3d")}
         />
       )}
 
@@ -370,26 +383,23 @@ export default function GameLayout() {
       {viewMode === "2d" && <ActionPanel onLastTrick={openLast} />}
 
       {/* Per-round poet line, hanging centre-top below the round tracker.
-          Offset clears both the TopBar pills (~56px) and the transient
-          "waiting for X" chip (80–116px) so nothing overlaps. */}
+          It starts below the transient "waiting for X" chip (which floats
+          under the bar, ~84–116px, on the same centre line) so they never
+          overlap, and is hidden when it would reach the felt. */}
       {viewMode === "2d" && roundQuote && (
         <div
+          ref={quoteRef}
           className="k-game-quote absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none select-none text-center px-4 hide-on-phone-landscape"
           style={{
-            top: "calc(env(safe-area-inset-top, 0px) + 96px)",
+            top: "calc(env(safe-area-inset-top, 0px) + 122px)",
             maxWidth: "min(560px, 72vw)",
+            visibility: quoteFits ? undefined : "hidden",
           }}
         >
-          <p
-            className="k-table-quote font-handwritten text-xs leading-snug"
-            style={{ textShadow: "0 2px 8px rgba(0,0,0,0.4)" }}
-          >
+          <p className="k-table-quote font-handwritten text-xs leading-snug">
             „{roundQuote.text}“
           </p>
-          <p
-            className="text-[9px] font-typewriter uppercase tracking-widest mt-0.5"
-            style={{ color: "rgba(213,185,130,0.6)" }}
-          >
+          <p className="text-[10px] font-typewriter uppercase tracking-widest mt-0.5">
             — {roundQuote.author}
           </p>
         </div>

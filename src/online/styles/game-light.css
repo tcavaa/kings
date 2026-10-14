@@ -103,10 +103,17 @@ body.king-light-game .k-game-connection i.on {
   background: #079b67;
 }
 body.king-light-game .k-table-quote {
-  color: #416451;
+  color: #2f4f3e;
 }
 body.king-light-game .k-game-quote > p:last-child {
-  color: #58705e !important;
+  color: #4a6555;
+}
+/* With the sound panel open the table is shifted left; keep the "waiting
+   for X" chip on the table's centre line, above the quote. */
+@media (min-width: 900px) {
+  body.king-light-game .has-sounds .k-game-header .k-turn-status {
+    left: calc((100% - 250px) / 2);
+  }
 }
 body.king-light-game .k-live-scores {
   background: #fffdf2ed;

@@ -1,14 +1,19 @@
 import * as THREE from "three";
-import { buildRoom } from "./room";
-import { Actor, createHands } from "./actors";
+import { buildRoom, SEATS } from "./room";
+import { Actor, createHands, dressHands } from "./actors";
 import {
   box,
-  label,
   card,
-  texture,
   dispose,
+  drawCrown,
+  fitText,
+  panel,
+  woodGrain,
   COLORS,
+  RED,
+  SERIF,
   SUITS,
+  CARD_H,
 } from "./primitives";
 import { relativeSeat } from "./characters";
 import { isPlayableCard } from "../lib/playable";
@@ -23,12 +28,27 @@ import {
 import { GAME_TYPES } from "../../constants/gameTypes";
 
 const key = (c) => `${c.rank}-${c.suit}`;
+const FELT_Y = 1.045;
+const EYE = new THREE.Vector3(0, 1.86, 2.02);
+const AIM = new THREE.Vector3(0, 1.18, -1.1);
+// Suit shown on each round tile, as on the reference board.
+const TILE_SUIT = { K: "S", Q: "H", J: "C", H: "D", L2: "S", T: "H", P1: "C", P2: "D", P3: "S" };
+// Where a seat's cards come from / go to (scene units).
 const atSeat = (rel) =>
   rel === 0
-    ? [0, 1.18, 1.7]
+    ? new THREE.Vector3(-0.35, 1.45, 1.75)
     : rel === 1
-      ? [-1.35, 1.15, -0.8]
-      : [1.35, 1.15, -0.8];
+      ? new THREE.Vector3(-1.15, 1.55, -1.35)
+      : new THREE.Vector3(1.15, 1.55, -1.35);
+// Each seat's played card lands on its own side of the trick.
+const trickSpot = (rel) =>
+  rel === 0
+    ? new THREE.Vector3(0.02, FELT_Y + 0.012, 0.32)
+    : rel === 1
+      ? new THREE.Vector3(-0.36, FELT_Y + 0.006, -0.18)
+      : new THREE.Vector3(0.36, FELT_Y + 0.009, -0.22);
+const pad = (n) => String(n).padStart(2, "0");
+
 export class TableScene {
   constructor(host, callbacks) {
     this.host = host;
@@ -36,6 +56,7 @@ export class TableScene {
     this.actors = [];
     this.targets = [];
     this.tweens = [];
+    this.handCards = [];
     this.time = 0;
     this.lastDeal = loadLastDeal();
     this.selection = null;
@@ -43,31 +64,36 @@ export class TableScene {
     this.page = 0;
     this.last = false;
     this.look = { x: 0, y: 0 };
+    this.looks = {};
+    this.myLook = { gender: "male" };
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(52, 1, 0.08, 60);
-    this.camera.position.set(0, 2.35, 3.65);
+    this.camera = new THREE.PerspectiveCamera(56, 1, 0.05, 80);
+    this.camera.position.copy(EYE);
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1.25;
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.setAttribute(
       "aria-label",
       "კინგი — 3D სათამაშო ოთახი",
     );
     this.renderer.domElement.tabIndex = 0;
-    buildRoom(this.scene);
-    this.hands = createHands(this.scene);
+    this.lights = buildRoom(this.scene);
+    this.hands = createHands(this.scene, () => {
+      dressHands(this.hands, this.myLook.gender);
+    });
     this.dynamic = new THREE.Group();
     this.scene.add(this.dynamic);
     this.ray = new THREE.Raycaster();
     this.pointer = new THREE.Vector2();
+    this.reachPoint = new THREE.Vector3();
     this.abort = new AbortController();
     const options = { signal: this.abort.signal };
     const canvas = this.renderer.domElement;
@@ -78,7 +104,11 @@ export class TableScene {
         if (e.button === 2) {
           this.drag = { x: e.clientX, y: e.clientY };
           canvas.setPointerCapture(e.pointerId);
-        } else if (e.button === 0) this.pick(e)?.userData.action?.();
+        } else if (e.button === 0) {
+          const hit = this.pick(e);
+          if (hit?.point) this.reachPoint.copy(hit.point);
+          hit?.object.userData.action?.();
+        }
       },
       options,
     );
@@ -102,17 +132,17 @@ export class TableScene {
         if (this.drag) {
           this.look.x = THREE.MathUtils.clamp(
             this.look.x + (e.clientX - this.drag.x) * 0.002,
-            -0.38,
-            0.38,
+            -0.45,
+            0.45,
           );
           this.look.y = THREE.MathUtils.clamp(
             this.look.y + (e.clientY - this.drag.y) * 0.0015,
-            -0.16,
-            0.2,
+            -0.18,
+            0.3,
           );
           this.drag = { x: e.clientX, y: e.clientY };
         } else {
-          const hit = this.pick(e);
+          const hit = this.pick(e)?.object || null;
           canvas.style.cursor = hit ? "pointer" : "grab";
           if (this.hover !== hit) {
             this.hover = hit;
@@ -133,9 +163,9 @@ export class TableScene {
         }
         if (e.key.toLowerCase() === "s") this.showScores();
         if (e.key === "ArrowLeft")
-          this.look.x = Math.max(-0.38, this.look.x - 0.08);
+          this.look.x = Math.max(-0.45, this.look.x - 0.08);
         if (e.key === "ArrowRight")
-          this.look.x = Math.min(0.38, this.look.x + 0.08);
+          this.look.x = Math.min(0.45, this.look.x + 0.08);
       },
       options,
     );
@@ -156,51 +186,102 @@ export class TableScene {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     let before = performance.now();
+    const aim = new THREE.Vector3();
     this.renderer.setAnimationLoop((now) => {
       const dt = Math.min((now - before) / 1000, 0.05);
       before = now;
       if (document.hidden) return;
       this.time += dt;
-      this.camera.lookAt(this.look.x * 3, 1.03 + this.look.y * 3, -0.2);
-      for (const t of this.tweens) {
-        const p = THREE.MathUtils.clamp(
-          (this.time - t.start) / t.duration,
-          0,
-          1,
-        );
-        t.mesh.position.lerpVectors(t.from, t.to, 1 - Math.pow(1 - p, 3));
-        if (p > 0 && p < 1) t.mesh.position.y += Math.sin(p * Math.PI) * 0.16;
+      const t = this.time,
+        still = this.reducedMotion;
+      // Seated breathing: the camera drifts a few millimetres.
+      this.camera.position.set(
+        EYE.x + (still ? 0 : Math.sin(t * 0.5) * 0.012),
+        EYE.y + (still ? 0 : Math.sin(t * 1.1) * 0.008),
+        EYE.z,
+      );
+      aim.set(AIM.x + this.look.x * 3, AIM.y + this.look.y * 3, AIM.z);
+      this.camera.lookAt(aim);
+      for (const tw of this.tweens) {
+        const p = THREE.MathUtils.clamp((t - tw.start) / tw.duration, 0, 1);
+        tw.mesh.position.lerpVectors(tw.from, tw.to, 1 - Math.pow(1 - p, 3));
+        if (p > 0 && p < 1) tw.mesh.position.y += Math.sin(p * Math.PI) * 0.18;
       }
-      this.tweens = this.tweens.filter((t) => this.time < t.start + t.duration);
-      if (!this.reducedMotion) {
-        for (const actor of this.actors)
-          actor.update(
-            this.time,
-            dt,
-            actor.player.seat === this.state?.currentTurn,
-            this.state?.cardCounts?.[actor.player.seat] || 0,
-            this.state?.gamePhase === "round_end"
-              ? this.state.cumulativeScores[actor.player.seat] ===
-                Math.max(...Object.values(this.state.cumulativeScores))
-                ? 1
-                : -1
-              : 0,
-          );
-        this.hands.position.y = Math.sin(this.time * 1.4) * 0.006;
-        const reach = Math.max(0, (this.reachUntil || 0) - this.time);
-        this.hands.children[1].position.z =
-          1.65 - Math.sin((Math.min(reach, 0.6) / 0.6) * Math.PI) * 0.5;
+      this.tweens = this.tweens.filter((tw) => t < tw.start + tw.duration);
+      // Hovered card in hand rises out of the fan.
+      for (const h of this.handCards) {
+        const want = (this.hover === h.face ? 0.06 : 0) + (h.selected ? 0.08 : 0);
+        h.lift += (want - h.lift) * Math.min(1, dt * 12);
+        h.arm.position.y = h.lift;
       }
-      if (this.bookGroup && !this.reducedMotion && this.pageTurnAt != null) {
-        const progress = Math.min(1, (this.time - this.pageTurnAt) / 0.35);
-        this.bookGroup.rotation.y = Math.sin(progress * Math.PI) * 0.12;
+      this.updateActors(t, dt);
+      this.updateHands(t, dt);
+      if (this.bookGroup && !still && this.pageTurnAt != null) {
+        const progress = Math.min(1, (t - this.pageTurnAt) / 0.35);
+        this.bookGroup.rotation.z = -0.08 + Math.sin(progress * Math.PI) * 0.06;
       }
+      if (this.lights?.lamps && !still)
+        this.lights.lamps.forEach((l, i) => {
+          l.intensity = 9 + Math.sin(t * 7 + i * 3) * 0.15;
+        });
       this.renderer.render(this.scene, this.camera);
     });
   }
+  updateActors(t, dt) {
+    const s = this.state;
+    if (!s) return;
+    const scores = s.cumulativeScores || {};
+    const best = Math.max(...Object.values(scores), -Infinity);
+    for (const actor of this.actors) {
+      const seat = actor.player.seat;
+      // Look at whoever's turn it is: the camera for me, a head for others.
+      const turnRel =
+        s.currentTurn == null ? null : relativeSeat(s.currentTurn, s.mySeat);
+      let lookAt;
+      if (s.currentTurn === seat) lookAt = new THREE.Vector3(0, FELT_Y, 0.4);
+      else if (turnRel === 0) lookAt = this.camera.position;
+      else if (turnRel != null) {
+        const other = this.actors.find((a) => a.player.seat === s.currentTurn);
+        lookAt = other?.root.position.clone().setY(1.95);
+      }
+      if (!this.reducedMotion)
+        actor.update(t, dt, {
+          active: s.gamePhase === "playing" && s.currentTurn === seat,
+          count: s.cardCounts?.[seat] || 0,
+          lookAt,
+        });
+      if (s.gamePhase === "round_end" && actor.reactedRound !== s.round) {
+        actor.reactedRound = s.round;
+        actor.gesture(scores[seat] === best ? "win" : "lose");
+      }
+    }
+  }
+  updateHands(t, dt) {
+    const { left, right } = this.hands.userData;
+    if (!left || !right) return;
+    const still = this.reducedMotion;
+    // Left hand under the fan; it follows the fan's pivot.
+    left.position.copy(this.fanPivot || new THREE.Vector3(-0.42, 1.3, 1.22));
+    left.position.y += still ? 0 : Math.sin(t * 1.4) * 0.004;
+    left.rotation.set(-0.5, 0.28, 0.1);
+    // Right hand rests on the felt edge and reaches toward what was clicked.
+    const rest = this.bookGroup
+      ? new THREE.Vector3(0.82, FELT_Y + 0.1, 0.78)
+      : new THREE.Vector3(0.38, FELT_Y + 0.07, 0.92);
+    const reach = Math.max(0, (this.reachUntil || 0) - t);
+    const k = Math.sin((Math.min(reach, 0.55) / 0.55) * Math.PI);
+    const target = rest.clone().lerp(this.reachPoint, k * 0.55);
+    if (!this.reachPoint.lengthSq()) target.copy(rest);
+    right.position.lerp(target, still ? 1 : Math.min(1, dt * 14));
+    if (!still) right.position.y += Math.sin(t * 1.2 + 1) * 0.003;
+    right.rotation.set(-0.12, -0.25, 0);
+  }
   resize() {
     const { width, height } = this.host.getBoundingClientRect();
-    this.camera.aspect = width / Math.max(height, 1);
+    const aspect = width / Math.max(height, 1);
+    this.camera.aspect = aspect;
+    // Narrow screens widen the lens so both opponents stay in view.
+    this.camera.fov = aspect < 1.2 ? 74 : aspect < 1.5 ? 64 : 58;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }
@@ -211,12 +292,14 @@ export class TableScene {
       (-(event.clientY - rect.top) / rect.height) * 2 + 1,
     );
     this.ray.setFromCamera(this.pointer, this.camera);
-    return this.ray.intersectObjects(this.targets, false)[0]?.object;
+    return this.ray.intersectObjects(this.targets, false)[0];
   }
   clickable(mesh, title, action, enabled = true) {
     if (!enabled) return;
     const interact = () => {
-      this.reachUntil = this.time + 0.6;
+      this.reachUntil = this.time + 0.55;
+      if (!this.reachPoint.lengthSq() || this.reachPoint.distanceTo(mesh.getWorldPosition(new THREE.Vector3())) > 0.5)
+        mesh.getWorldPosition(this.reachPoint);
       action();
     };
     mesh.userData.action = interact;
@@ -237,6 +320,16 @@ export class TableScene {
       start: this.time + delay,
       duration,
     });
+  }
+  // Per-player 3D looks from profiles: { [seat]: { gender, head } }.
+  setLooks(looks, mine) {
+    this.looks = looks || {};
+    if (mine) {
+      this.myLook = mine;
+      dressHands(this.hands, mine.gender);
+    }
+    for (const actor of this.actors)
+      actor.setLook(this.looks[actor.player.seat]);
   }
   update(state) {
     const old = this.state;
@@ -268,9 +361,9 @@ export class TableScene {
           const rel = relativeSeat(p.seat, state.mySeat);
           return new Actor(
             this.scene,
-            [rel === 1 ? -1.43 : 1.43, 0, -1.4],
-            state.roomCode,
+            { ...SEATS[rel], slot: rel - 1 },
             p,
+            this.looks[p.seat],
             (msg) => this.callbacks.onNotice(msg),
           );
         });
@@ -304,15 +397,9 @@ export class TableScene {
     this.book = false;
     this.refresh();
   }
-  async replaceCharacter(name, custom) {
-    const actor = this.actors.find((a) => a.player.name === name);
-    if (actor) {
-      if (custom) return actor.replace(custom);
-      else {
-        this.roster = null;
-        this.update(this.state);
-      }
-    }
+  name(p) {
+    if (!p) return "";
+    return p.seat === this.state.mySeat && !this.state.spectator ? "შენ" : p.name;
   }
   refresh() {
     if (!this.state || this.disposed) return;
@@ -321,6 +408,7 @@ export class TableScene {
     this.targets = [];
     this.controls = [];
     this.tweens = [];
+    this.handCards = [];
     this.hover = null;
     this.bookGroup = null;
     dispose(this.dynamic);
@@ -331,55 +419,50 @@ export class TableScene {
       ["type_selection", "trump_selection", "discard"].includes(s.gamePhase);
     const open = this.book || s.gamePhase === "round_end";
     this.hands.visible = mine;
-    // In-world nameplates and score displays.
+    this.kingSign();
+    this.scoreStand();
+    // Chat bubbles float above the speaker.
     s.players.forEach((p) => {
-      const rel = relativeSeat(p.seat, s.mySeat),
-        x = rel === 0 ? -1.35 : rel === 1 ? -1.25 : 1.25,
-        z = rel === 0 ? 0.9 : -0.68;
-      const g = new THREE.Group();
-      g.position.set(x, 1.13, z);
-      g.rotation.x = -0.35;
-      this.dynamic.add(g);
-      box(g, [0.69, 0.22, 0.055], [0, 0, 0], COLORS.wood);
-      const plate = label(
-        g,
-        `${p.name}${p.connected === false ? " · offline" : ""}\n${s.cumulativeScores?.[p.seat] ?? 0}`,
-        0.66,
-        0.2,
-        [0, 0, 0.03],
-        { font: 50, border: s.currentTurn === p.seat ? "#f0cf76" : "#927a4a" },
-      );
-      this.clickable(plate, `${p.name} — ქულები`, () => this.showScores());
+      const rel = relativeSeat(p.seat, s.mySeat);
       const message = s.chatBubbles?.[p.seat]?.message;
-      if (message && rel)
-        label(
-          this.dynamic,
-          String(message).slice(0, 70),
-          0.95,
-          0.25,
-          [x, 2.06, -1],
-          { bg: "#e8ddc0", color: "#233e33", font: 48 },
-        );
+      if (!message || !rel) return;
+      const seat = SEATS[rel].position;
+      const bubble = panel(
+        this.dynamic,
+        0.95,
+        0.26,
+        [seat[0] * 0.92, 2.55, seat[2] + 0.2],
+        (ctx, w, h) => {
+          ctx.fillStyle = "#f6f1e4";
+          ctx.beginPath();
+          ctx.roundRect(4, 4, w - 8, h - 8, 24);
+          ctx.fill();
+          ctx.fillStyle = "#1d3a30";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          fitText(ctx, String(message).slice(0, 70), w / 2, h / 2, w - 40, 44, "500", "sans-serif");
+        },
+      );
+      bubble.lookAt(this.camera.position);
+      bubble.material = new THREE.MeshBasicMaterial({ map: bubble.material.map, toneMapped: false });
     });
-    const status = this.status();
-    const sign = label(
-      this.dynamic,
-      `KING · ${s.round} / 27\n${status}`,
-      0.9,
-      0.28,
-      [0, 1.28, -0.95],
-      { font: 43 },
-    );
-    sign.rotation.x = -0.22;
-    // Deck and the two center cards before the leader takes them.
-    const deck = card(this.dynamic, null, true);
-    deck.rotation.x = -Math.PI / 2;
-    deck.position.set(-0.72, 1.064, -0.12);
+    // The deck: a stack of backs at the leader's left.
+    const deck = new THREE.Group();
+    deck.position.set(-0.86, FELT_Y, 0.2);
+    deck.rotation.y = 0.25;
+    this.dynamic.add(deck);
+    const stack = s.gamePhase === "playing" ? 3 : 8;
+    for (let i = 0; i < stack; i++) {
+      const c = card(deck, null, true);
+      c.rotation.x = -Math.PI / 2;
+      c.position.set(Math.sin(i) * 0.004, 0.004 + i * 0.006, Math.cos(i * 1.7) * 0.003);
+    }
+    // The two talon cards face-up before the leader takes them.
     if (s.gamePhase === "type_selection" || s.gamePhase === "trump_selection")
       (s.centerCards || []).forEach((c, i) => {
         const mesh = card(this.dynamic, c);
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.position.set(0.18 + i * 0.27, 1.062, -0.25);
+        mesh.rotation.set(-Math.PI / 2, 0, (i - 0.5) * 0.08);
+        mesh.position.set(-0.15 + i * 0.3, FELT_Y + 0.006, -0.2);
       });
     const trick = this.last
       ? s.lastTrickResult?.trick || []
@@ -387,32 +470,26 @@ export class TableScene {
     trick.forEach((entry, i) => {
       const c = entry.card || entry;
       if (!c.rank) return;
-      const mesh = card(this.dynamic, c);
-      mesh.rotation.set(-Math.PI / 2, 0, (i - 1) * 0.2);
-      const to = new THREE.Vector3(
-        (i - 1) * 0.3,
-        1.065 + i * 0.005,
-        0.05 + (i % 2) * 0.18,
-      );
-      const previous = old?.currentTrick?.some(
-        (t) => key(t.card || t) === key(c),
-      );
       const rel = relativeSeat(entry.seat ?? i, s.mySeat);
+      const mesh = card(this.dynamic, c);
+      mesh.rotation.set(-Math.PI / 2, 0, [0.04, 0.35, -0.3][rel] + i * 0.03);
+      const to = trickSpot(rel);
+      to.y += i * 0.004;
+      const previous = old?.currentTrick?.some(
+        (tc) => key(tc.card || tc) === key(c),
+      );
       if (!previous && !this.last) {
-        this.tween(mesh, new THREE.Vector3(...atSeat(rel)), to);
-        const actor = this.actors.find((a) => a.player.seat === entry.seat);
-        if (actor) actor.reachUntil = this.time + 0.8;
+        this.tween(mesh, atSeat(rel), to, rel ? 0.18 : 0);
+        this.actors.find((a) => a.player.seat === entry.seat)?.gesture("play");
       } else mesh.position.copy(to);
       if (this.collecting != null || s.trickAnimation?.status === "animating")
         this.tween(
           mesh,
           to,
-          new THREE.Vector3(
-            ...atSeat(
-              relativeSeat(
-                this.collecting ?? s.trickAnimation.winnerSeat,
-                s.mySeat,
-              ),
+          atSeat(
+            relativeSeat(
+              this.collecting ?? s.trickAnimation.winnerSeat,
+              s.mySeat,
             ),
           ),
           0,
@@ -423,197 +500,363 @@ export class TableScene {
       this.makeButton(
         this.dynamic,
         "დახურვა",
-        [0, 1.12, 0.55],
-        0.65,
-        0.14,
+        [0, FELT_Y + 0.15, 0.75],
+        0.6,
+        0.13,
         () => this.showLast(),
       );
-    // A real fan held above the near table edge. Faces stay private to the local player.
-    if (mine)
-      (s.hand || []).forEach((c, i, hand) => {
-        const mesh = card(this.dynamic, c),
-          offset = i - (hand.length - 1) / 2;
-        const selected = (s.selectedDiscards || []).some(
-          (d) => key(d) === key(c),
-        );
-        const to = new THREE.Vector3(
-          -0.43 + offset * 0.105,
-          1.28 - Math.abs(offset) * 0.018 + (selected ? 0.09 : 0),
-          2 + i * 0.009,
-        );
-        mesh.rotation.set(-0.17, 0, -offset * 0.07);
-        const allowed =
-          deciding && s.gamePhase === "discard"
-            ? canDiscard(s.chosenGameType, c) &&
-              (selected || s.selectedDiscards.length < 2)
-            : isPlayableCard(c, s) && mine;
-        if (s.gamePhase === "playing" && !allowed)
-          mesh.children[1].material.color.set(0x999d92);
-        if (selected) mesh.children[1].material.color.set(0xffdf8c);
-        if (this.animateDeal)
-          this.tween(
-            mesh,
-            new THREE.Vector3(-0.72, 1.06, -0.12),
-            to,
-            i * 0.055,
-            0.45,
-          );
-        else mesh.position.copy(to);
-        const action = () => {
-          if (s.gamePhase === "discard")
-            this.callbacks.onAction("toggleDiscard", c);
-          else if (!this.playLocked) {
-            this.playLocked = true;
-            this.callbacks.onAction("playCard", c);
-            clearTimeout(this.playTimer);
-            this.playTimer = setTimeout(() => {
-              this.playLocked = false;
-            }, 1200);
-          }
-        };
-        this.clickable(
-          mesh.children[1],
-          `${c.rank}${SUITS[c.suit]}${selected ? " ✓" : ""}`,
-          action,
-          allowed && !open && !s.reconnecting && !this.sent,
-        );
-      });
-    // Clicking a book opens the actual score ledger, not a flat HUD.
-    const book = new THREE.Group();
-    book.position.set(1.18, 1.09, 0.74);
-    book.rotation.set(-1.05, 0, -0.13);
-    this.dynamic.add(book);
-    box(book, [0.5, 0.66, 0.07], [0, 0, 0], 0x472d21);
-    const cover = label(book, "♛\nქულები", 0.47, 0.63, [0, 0, 0.04], {
-      bg: "#473326",
-      font: 110,
-    });
-    this.clickable(cover, "ქულების წიგნი", () => this.showScores());
+    if (mine) this.handFan(deciding, open);
     if (open) this.scorebook();
     else if (deciding) this.selectionTray();
     this.callbacks.onControls(this.controls);
     this.previous = s;
     this.animateDeal = false;
   }
+  // My cards, fanned upright in the left hand, faces toward the camera.
+  handFan(deciding, open) {
+    const s = this.state;
+    const hand = s.hand || [];
+    const pivot = new THREE.Group();
+    pivot.position.set(-0.42, 1.3, 1.22);
+    pivot.rotation.set(-0.5, 0.28, 0.1);
+    pivot.scale.setScalar(0.78);
+    this.dynamic.add(pivot);
+    this.fanPivot = pivot.position;
+    const spread = Math.min(0.13, 1.25 / Math.max(hand.length, 1));
+    hand.forEach((c, i) => {
+      const offset = i - (hand.length - 1) / 2;
+      const arm = new THREE.Group();
+      arm.rotation.z = -offset * spread;
+      arm.position.set(offset * 0.012, 0, i * 0.0045);
+      pivot.add(arm);
+      const mesh = card(arm, c);
+      mesh.position.y = CARD_H * 0.42;
+      const selected = (s.selectedDiscards || []).some(
+        (d) => key(d) === key(c),
+      );
+      const allowed =
+        deciding && s.gamePhase === "discard"
+          ? canDiscard(s.chosenGameType, c) &&
+            (selected || s.selectedDiscards.length < 2)
+          : isPlayableCard(c, s);
+      const face = mesh.children[1];
+      if (s.gamePhase === "playing" && !allowed)
+        face.material.color.set(0x9a9c94);
+      if (selected) face.material.color.set(0xffe29a);
+      // Freshly dealt cards rise into the fan one after another.
+      if (this.animateDeal)
+        this.tween(mesh, new THREE.Vector3(0, -0.6, -1.2), mesh.position.clone(), i * 0.055, 0.45);
+      this.handCards.push({ arm, face, lift: 0, selected });
+      const action = () => {
+        if (s.gamePhase === "discard")
+          this.callbacks.onAction("toggleDiscard", c);
+        else if (!this.playLocked) {
+          this.playLocked = true;
+          this.reachPoint.copy(trickSpot(0));
+          this.callbacks.onAction("playCard", c);
+          clearTimeout(this.playTimer);
+          this.playTimer = setTimeout(() => {
+            this.playLocked = false;
+          }, 1200);
+        }
+      };
+      this.clickable(
+        face,
+        `${c.rank}${SUITS[c.suit]}${selected ? " ✓" : ""}`,
+        action,
+        allowed && !open && !s.reconnecting && !this.sent,
+      );
+    });
+  }
   status() {
     const s = this.state;
     if (s.reconnecting) return "კავშირი აღდგება…";
     if (s.gamePhase === "round_end") return "ხელი დასრულდა";
     if (s.gamePhase === "playing")
-      return `${GAME_TYPES.find((t) => t.code === s.chosenGameType)?.name || ""} ${SUITS[s.trumpSuit] || ""} · ${s.currentTurn === s.mySeat && !s.spectator ? "შენი სვლა" : s.players.find((p) => p.seat === s.currentTurn)?.name || ""}`;
+      return s.currentTurn === s.mySeat && !s.spectator
+        ? "შენი სვლა"
+        : `სვლა: ${s.players.find((p) => p.seat === s.currentTurn)?.name || ""}`;
     const phase =
       {
         type_selection: "ირჩევს თამაშს",
         trump_selection: "ირჩევს კოზირს",
         discard: "გადადებს 2 კარტს",
       }[s.gamePhase] || "";
-    return `${s.players.find((p) => p.seat === s.leaderSeat)?.name || ""} · ${phase}`;
+    return `${this.name(s.players.find((p) => p.seat === s.leaderSeat))} · ${phase}`;
   }
-  makeButton(
-    parent,
-    text,
-    position,
-    width,
-    height,
-    action,
-    enabled = true,
-    selected = false,
-  ) {
+  // Wooden tent card on the left: KING, the game's suit and round count.
+  kingSign() {
+    const s = this.state;
+    const g = new THREE.Group();
+    g.position.set(-1.08, FELT_Y, -0.3);
+    g.rotation.y = 0.42;
+    this.dynamic.add(g);
+    const tilt = 0.32,
+      w = 0.62,
+      h = 0.36;
+    for (const side of [1, -1]) {
+      const face = new THREE.Group();
+      face.position.set(0, h / 2 - 0.01, side * Math.sin(tilt) * h * 0.5);
+      face.rotation.x = -side * tilt;
+      if (side < 0) face.rotation.y = Math.PI;
+      g.add(face);
+      box(face, [w, h, 0.025], [0, 0, 0], COLORS.woodDark);
+      if (side < 0) continue;
+      const type = GAME_TYPES.find((t) => t.code === s.chosenGameType);
+      const suit = s.trumpSuit || TILE_SUIT[s.chosenGameType];
+      const plate = panel(face, w * 0.94, h * 0.9, [0, 0, 0.014], (ctx, cw, ch) => {
+        woodGrain(ctx, cw, ch, "#5a331f", "#3a2012");
+        ctx.strokeStyle = "#c8a050";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(10, 10, cw - 20, ch - 20);
+        ctx.fillStyle = "#d9b45e";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        drawCrown(ctx, cw / 2, ch * 0.13, 22);
+        ctx.font = `bold ${ch * 0.27}px ${SERIF}`;
+        ctx.fillText("KING", cw / 2, ch * 0.37);
+        if (suit && s.gamePhase === "playing") {
+          ctx.fillStyle = RED(suit) ? "#c33a34" : "#16130f";
+          ctx.font = `${ch * 0.2}px ${SERIF}`;
+          ctx.fillText(SUITS[suit], cw * 0.27, ch * 0.63);
+        }
+        ctx.fillStyle = "#f0e3c5";
+        ctx.font = `600 ${ch * 0.17}px ${SERIF}`;
+        ctx.fillText(`${pad(s.round || 1)} / 27`, cw * 0.6, ch * 0.63);
+        ctx.font = `500 ${ch * 0.1}px ${SERIF}`;
+        ctx.fillStyle = "#e8d6a8";
+        fitText(
+          ctx,
+          `${type && s.gamePhase === "playing" ? type.name + " · " : ""}${this.status()}`,
+          cw / 2,
+          ch * 0.84,
+          cw * 0.86,
+          ch * 0.1,
+          "500",
+        );
+      }, 640);
+      this.clickable(plate, "ბოლო ხელი", () => this.showLast(), !!s.lastTrickResult?.trick?.length);
+    }
+  }
+  // Flip-score stand on the right: names and running totals.
+  scoreStand() {
+    const s = this.state;
+    const g = new THREE.Group();
+    g.position.set(1.1, FELT_Y, -0.26);
+    g.rotation.y = -0.42;
+    this.dynamic.add(g);
+    const w = 0.66,
+      h = 0.44;
+    box(g, [w + 0.06, 0.05, 0.22], [0, 0.025, 0], COLORS.woodDark);
+    const board = new THREE.Group();
+    board.position.set(0, 0.05 + h / 2, -0.02);
+    board.rotation.x = -0.28;
+    g.add(board);
+    box(board, [w + 0.04, h + 0.04, 0.04], [0, 0, -0.02], COLORS.wood);
+    // Rings along the top, like a desk flip chart.
+    for (let i = 0; i < 4; i++)
+      box(board, [0.025, 0.05, 0.05], [-w / 2 + 0.12 + i * 0.14, h / 2 + 0.02, 0], COLORS.gold);
+    const rows = [...s.players].sort(
+      (a, b) =>
+        relativeSeat(a.seat, s.mySeat) - relativeSeat(b.seat, s.mySeat),
+    );
+    const face = panel(board, w, h, [0, 0, 0.002], (ctx, cw, ch) => {
+      woodGrain(ctx, cw, ch, "#4a2a18", "#2e180c");
+      const rh = (ch - 24) / 3;
+      rows.forEach((p, i) => {
+        const y = 12 + i * rh;
+        ctx.fillStyle = "#efe6d0";
+        ctx.fillRect(12, y + 4, cw - 24, rh - 8);
+        ctx.fillStyle = "#c9bea2";
+        ctx.fillRect(12, y + rh / 2 - 1, cw - 24, 2);
+        ctx.textBaseline = "middle";
+        ctx.textAlign = "left";
+        ctx.fillStyle = "#1e1a14";
+        const off = p.connected === false ? " ·" : "";
+        fitText(ctx, `${this.name(p).toUpperCase()}${off}`, 26, y + rh / 2, cw * 0.55, rh * 0.42, "700");
+        const v = s.cumulativeScores?.[p.seat] ?? 0;
+        ctx.textAlign = "right";
+        ctx.fillStyle = v < 0 ? "#b12c25" : v > 0 ? "#1f6a3a" : "#1e1a14";
+        ctx.font = `700 ${rh * 0.5}px ${SERIF}`;
+        ctx.fillText(`${v > 0 ? "+" : ""}${v}`, cw - 26, y + rh / 2);
+        if (s.currentTurn === p.seat && s.gamePhase === "playing") {
+          ctx.fillStyle = "#c8a050";
+          ctx.fillRect(12, y + 4, 8, rh - 8);
+        }
+      });
+    }, 512);
+    this.clickable(face, "ქულები", () => this.showScores());
+  }
+  makeButton(parent, text, position, width, height, action, enabled = true, selected = false) {
     const g = new THREE.Group();
     g.position.set(...position);
     parent.add(g);
-    box(
-      g,
-      [width, height, 0.035],
-      [0, 0, 0],
-      selected ? COLORS.gold : COLORS.wood,
-    );
-    const face = label(g, text, width * 0.96, height * 0.9, [0, 0, 0.022], {
-      bg: selected ? "#b99a58" : enabled ? "#224b3e" : "#55564b",
-      color: selected ? "#172d26" : "#f0e3c5",
-      font: 60,
+    box(g, [width, height, 0.03], [0, 0, 0], COLORS.woodDark);
+    const face = panel(g, width * 0.94, height * 0.82, [0, 0, 0.016], (ctx, w, h) => {
+      const grad = ctx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, enabled ? (selected ? "#d8b464" : "#2f6a52") : "#5d5f56");
+      grad.addColorStop(1, enabled ? (selected ? "#a8843c" : "#1d4a39") : "#46483f");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = "#c8a050";
+      ctx.lineWidth = 5;
+      ctx.strokeRect(5, 5, w - 10, h - 10);
+      ctx.fillStyle = selected ? "#1d2a22" : "#e8cf8a";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      fitText(ctx, text, w / 2, h / 2 + 2, w * 0.86, h * 0.5, "700");
     });
     this.clickable(face, text.replaceAll("\n", " "), action, enabled);
     return g;
   }
+  // A cream tile with a code and suit, as on the round board.
+  tile(parent, { code, suit, sub, position, w, h, enabled, selected, used }, action, title) {
+    const g = new THREE.Group();
+    g.position.set(...position);
+    parent.add(g);
+    box(g, [w, h, 0.035], [0, 0, 0], selected ? 0xe8c460 : 0xd9ccb0);
+    const face = panel(g, w * 0.92, h * 0.88, [0, 0, 0.0185], (ctx, cw, ch) => {
+      ctx.fillStyle = enabled || selected ? "#f3ead6" : "#c9c2b0";
+      ctx.fillRect(0, 0, cw, ch);
+      ctx.strokeStyle = selected ? "#e0b030" : "#b9a982";
+      ctx.lineWidth = selected ? 14 : 4;
+      ctx.strokeRect(4, 4, cw - 8, ch - 8);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const red = suit && RED(suit);
+      if (code) {
+        ctx.fillStyle = red && code.length === 1 && "HT".includes(code) ? "#b52a2e" : "#16130f";
+        fitText(ctx, code, cw / 2, ch * (suit ? 0.36 : 0.5), cw * 0.8, ch * 0.38, "700");
+      }
+      if (suit) {
+        ctx.fillStyle = red ? "#b52a2e" : "#16130f";
+        ctx.font = `${ch * (code ? 0.3 : 0.62)}px ${SERIF}`;
+        ctx.fillText(SUITS[suit], cw / 2, ch * (code ? 0.72 : 0.54));
+      }
+      if (sub) {
+        ctx.fillStyle = "#6a5a3a";
+        fitText(ctx, sub, cw / 2, ch * 0.9, cw * 0.9, ch * 0.13, "500", "sans-serif");
+      }
+      if (used) {
+        ctx.fillStyle = "#2f6a52";
+        ctx.font = `700 ${ch * 0.22}px sans-serif`;
+        ctx.fillText("✓", cw * 0.82, ch * 0.2);
+      }
+    }, 256);
+    this.clickable(face, title, action, enabled);
+    return g;
+  }
+  // The leader's wooden board for choosing the game, trump or discards.
   selectionTray() {
     const s = this.state,
       tray = new THREE.Group();
-    tray.position.set(0.32, 1.53, 0.4);
-    tray.rotation.x = -0.62;
+    tray.position.set(0.36, FELT_Y + 0.13, 0.44);
+    tray.rotation.set(-1.0, -0.12, 0);
+    tray.scale.setScalar(0.86);
     this.dynamic.add(tray);
-    box(tray, [1.38, 1.05, 0.09], [0, 0, 0], COLORS.wood);
+    const W = 1.0,
+      H = 0.86;
+    box(tray, [W, H, 0.05], [0, 0, 0], COLORS.wood);
+    box(tray, [W - 0.06, H - 0.06, 0.02], [0, 0, 0.03], COLORS.woodDark);
+    const header = (text, badge) => {
+      panel(tray, W * 0.6, 0.1, [-W * 0.15, H / 2 - 0.1, 0.045], (ctx, w, h) => {
+        ctx.fillStyle = "#2a1a10";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "#a88445";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(3, 3, w - 6, h - 6);
+        ctx.fillStyle = "#e8cf8a";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        fitText(ctx, text, w / 2, h / 2 + 2, w * 0.86, h * 0.55, "700");
+      });
+      panel(tray, W * 0.25, 0.1, [W * 0.31, H / 2 - 0.1, 0.045], (ctx, w, h) => {
+        ctx.fillStyle = "#16100a";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = "#a88445";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(3, 3, w - 6, h - 6);
+        ctx.fillStyle = "#efe6d0";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        fitText(ctx, badge, w / 2, h / 2 + 2, w * 0.86, h * 0.55, "700");
+      }, 256);
+    };
     const available = !(this.sent || s.reconnecting);
     if (s.gamePhase === "type_selection") {
-      label(tray, "აირჩიე თამაში", 1.23, 0.14, [0, 0.43, 0.06]);
+      header("აირჩიე თამაში", `${pad(s.round || 1)} / 27`);
       GAME_TYPES.forEach((type, i) => {
         const used = s.usedTypes?.[s.leaderSeat]?.includes(type.code);
-        this.makeButton(
+        this.tile(
           tray,
-          `${type.code} ${used ? "✓" : ""}\n${type.name}`,
-          [((i % 3) - 1) * 0.43, 0.21 - Math.floor(i / 3) * 0.21, 0.06],
-          0.4,
-          0.19,
+          {
+            code: type.code,
+            suit: TILE_SUIT[type.code],
+            sub: type.name,
+            position: [((i % 3) - 1) * 0.27, 0.17 - Math.floor(i / 3) * 0.17, 0.05],
+            w: 0.24,
+            h: 0.15,
+            enabled: available && !used,
+            selected: this.selection === type.code,
+            used,
+          },
           () => {
             this.selection = type.code;
             this.refresh();
           },
-          available && !used,
-          this.selection === type.code,
+          `${type.code} · ${type.name}${used ? " ✓" : ""}`,
         );
       });
       this.makeButton(
         tray,
-        this.sent ? "იგზავნება…" : "დავიწყოთ",
-        [0, -0.41, 0.06],
-        1.2,
-        0.15,
+        this.sent ? "იგზავნება…" : "თამაში",
+        [0, -H / 2 + 0.1, 0.05],
+        0.5,
+        0.11,
         () => this.send("selectGameType", this.selection),
         available && !!this.selection,
       );
     } else if (s.gamePhase === "trump_selection") {
-      label(tray, "აირჩიე კოზირი", 1.23, 0.2, [0, 0.36, 0.06]);
+      const type = GAME_TYPES.find((t) => t.code === s.chosenGameType);
+      header("აირჩიე კოზირი", `${s.chosenGameType || ""} ${type?.kind === "plus" || /^P/.test(s.chosenGameType || "") ? "+8" : ""}`);
       ["S", "H", "C", "D"].forEach((suit, i) =>
-        this.makeButton(
+        this.tile(
           tray,
-          SUITS[suit],
-          [(i - 1.5) * 0.3, 0.03, 0.06],
-          0.27,
-          0.32,
+          {
+            suit,
+            position: [(i - 1.5) * 0.22, 0.04, 0.05],
+            w: 0.19,
+            h: 0.24,
+            enabled: available,
+            selected: this.selection === suit,
+          },
           () => {
             this.selection = suit;
             this.refresh();
           },
-          available,
-          this.selection === suit,
+          SUITS[suit],
         ),
       );
       this.makeButton(
         tray,
-        "დადასტურება",
-        [0, -0.32, 0.06],
-        1.2,
-        0.2,
+        this.sent ? "იგზავნება…" : "დადასტურება",
+        [0, -H / 2 + 0.14, 0.05],
+        0.56,
+        0.13,
         () => this.send("selectTrump", this.selection),
         available && !!this.selection,
       );
     } else {
-      label(
-        tray,
-        `გადადე 2 კარტი\nარჩეულია ${s.selectedDiscards.length} / 2`,
-        1.23,
-        0.36,
-        [0, 0.2, 0.06],
-        { font: 64 },
-      );
-      label(
-        tray,
-        "პრიკუპიდან ერთი მაინც დაიტოვე",
-        1.23,
-        0.18,
-        [0, -0.08, 0.06],
-        { font: 45 },
-      );
+      header("გადადე 2 კარტი", `${s.selectedDiscards.length} / 2`);
+      panel(tray, W * 0.86, 0.32, [0, 0.05, 0.045], (ctx, w, h) => {
+        ctx.fillStyle = "#efe6d0";
+        ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = "#2a2418";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        fitText(ctx, "აირჩიე ორი კარტი ხელში.", w / 2, h * 0.35, w * 0.9, h * 0.2, "600");
+        fitText(ctx, "პრიკუპიდან ერთი მაინც დაიტოვე.", w / 2, h * 0.68, w * 0.9, h * 0.16, "500");
+      });
       const center = new Set((s.lastCenterCards || []).map(key));
       const legal =
         s.selectedDiscards.length === 2 &&
@@ -621,100 +864,101 @@ export class TableScene {
         s.selectedDiscards.every((c) => canDiscard(s.chosenGameType, c));
       this.makeButton(
         tray,
-        "გადადება",
-        [0, -0.34, 0.06],
-        1.2,
-        0.2,
+        this.sent ? "იგზავნება…" : "გადადება",
+        [0, -H / 2 + 0.14, 0.05],
+        0.56,
+        0.13,
         () => this.send("discardCards", s.selectedDiscards),
         available && legal,
       );
     }
   }
+  // The score ledger, held open in the right hand.
   scorebook() {
     const s = this.state;
     const g = new THREE.Group();
     this.bookGroup = g;
-    g.position.set(0.52, 1.76, 0.65);
-    g.rotation.x = -0.65;
+    g.position.set(0.5, FELT_Y + 0.26, 0.72);
+    g.rotation.set(-0.95, -0.2, -0.08);
+    g.scale.setScalar(0.7);
     this.dynamic.add(g);
-    box(g, [1.85, 1.28, 0.09], [0, 0, 0], 0x493325);
-    box(g, [1.77, 1.2, 0.06], [0, 0, 0.06], COLORS.cream);
+    const W = 0.92,
+      H = 1.0;
+    box(g, [W + 0.06, H + 0.06, 0.04], [0, 0, -0.02], 0x3a2216);
+    // Page edges on the right, as in a thick ledger.
+    for (let i = 0; i < 4; i++)
+      box(g, [0.012, H - 0.02, 0.02], [W / 2 + 0.008 + i * 0.008, 0, 0.004 - i * 0.004], 0xe6dcc4);
     const rows = s.roundScores || [],
-      pages = Math.max(1, Math.ceil(rows.length / 9));
+      perPage = 9,
+      pages = Math.max(1, Math.ceil(rows.length / perPage));
     this.page = Math.min(this.page, pages - 1);
-    const map = texture(
-      (ctx, w, h) => {
-        ctx.fillStyle = "#ede1bf";
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = "#2d352b";
-        ctx.textAlign = "center";
-        ctx.font = "bold 48px Georgia";
-        ctx.fillText("KING · ქულები", w / 2, 62);
-        const xs = [110, 430, 660, 900];
-        ctx.font = "bold 27px sans-serif";
-        ["ხელი", ...s.players.map((p) => p.name)].forEach((v, i) =>
-          ctx.fillText(v, xs[i], 120, i ? 200 : 180),
-        );
-        const slice = rows.slice(this.page * 9, this.page * 9 + 9);
-        slice.forEach((r, i) => {
-          const y = 168 + i * 43;
-          ctx.strokeStyle = "#baae8b";
-          ctx.beginPath();
-          ctx.moveTo(32, y + 13);
-          ctx.lineTo(w - 32, y + 13);
-          ctx.stroke();
-          [
-            String(r.round || this.page * 9 + i + 1) + " " + r.gameType,
-            ...s.players.map((p) => r.scores?.[p.seat] ?? 0),
-          ].forEach((v, j) => {
-            ctx.fillStyle =
-              typeof v === "number" && v < 0 ? "#9a3d31" : "#284739";
-            ctx.fillText(v, xs[j], y);
-          });
+    const players = [...s.players].sort(
+      (a, b) =>
+        relativeSeat(a.seat, s.mySeat) - relativeSeat(b.seat, s.mySeat),
+    );
+    const page = panel(g, W, H, [0, 0, 0.002], (ctx, w, h) => {
+      ctx.fillStyle = "#f2ead6";
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = "#1c1a16";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `700 ${h * 0.05}px ${SERIF}`;
+      ctx.fillText("KING · ქულები", w / 2, h * 0.07);
+      const xs = [w * 0.15, w * 0.42, w * 0.64, w * 0.86];
+      ctx.strokeStyle = "#7d7360";
+      ctx.lineWidth = 2;
+      for (const x of [w * 0.29, w * 0.53, w * 0.75]) {
+        ctx.beginPath();
+        ctx.moveTo(x, h * 0.12);
+        ctx.lineTo(x, h * 0.86);
+        ctx.stroke();
+      }
+      ["ხელი", ...players.map((p) => this.name(p).toUpperCase())].forEach((v, i) =>
+        fitText(ctx, v, xs[i], h * 0.155, w * 0.2, h * 0.034, "700"),
+      );
+      const top = h * 0.2,
+        rh = (h * 0.62) / perPage;
+      rows.slice(this.page * perPage, this.page * perPage + perPage).forEach((r, i) => {
+        const y = top + i * rh + rh / 2;
+        ctx.strokeStyle = "#c9bc98";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.04, y + rh / 2);
+        ctx.lineTo(w * 0.96, y + rh / 2);
+        ctx.stroke();
+        ctx.fillStyle = "#1c1a16";
+        ctx.font = `600 ${rh * 0.5}px ${SERIF}`;
+        ctx.fillText(`${pad(r.round || this.page * perPage + i + 1)}  ${r.gameType || ""}`, xs[0], y);
+        players.forEach((p, j) => {
+          const v = r.scores?.[p.seat] ?? 0;
+          ctx.fillStyle = v < 0 ? "#9a2f27" : v > 0 ? "#1f6a3a" : "#1c1a16";
+          ctx.fillText(String(v), xs[j + 1], y);
         });
-        ctx.font = "bold 31px sans-serif";
-        ctx.fillStyle = "#203e31";
-        [
-          "ჯამი",
-          ...s.players.map((p) => s.cumulativeScores?.[p.seat] ?? 0),
-        ].forEach((v, i) => ctx.fillText(v, xs[i], h - 55));
-      },
-      1024,
-      650,
-    );
-    const page = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.72, 1.09),
-      new THREE.MeshBasicMaterial({ map }),
-    );
-    page.position.z = 0.095;
-    g.add(page);
+      });
+      ctx.strokeStyle = "#1c1a16";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.04, h * 0.86);
+      ctx.lineTo(w * 0.96, h * 0.86);
+      ctx.stroke();
+      ctx.fillStyle = "#1c1a16";
+      ctx.font = `700 ${h * 0.042}px ${SERIF}`;
+      ctx.fillText("ჯამი", xs[0], h * 0.91);
+      players.forEach((p, j) =>
+        ctx.fillText(String(s.cumulativeScores?.[p.seat] ?? 0), xs[j + 1], h * 0.91),
+      );
+    }, 768);
     this.targets.push(page);
-    this.makeButton(
-      g,
-      "‹",
-      [-0.65, -0.69, 0.08],
-      0.22,
-      0.15,
-      () => {
-        this.pageTurnAt = this.time;
-        this.page = Math.max(0, this.page - 1);
-        this.refresh();
-      },
-      this.page > 0,
-    );
-    this.makeButton(
-      g,
-      "›",
-      [0.65, -0.69, 0.08],
-      0.22,
-      0.15,
-      () => {
-        this.pageTurnAt = this.time;
-        this.page = Math.min(pages - 1, this.page + 1);
-        this.refresh();
-      },
-      this.page < pages - 1,
-    );
+    this.makeButton(g, "‹", [-W / 2 + 0.1, -H / 2 - 0.08, 0.02], 0.14, 0.1, () => {
+      this.pageTurnAt = this.time;
+      this.page = Math.max(0, this.page - 1);
+      this.refresh();
+    }, this.page > 0);
+    this.makeButton(g, "›", [W / 2 - 0.1, -H / 2 - 0.08, 0.02], 0.14, 0.1, () => {
+      this.pageTurnAt = this.time;
+      this.page = Math.min(pages - 1, this.page + 1);
+      this.refresh();
+    }, this.page < pages - 1);
     if (s.gamePhase === "round_end") {
       const zero = s.players.find((p) => p.seat === 0),
         starter =
@@ -728,14 +972,14 @@ export class TableScene {
       this.makeButton(
         g,
         this.sent ? "იგზავნება…" : "შემდეგი ხელი",
-        [0, -0.69, 0.08],
-        0.9,
-        0.15,
+        [0, -H / 2 - 0.08, 0.02],
+        0.5,
+        0.1,
         () => this.send("nextRound"),
         !s.spectator && s.mySeat === starter && !s.reconnecting && !this.sent,
       );
     } else
-      this.makeButton(g, "დახურვა", [0, -0.69, 0.08], 0.9, 0.15, () => {
+      this.makeButton(g, "დახურვა", [0, -H / 2 - 0.08, 0.02], 0.5, 0.1, () => {
         this.book = false;
         this.refresh();
       });

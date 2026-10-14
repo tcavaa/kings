@@ -1,115 +1,121 @@
 import * as THREE from "three";
-import { box, cylinder, label, COLORS } from "./primitives";
-export function buildRoom(scene) {
-  scene.background = new THREE.Color("#293b50");
-  scene.fog = new THREE.Fog("#293b50", 13, 38);
-  scene.add(new THREE.HemisphereLight(0xc3d6e6, 0x6b432a, 2.1));
-  const sun = new THREE.DirectionalLight(0xffd3a0, 2.5);
-  sun.position.set(-3, 6, 4);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024);
-  Object.assign(sun.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6 });
-  sun.shadow.bias = -0.001;
-  scene.add(sun);
-  box(scene, [15, 0.12, 15], [0, -0.12, 0], 0x302d27);
-  box(scene, [8, 0.02, 7], [0, -0.045, 0], 0x22433b);
-  for (let x = -4; x <= 4; x++)
-    box(scene, [0.025, 0.025, 7], [x, -0.025, 0], 0x74644a);
-  box(scene, [0.2, 6, 13], [-6, 2.8, 0], COLORS.wood);
-  box(scene, [0.2, 6, 13], [6, 2.8, 0], COLORS.wood);
-  box(scene, [12, 1, 0.2], [0, 0.45, -5], COLORS.wood);
-  box(scene, [12, 0.35, 0.3], [0, 4.6, -5], COLORS.wood);
-  for (let x = -6; x <= 6; x += 3) {
-    box(scene, [0.22, 4.6, 0.3], [x, 2.25, -5], COLORS.wood);
-    box(scene, [0.27, 0.06, 0.36], [x, 1.05, -5], COLORS.gold);
-  }
-  // Actual skyline geometry outside the windows; deterministic dimensions.
-  for (let i = 0; i < 25; i++) {
-    const x = (i - 12) * 1.05,
-      h = 1.4 + ((i * 17) % 11) * 0.29,
-      z = -8 - (i % 3);
-    box(
-      scene,
-      [0.85, h, 0.9],
-      [x, h / 2 - 0.5, z],
-      i % 2 ? 0x404959 : 0x535669,
-    );
-    for (let row = 0; row < Math.floor(h * 2); row++)
-      for (let col = 0; col < 3; col++) {
-        if ((row + col + i) % 3 === 0) continue;
-        box(
-          scene,
-          [0.09, 0.14, 0.012],
-          [x - 0.25 + col * 0.25, row * 0.4, z + 0.46],
-          0xd3ae69,
-        );
-      }
-  }
-  cylinder(scene, 0.055, 4, [3.9, 3.6, -10], 0x625958, 6);
-  cylinder(scene, 0.28, 0.15, [3.9, 4.2, -10], 0xdcb683, 8);
-  // Bookcase and lamps frame the table.
-  for (const side of [-1, 1]) {
-    const shelf = new THREE.Group();
-    shelf.position.set(side * 4.5, 0, -3.7);
-    scene.add(shelf);
-    box(shelf, [1.7, 3.7, 0.45], [0, 1.8, 0], 0x36271e);
-    for (let row = 0; row < 4; row++) {
-      box(shelf, [1.7, 0.09, 0.7], [0, 0.3 + row * 0.86, 0.1], 0x755139);
-      for (let j = 0; j < 6; j++)
-        box(
-          shelf,
-          [0.14, 0.38 + (j % 3) * 0.08, 0.25],
-          [-0.65 + j * 0.23, 0.54 + row * 0.86, 0.27],
-          [0x8a6950, 0x273f39, 0x8b4434][j % 3],
-        );
-    }
-    cylinder(scene, 0.24, 0.06, [side * 3.1, 0.05, -2.5], COLORS.gold);
-    cylinder(scene, 0.035, 2.6, [side * 3.1, 1.35, -2.5], COLORS.gold);
-    const shade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.3, 0.52, 0.5, 8),
-      new THREE.MeshStandardMaterial({
-        color: 0xe7c58a,
-        emissive: 0x8b602b,
-        emissiveIntensity: 0.45,
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+// The Blender-built club room (blender/room.py) is modelled in real metres;
+// the table scene works in units 1.4x larger (felt top at y ≈ 1.043).
+export const WORLD_SCALE = 1.4;
+export const ASSETS = "/models/king3d";
+// Opponent armchairs, in scene units (blender/room.py SEATS × WORLD_SCALE).
+export const SEATS = {
+  1: { position: [-1.26, 0, -1.54], rotation: 0.686 },
+  2: { position: [1.26, 0, -1.54], rotation: -0.686 },
+};
+
+const loader = new GLTFLoader();
+const cache = new Map();
+// Each GLB is fetched and parsed once per page; scenes clone from it.
+export function loadGLB(url) {
+  if (!cache.has(url))
+    cache.set(
+      url,
+      loader
+        .loadAsync(url)
+        .then((gltf) => {
+          // Shared by every clone for the life of the page: dispose() skips
+          // these (closing their ImageBitmaps would break later scenes).
+          gltf.scene.traverse((o) => {
+            o.userData.cached = true;
+          });
+          return gltf;
+        })
+        .catch((e) => {
+        cache.delete(url);
+        throw e;
       }),
     );
-    shade.position.set(side * 3.1, 2.6, -2.5);
-    scene.add(shade);
-    const light = new THREE.PointLight(0xffc279, 10, 7, 2);
-    light.position.set(side * 3.1, 2.4, -2.5);
+  return cache.get(url);
+}
+
+export function buildRoom(scene, onReady) {
+  scene.background = new THREE.Color("#2b2740");
+  scene.fog = new THREE.Fog("#2b2740", 26, 60);
+
+  // Bright, warm club lighting: a strong sky/ground fill so nothing reads as
+  // murky, a key from the chandelier, warm lamps and a cool window light.
+  scene.add(new THREE.HemisphereLight(0xfff3e0, 0x8a6a50, 1.9));
+  scene.add(new THREE.AmbientLight(0xffe8cc, 0.55));
+  const key = new THREE.DirectionalLight(0xfff0dc, 2.6);
+  key.position.set(-2.5, 7, 4.5);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, {
+    left: -5,
+    right: 5,
+    top: 5,
+    bottom: -5,
+    near: 1,
+    far: 20,
+  });
+  key.shadow.bias = -0.0005;
+  key.shadow.normalBias = 0.02;
+  scene.add(key);
+  const windowLight = new THREE.DirectionalLight(0xb8c4ff, 0.9);
+  windowLight.position.set(8, 4, -6);
+  scene.add(windowLight);
+  const chandelier = new THREE.PointLight(0xffd9a8, 22, 9, 1.6);
+  chandelier.position.set(0, 3.4, 0.1);
+  scene.add(chandelier);
+  // The cabinet lamp and the floor lamp (Blender coordinates × 1.4).
+  const lamps = [
+    [-0.84, 1.8, -5.74],
+    [-5.46, 2.38, -5.18],
+  ].map(([x, y, z]) => {
+    const light = new THREE.PointLight(0xffc27a, 9, 7, 1.8);
+    light.position.set(x, y, z);
     scene.add(light);
-  }
-  const tabletop = cylinder(scene, 2.2, 0.18, [0, 0.91, 0.1], COLORS.wood, 48);
-  tabletop.scale.z = 0.78;
-  const trim = cylinder(scene, 2.08, 0.025, [0, 1.012, 0.1], COLORS.gold, 48);
-  trim.scale.z = 0.78;
-  const felt = cylinder(scene, 2.04, 0.022, [0, 1.033, 0.1], COLORS.felt, 48);
-  felt.scale.z = 0.78;
-  for (const x of [-1.1, 1.1])
-    box(scene, [0.18, 0.85, 0.18], [x, 0.45, 0.1], COLORS.wood);
-  const mark = label(scene, "♛  KING", 0.58, 0.22, [0, 1.047, -0.15], {
-    bg: "#164c40",
-    border: "#164c40",
-    color: "#aa985d",
+    return light;
   });
-  mark.rotation.x = -Math.PI / 2;
-  for (const [x, z] of [
-    [-1.43, -1.4],
-    [1.43, -1.4],
-  ]) {
-    box(scene, [0.72, 0.15, 0.7], [x, 0.48, z], 0x17483c);
-    box(scene, [0.78, 1.2, 0.15], [x, 1.1, z - 0.29], 0x184436);
-    for (const dx of [-0.29, 0.29])
-      for (const dz of [-0.24, 0.24])
-        box(scene, [0.07, 0.5, 0.07], [x + dx, 0.22, z + dz], COLORS.wood);
-    box(scene, [0.83, 0.06, 0.19], [x, 1.7, z - 0.29], COLORS.gold);
-  }
-  const art = label(scene, "♛\nKING CLUB", 1.15, 1.3, [0, 2.8, -4.72], {
-    bg: "#243d37",
-    color: "#be9d60",
-    font: 96,
-  });
-  // Center window panel doubles as a framed club sign.
-  box(scene, [1.25, 1.4, 0.12], [0, 2.8, -4.82], COLORS.gold);
-  return art;
+
+  const room = new THREE.Group();
+  room.scale.setScalar(WORLD_SCALE);
+  scene.add(room);
+  loadGLB(`${ASSETS}/room.glb`)
+    .then((gltf) => {
+      const model = gltf.scene.clone(true);
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = !/ceiling|beam|floor|rug|wain|paper|crown$/.test(o.name);
+        o.receiveShadow = true;
+        const m = o.material;
+        if (m?.map) m.map.anisotropy = 4;
+        if (/shade|bulb/.test(m?.name || "")) m.toneMapped = false;
+        // Keep the baize a deep billiard green under the bright fill.
+        if (m?.name === "felt") m.color.setHex(0xb8c4bc);
+      });
+      room.add(model);
+      onReady?.();
+    })
+    .catch((e) => console.error("KING room failed to load", e));
+
+  // Tbilisi at dusk, Mtatsminda and the TV tower, on a curved wall outside
+  // the windows (back-right of the room).
+  const pano = new THREE.TextureLoader().load(`${ASSETS}/tbilisi.jpg`);
+  pano.colorSpace = THREE.SRGBColorSpace;
+  pano.anisotropy = 4;
+  const backdrop = new THREE.Mesh(
+    new THREE.CylinderGeometry(15, 15, 12, 48, 1, true, 1.35, 2.8),
+    new THREE.MeshBasicMaterial({
+      map: pano,
+      side: THREE.BackSide,
+      fog: false,
+      toneMapped: false,
+    }),
+  );
+  pano.wrapS = THREE.RepeatWrapping;
+  pano.repeat.x = -1;
+  // The ridge and tower fill the window tops; the city sits below the sills.
+  backdrop.position.set(0, -0.5, -0.5);
+  scene.add(backdrop);
+
+  return { lamps, chandelier };
 }

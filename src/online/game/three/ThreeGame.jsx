@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { TableScene } from "./TableScene";
-import { customCharacter, validGLB } from "./characters";
+import { looksFor } from "./looks";
 import "./three.css";
 import { EventBus } from "../EventBus";
 import { armShuffleSound } from "../lib/shuffleSound";
@@ -25,11 +25,7 @@ export default function ThreeGame({
     [hint, setHint] = useState(""),
     [notice, setNotice] = useState("");
   const [controls, setControls] = useState([]),
-    [accessible, setAccessible] = useState(false),
-    [customize, setCustomize] = useState(false);
-  const [seatName, setSeatName] = useState(""),
-    [kind, setKind] = useState("head"),
-    [busy, setBusy] = useState(false);
+    [accessible, setAccessible] = useState(false);
   useEffect(() => armShuffleSound(), []);
   useEffect(() => {
     try {
@@ -80,46 +76,22 @@ export default function ThreeGame({
     const timer = setTimeout(() => setNotice(""), 7000);
     return () => clearTimeout(timer);
   }, [notice]);
-  async function upload(event) {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setBusy(true);
-    try {
-      if (file.size > 25 * 1024 * 1024)
-        throw new Error("მაქსიმალური ზომაა 25 MB.");
-      const buffer = await file.arrayBuffer();
-      if (!validGLB(buffer))
-        throw new Error(
-          "აირჩიე GLB 2.0 ფაილი ჩაშენებული ტექსტურებით (მაქს. 25 MB).",
-        );
-      const value = { kind, buffer, filename: file.name };
-      const loaded = await scene.current.replaceCharacter(seatName, value);
-      if (!loaded)
-        throw new Error("მოდელი ვერ გამოიყენება. სცადე სხვა GLB ფაილი.");
-      await customCharacter(seatName, value);
-      setNotice("მოდელი შენახულია ამ ბრაუზერში.");
-    } catch (e) {
-      setNotice(e.message || "მოდელი ვერ შეინახა.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function reset() {
-    setBusy(true);
-    try {
-      await customCharacter(seatName, null);
-      await scene.current.replaceCharacter(seatName, null);
-      setNotice("საწყისი პერსონაჟი აღდგა.");
-    } catch {
-      setNotice("პერსონაჟი ვერ აღდგა.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  const others = gameState.players.filter(
-    (p) => p.seat !== (gameState.mySeat ?? 0),
-  );
+  // Each player's look (gender, uploaded head) comes from their profile;
+  // it is edited on the profile screen, not here.
+  const rosterKey = gameState.players
+    .map((p) => `${p.seat}:${p.profileId || ""}`)
+    .join("|");
+  useEffect(() => {
+    let live = true;
+    const players = gameState.players;
+    looksFor(players).then((looks) => {
+      if (live) scene.current?.setLooks(looks, looks[gameState.mySeat]);
+    });
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rosterKey, gameState.mySeat]);
   return (
     <div className="king-three">
       <div ref={host} className="king-three-canvas" />
@@ -132,14 +104,6 @@ export default function ThreeGame({
             ქულები <kbd>S</kbd>
           </button>
           <button onClick={() => scene.current?.showLast()}>ბოლო ხელი</button>
-          <button
-            onClick={() => {
-              setSeatName(others[0]?.name || "");
-              setCustomize((v) => !v);
-            }}
-          >
-            პერსონაჟები
-          </button>
           <button
             onClick={() => setAccessible((v) => !v)}
             aria-expanded={accessible}
@@ -179,46 +143,6 @@ export default function ThreeGame({
             </button>
           ))}
           <button onClick={() => setAccessible(false)}>დახურვა</button>
-        </aside>
-      )}
-      {customize && (
-        <aside className="king-three-panel" aria-label="პერსონაჟის შეცვლა">
-          <h2>პერსონაჟის შეცვლა</h2>
-          <p>
-            შეცვლა ინახება მხოლოდ ამ ბრაუზერში. GLB ფაილი უნდა შეიცავდეს
-            ტექსტურებს. სრული სხეულისთვის სასურველია sitting ან seated ანიმაცია.
-          </p>
-          <label>
-            მოთამაშე
-            <select
-              value={seatName}
-              onChange={(e) => setSeatName(e.target.value)}
-            >
-              {others.map((p) => (
-                <option key={p.seat}>{p.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            მოდელის ტიპი
-            <select value={kind} onChange={(e) => setKind(e.target.value)}>
-              <option value="head">თავი / სახე</option>
-              <option value="body">სრული პერსონაჟი</option>
-            </select>
-          </label>
-          <label className="king-three-upload">
-            {busy ? "იტვირთება…" : "GLB ფაილის არჩევა"}
-            <input
-              type="file"
-              accept=".glb"
-              disabled={busy || !seatName}
-              onChange={upload}
-            />
-          </label>
-          <button disabled={busy || !seatName} onClick={reset}>
-            საწყისი მოდელის აღდგენა
-          </button>
-          <button onClick={() => setCustomize(false)}>დახურვა</button>
         </aside>
       )}
     </div>

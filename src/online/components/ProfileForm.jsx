@@ -2,11 +2,16 @@ import { AvatarPhoto } from "./AvatarImg";
 import { useEffect, useRef, useState } from "react";
 import { Upload, Trash2, ArrowRight, Pencil, Check } from "lucide-react";
 import { saveProfile, fileToDataURL, deleteProfile } from "../lib/profiles";
+import { api } from "../lib/api";
+import { toBase64 } from "../game/three/characters";
+import { forgetLook } from "../game/three/looks";
+import ProfileCharacter from "./ProfileCharacter";
 
 const PIN_DIGITS = 4;
 
 /**
- * Inline form for creating or editing a profile (username + avatar + PIN).
+ * Inline form for creating or editing a profile (username + avatar + PIN +
+ * the 3D table look: gender and an optional face/head model).
  * `editing` is the profile object (or null to create new). Calls onDone(profile|null).
  * `currentPin` is the PIN the user typed to open a protected profile for
  * editing; the server needs it to save or delete.
@@ -24,10 +29,29 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
   const [pinErr, setPinErr] = useState("");
   const [error, setError] = useState("");
   const fileRef = useRef(null);
+  // The 3D look as stored, and as edited here (saved with the profile).
+  const [savedLook, setSavedLook] = useState({ gender: "male", head: null });
+  const [look, setLook] = useState(savedLook);
 
   useEffect(() => {
     fileRef.current?.closest("dialog")?.scrollTo(0, 0);
   }, []);
+  useEffect(() => {
+    if (!editing?.id) return;
+    let live = true;
+    api
+      .getCharacter(editing.id)
+      .then((stored) => {
+        if (!live || !stored) return;
+        const next = { gender: stored.gender || "male", head: stored.head || null };
+        setSavedLook(next);
+        setLook(next);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [editing?.id]);
 
   const isNewProfile = !editing;
   const hadPin = !!editing?.has_pin;
@@ -84,6 +108,24 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
         ...(pin.length === PIN_DIGITS ? { pin } : {}),
         currentPin,
       });
+      // The look saves after the profile (a new profile must exist first),
+      // proving ownership with the PIN just set or the one typed to edit.
+      const headChanged = look.head !== savedLook.head;
+      if (look.gender !== savedLook.gender || headChanged) {
+        try {
+          await api.saveCharacter(saved.id, {
+            gender: look.gender,
+            ...(headChanged
+              ? { head: look.head?.buffer ? toBase64(look.head.buffer) : null }
+              : {}),
+            currentPin: pin.length === PIN_DIGITS ? pin : currentPin,
+          });
+          forgetLook(saved.id);
+        } catch (err) {
+          setError(`პროფილი შეინახა, მაგრამ 3D პერსონაჟი ვერა: ${err.message}`);
+          return;
+        }
+      }
       onDone?.(saved);
     } catch (err) {
       setError(`პროფილის შენახვა ვერ მოხერხდა: ${err.message}`);
@@ -179,6 +221,11 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
             : "4 ციფრი. შენი პროფილის გასახსნელად ახალ მოწყობილობაზე."}
         </small>
       </label>
+      <ProfileCharacter
+        value={look}
+        onChange={setLook}
+        disabled={busy || (!isNewProfile && !hadPin)}
+      />
       {confirmDelete && (
         <p className="k-form-error" role="alert">
           {`„${editing?.name}“ წაიშლება ყველასთვის, ჩაწერის ჩათვლით.`}

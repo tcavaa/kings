@@ -25,6 +25,7 @@ function TopBar({
   onToggleScores,
   onToggleChat,
   onToggleRounds,
+  onView3D,
   waiting,
 }) {
   const {
@@ -140,6 +141,16 @@ function TopBar({
             ხელები <b>{Math.max(0, 27 - round)}</b>
           </span>
         </button>
+        {onView3D && (
+          <button
+            className="k-game-icon k-view-3d"
+            aria-label="3D რეჟიმი"
+            title="3D რეჟიმი"
+            onClick={onView3D}
+          >
+            3D
+          </button>
+        )}
         <button
           className="k-game-icon"
           aria-label="ქულები"

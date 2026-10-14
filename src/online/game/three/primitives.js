@@ -1,17 +1,20 @@
 import * as THREE from "three";
 export const COLORS = {
-  felt: 0x164c40,
-  wood: 0x513425,
-  gold: 0xb99a58,
-  cream: 0xf0e3c5,
+  felt: 0x2a7558,
+  wood: 0x6b3f26,
+  woodDark: 0x4a2a18,
+  gold: 0xc8a050,
+  cream: 0xf3ead6,
 };
 export const SUITS = { S: "♠", H: "♥", D: "♦", C: "♣" };
+export const RED = (suit) => suit === "H" || suit === "D";
+export const SERIF = 'Georgia, "Times New Roman", "Noto Serif Georgian", serif';
 export function box(parent, size, position, color, rotation) {
   const mesh = new THREE.Mesh(
     new THREE.BoxGeometry(...size),
     new THREE.MeshStandardMaterial({
       color,
-      roughness: 0.88,
+      roughness: 0.7,
       flatShading: true,
     }),
   );
@@ -43,107 +46,215 @@ export function texture(draw, width = 1024, height = 512) {
   draw(canvas.getContext("2d"), width, height);
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
   return map;
 }
-export function label(parent, text, width, height, position, options = {}) {
-  const map = texture(
-    (ctx, w, h) => {
-      ctx.fillStyle = options.bg || "#163d34";
-      ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = options.border || "#b99a58";
-      ctx.lineWidth = 9;
-      ctx.strokeRect(5, 5, w - 10, h - 10);
-      ctx.fillStyle = options.color || "#f0e3c5";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const lines = String(text).split("\n");
-      const font = Math.min(
-        (options.font || 54) * 2,
-        h / (lines.length * 1.4),
-        w / (Math.max(5, ...lines.map((l) => l.length)) * 0.65),
-      );
-      ctx.font = `600 ${font}px sans-serif`;
-      lines.forEach((line, i) =>
-        ctx.fillText(
-          line,
-          w / 2,
-          h / 2 + (i - (lines.length - 1) / 2) * font * 1.2,
-          w - 50,
-        ),
-      );
-    },
-    1024,
-    Math.max(180, Math.round((1024 * height) / width)),
-  );
+// A flat textured face drawn with a 2D canvas, lit like the rest of the room.
+export function panel(parent, width, height, position, draw, px = 512) {
+  const h = Math.max(64, Math.round((px * height) / width));
+  const map = texture((ctx) => draw(ctx, px, h), px, h);
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(width, height),
-    new THREE.MeshBasicMaterial({ map, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ map, roughness: 0.8 }),
   );
   mesh.position.set(...position);
+  mesh.receiveShadow = true;
   parent.add(mesh);
   return mesh;
 }
-export function card(parent, value, back = false) {
-  const group = new THREE.Group();
-  parent.add(group);
-  box(group, [0.235, 0.34, 0.012], [0, 0, 0], COLORS.cream);
-  const face = texture(
+// Fit text to a width, returning the font size used.
+export function fitText(ctx, text, x, y, maxWidth, size, weight = "600", family = SERIF) {
+  let s = size;
+  ctx.font = `${weight} ${s}px ${family}`;
+  while (s > 8 && ctx.measureText(text).width > maxWidth) {
+    s -= 2;
+    ctx.font = `${weight} ${s}px ${family}`;
+  }
+  ctx.fillText(text, x, y);
+  return s;
+}
+export function woodGrain(ctx, w, h, base = "#6b3f26", dark = "#45261a") {
+  ctx.fillStyle = base;
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = dark;
+  ctx.globalAlpha = 0.35;
+  for (let i = 0; i < 26; i++) {
+    const y = (i / 26) * h + Math.sin(i * 7.3) * 4;
+    ctx.lineWidth = 1 + (i % 3);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= w; x += 24)
+      ctx.lineTo(x, y + Math.sin(x * 0.02 + i) * 3);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+export function label(parent, text, width, height, position, options = {}) {
+  return panel(
+    parent,
+    width,
+    height,
+    position,
     (ctx, w, h) => {
-      ctx.fillStyle = back ? "#123e35" : "#f5ecd8";
+      ctx.fillStyle = options.bg || "#1d4a3c";
       ctx.fillRect(0, 0, w, h);
-      ctx.strokeStyle = "#b99a58";
-      ctx.lineWidth = 5;
-      ctx.strokeRect(9, 9, w - 18, h - 18);
-      ctx.fillStyle = back
-        ? "#c7a65e"
-        : ["H", "D"].includes(value?.suit)
-          ? "#a12e32"
-          : "#17241f";
+      ctx.strokeStyle = options.border || "#c8a050";
+      ctx.lineWidth = Math.max(3, h * 0.04);
+      ctx.strokeRect(4, 4, w - 8, h - 8);
+      ctx.fillStyle = options.color || "#f3ead6";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
+      const lines = String(text).split("\n");
+      const size = Math.min((h / lines.length) * 0.62, options.font || 999);
+      lines.forEach((line, i) =>
+        fitText(
+          ctx,
+          line,
+          w / 2,
+          h / 2 + (i - (lines.length - 1) / 2) * size * 1.2,
+          w * 0.9,
+          size,
+        ),
+      );
+    },
+    options.px || 512,
+  );
+}
+const faceCache = new Map();
+function cardFace(value, back) {
+  const id = back ? "back" : `${value.rank}${value.suit}`;
+  if (faceCache.has(id)) return faceCache.get(id);
+  const map = texture(
+    (ctx, w, h) => {
+      const r = 22;
+      ctx.fillStyle = back ? "#163f32" : "#f6f1e4";
+      ctx.beginPath();
+      ctx.roundRect(0, 0, w, h, r);
+      ctx.fill();
       if (back) {
-        ctx.font = "95px serif";
-        ctx.fillText("♛", w / 2, h / 2);
-      } else {
-        ctx.textAlign = "left";
-        ctx.font = "bold 48px Georgia";
-        ctx.fillText(value.rank, 22, 43);
-        ctx.font = "42px serif";
-        ctx.fillText(SUITS[value.suit], 24, 91);
+        ctx.strokeStyle = "#c8a050";
+        ctx.lineWidth = 6;
+        ctx.strokeRect(18, 18, w - 36, h - 36);
+        ctx.fillStyle = "#c8a050";
         ctx.textAlign = "center";
-        ctx.font = "100px serif";
-        ctx.fillText(SUITS[value.suit], w / 2, h / 2 + 15);
+        ctx.textBaseline = "middle";
+        drawCrown(ctx, w / 2, h / 2, 70);
+        return;
+      }
+      const red = RED(value.suit);
+      ctx.fillStyle = red ? "#b52a2e" : "#141414";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const corner = (flip) => {
         ctx.save();
-        ctx.translate(w, h);
-        ctx.rotate(Math.PI);
-        ctx.textAlign = "left";
-        ctx.font = "bold 42px Georgia";
-        ctx.fillText(value.rank + SUITS[value.suit], 18, 35);
+        if (flip) {
+          ctx.translate(w, h);
+          ctx.rotate(Math.PI);
+        }
+        ctx.font = `bold 64px ${SERIF}`;
+        ctx.fillText(value.rank, 40, 52);
+        ctx.font = `48px ${SERIF}`;
+        ctx.fillText(SUITS[value.suit], 40, 104);
         ctx.restore();
+      };
+      corner(false);
+      corner(true);
+      const court = ["K", "Q", "J"].includes(value.rank);
+      if (court) {
+        ctx.strokeStyle = red ? "#b52a2e" : "#141414";
+        ctx.lineWidth = 4;
+        ctx.strokeRect(70, 70, w - 140, h - 140);
+        ctx.fillStyle = "#e9dcb8";
+        ctx.fillRect(72, 72, w - 144, h - 144);
+        ctx.fillStyle = red ? "#b52a2e" : "#141414";
+        ctx.font = `bold 120px ${SERIF}`;
+        ctx.fillText(value.rank, w / 2, h / 2 - 40);
+        ctx.font = `90px ${SERIF}`;
+        ctx.fillText(SUITS[value.suit], w / 2, h / 2 + 70);
+      } else {
+        ctx.font = `150px ${SERIF}`;
+        ctx.fillText(SUITS[value.suit], w / 2, h / 2 + 8);
       }
     },
     256,
-    384,
+    372,
   );
-  const mesh = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.229, 0.334),
-    new THREE.MeshBasicMaterial({ map: face }),
+  faceCache.set(id, map);
+  return map;
+}
+export function drawCrown(ctx, x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x - s, y + s * 0.45);
+  ctx.lineTo(x - s * 1.1, y - s * 0.5);
+  ctx.lineTo(x - s * 0.5, y);
+  ctx.lineTo(x, y - s * 0.7);
+  ctx.lineTo(x + s * 0.5, y);
+  ctx.lineTo(x + s * 1.1, y - s * 0.5);
+  ctx.lineTo(x + s, y + s * 0.45);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(x - s, y + s * 0.52, s * 2, s * 0.18);
+}
+export const CARD_W = 0.235,
+  CARD_H = 0.34;
+const cardBody = new THREE.BoxGeometry(CARD_W, CARD_H, 0.006);
+const cardPlane = new THREE.PlaneGeometry(CARD_W * 0.995, CARD_H * 0.995);
+const edgeMaterial = new THREE.MeshStandardMaterial({
+  color: 0xefe7d4,
+  roughness: 0.8,
+});
+// Card faces are shared textures (one per card); materials are per card so a
+// single card can be dimmed or highlighted.
+export function card(parent, value, back = false) {
+  const group = new THREE.Group();
+  parent.add(group);
+  const body = new THREE.Mesh(cardBody, edgeMaterial);
+  body.castShadow = true;
+  body.userData.shared = true;
+  group.add(body);
+  const face = new THREE.Mesh(
+    cardPlane,
+    new THREE.MeshStandardMaterial({
+      map: cardFace(value, back || !value),
+      roughness: 0.65,
+      transparent: true,
+      alphaTest: 0.5,
+    }),
   );
-  mesh.position.z = 0.007;
-  group.add(mesh);
+  face.position.z = 0.0035;
+  face.userData.sharedMap = true;
+  group.add(face);
+  const rear = new THREE.Mesh(
+    cardPlane,
+    new THREE.MeshStandardMaterial({
+      map: cardFace(null, true),
+      roughness: 0.65,
+      transparent: true,
+      alphaTest: 0.5,
+    }),
+  );
+  rear.rotation.y = Math.PI;
+  rear.position.z = -0.0035;
+  rear.userData.sharedMap = true;
+  group.add(rear);
   return group;
 }
-// Textures, materials and geometry belong to each scene/group; dispose on rebuild/unmount.
+// Textures, materials and geometry belong to each scene/group; dispose on
+// rebuild/unmount. Shared card geometry, card-face textures and anything
+// cloned from a cached GLB are kept.
 export function dispose(root) {
   const geometries = new Set(),
     materials = new Set(),
     maps = new Set();
   root.traverse((o) => {
-    if (o.geometry) geometries.add(o.geometry);
+    if (o.userData.shared || o.userData.cached) return;
+    if (o.geometry && o.geometry !== cardPlane && o.geometry !== cardBody)
+      geometries.add(o.geometry);
     for (const m of Array.isArray(o.material) ? o.material : [o.material])
-      if (m) {
+      if (m && m !== edgeMaterial) {
         materials.add(m);
-        for (const v of Object.values(m)) if (v?.isTexture) maps.add(v);
+        if (!o.userData.sharedMap)
+          for (const v of Object.values(m)) if (v?.isTexture) maps.add(v);
       }
     if (o.isSkinnedMesh) o.skeleton?.dispose();
   });
