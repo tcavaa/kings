@@ -13,6 +13,19 @@
 
 const CHUNK = 50;          // rows per fetch, so a cold start never asks for the whole table
 const CONCURRENCY = 3;     // chunks in flight at once
+// Every reader waits on the sync, so one stuck query would hold every request
+// on the instance until the platform kills it (300 s on Vercel). Past this,
+// the sync fails, its readers get an error, and the next read starts afresh.
+const SYNC_TIMEOUT_MS = 20000;
+
+function withTimeout(promise) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Database sync timed out — try again')), SYNC_TIMEOUT_MS);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 function createMirror({ fetchMarks, fetchRows, makeEntry }) {
   const entries = new Map();   // id -> entry (entry.v = xmin of the row we hold)
@@ -41,7 +54,7 @@ function createMirror({ fetchMarks, fetchRows, makeEntry }) {
   }
 
   function start() {
-    running = pull().finally(() => { running = null; });
+    running = withTimeout(pull()).finally(() => { running = null; });
     return running;
   }
 

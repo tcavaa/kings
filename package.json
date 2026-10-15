@@ -12,6 +12,7 @@
     "server:dev": "npm --prefix server run dev",
     "db:merge-score-app": "node --env-file-if-exists=.env.local scripts/merge-score-app.mjs",
     "db:optimize-media": "node --env-file-if-exists=.env.local scripts/optimize-media.mjs",
+    "db:unembed-game-photos": "node --env-file-if-exists=.env.local scripts/unembed-game-photos.mjs",
     "test:3d": "node tests/three-browser.cjs"
   },
   "engines": {
