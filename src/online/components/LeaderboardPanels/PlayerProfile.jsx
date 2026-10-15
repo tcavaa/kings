@@ -3,6 +3,8 @@ import { ArrowLeft } from "lucide-react";
 import AvatarImg from "../AvatarImg";
 import AchievementsPanel from "./AchievementsPanel";
 import PastGamesList from "./PastGamesList";
+import FormGuide, { RESULT_LABELS } from "./FormGuide";
+import { recentForm, streaksOf } from "../../lib/playerStats";
 import { signed, winRate, averageScore } from "../../utils/format";
 
 export default function PlayerProfile({
@@ -26,6 +28,14 @@ export default function PlayerProfile({
       ?.closest(".k-player-profile")
       ?.scrollIntoView({ block: "start" });
   }, [player.name]);
+  const form = useMemo(
+    () => recentForm(matches, player.name, 10),
+    [matches, player.name],
+  );
+  const streaks = useMemo(
+    () => streaksOf(matches, player.name),
+    [matches, player.name],
+  );
   const stats = [
     ["თამაში", player.gamesPlayed],
     ["გამარჯვება", player.wins],
@@ -63,6 +73,41 @@ export default function PlayerProfile({
           </div>
         ))}
       </dl>
+      <section className="k-profile-form">
+        <header>
+          <span className="k-eyebrow">FORM / LAST {form.length}</span>
+          <h2>ფორმა</h2>
+        </header>
+        <FormGuide
+          form={form}
+          name={player.name}
+          onSelectGame={onSelectGame}
+          size="lg"
+        />
+        <dl>
+          <div>
+            <dt>მიმდინარე სერია</dt>
+            <dd>
+              {streaks.current ? (
+                <>
+                  {streaks.current.length}
+                  <small>{RESULT_LABELS[streaks.current.result]}</small>
+                </>
+              ) : (
+                "—"
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>საუკეთესო მოგების სერია</dt>
+            <dd>{streaks.longestWin}</dd>
+          </div>
+          <div>
+            <dt>ყველაზე გრძელი წაგების სერია</dt>
+            <dd>{streaks.longestLoss}</dd>
+          </div>
+        </dl>
+      </section>
       <AchievementsPanel games={matches} playerName={player.name} />
       <section className="k-profile-history">
         <header>

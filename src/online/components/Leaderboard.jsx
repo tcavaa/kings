@@ -18,6 +18,7 @@ const PastGamesList = lazy(() => import("./LeaderboardPanels/PastGamesList"));
 const GameDetail = lazy(() => import("./LeaderboardPanels/GameDetail"));
 const PlayerProfile = lazy(() => import("./LeaderboardPanels/PlayerProfile"));
 const SeasonsPanel = lazy(() => import("./LeaderboardPanels/SeasonsPanel"));
+const ComparePanel = lazy(() => import("./LeaderboardPanels/ComparePanel"));
 const PAGE_SIZE = 12;
 // Games played in King Online, games recorded at a table in ჩაწერა, or both.
 const GAME_TYPES = [
@@ -38,6 +39,7 @@ export default function Leaderboard({ onBack }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("wins");
   const [page, setPage] = useState(0);
+  const [compare, setCompare] = useState({ picked: null, scope: "shared" });
   const games = useMemo(
     () =>
       gameType === "all"
@@ -173,6 +175,7 @@ export default function Leaderboard({ onBack }) {
         {[
           ["rankings", "რეიტინგი"],
           ["insights", "ანალიტიკა"],
+          ["compare", "შედარება"],
           ["history", "თამაშების ისტორია"],
           ["seasons", "სეზონები"],
         ].map(([id, label], i) => (
@@ -284,7 +287,9 @@ export default function Leaderboard({ onBack }) {
                   </select>
                 </div>
                 <PlayersTable
+                  games={games}
                   onPlayerSelect={setProfileName}
+                  onSelectGame={setSelected}
                   aggregated={ranked.slice(
                     page * PAGE_SIZE,
                     (page + 1) * PAGE_SIZE,
@@ -295,6 +300,20 @@ export default function Leaderboard({ onBack }) {
                 )}
               </section>
             </div>
+          ) : section === "compare" ? (
+            aggregated.length > 1 ? (
+              <ComparePanel
+                games={games}
+                players={aggregated}
+                onSelectGame={setSelected}
+                state={compare}
+                onState={setCompare}
+              />
+            ) : (
+              <p className="k-empty">
+                შედარებისთვის საჭიროა ორი მოთამაშის შედეგები.
+              </p>
+            )
           ) : section === "seasons" ? (
             <SeasonsPanel games={games} />
           ) : section === "insights" ? (
@@ -304,6 +323,7 @@ export default function Leaderboard({ onBack }) {
                 games={games}
                 players={aggregated}
                 gameType={gameType}
+                onSelectGame={setSelected}
               />
             ) : (
               <p className="k-empty">
@@ -325,6 +345,7 @@ export default function Leaderboard({ onBack }) {
         !loading &&
         !error &&
         section !== "insights" &&
+        section !== "compare" &&
         section !== "seasons" &&
         pages > 1 && (
           <div className="k-pagination">

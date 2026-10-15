@@ -4,6 +4,7 @@
 
 import { api } from './api'
 import { winnerNames } from '../../../server/games/results.js'
+import { isRemovedPlayer } from './playerStats'
 
 export const listGames = (limit = 50) => api.listGames(limit)
 
@@ -16,12 +17,7 @@ export function isWinnerName(game, name) {
   return winnerNames(game).includes(name)
 }
 
-/**
- * Players taken off the shared player list (ჩაწერა players who had no King
- * Online name). Their old table games keep their name, but they are no longer
- * ranked or paired with anyone.
- */
-export const isRemovedPlayer = (p) => p?.profileId === null
+export { isRemovedPlayer }
 
 /**
  * Every pair of (current) players who shared a table, with each side's wins,

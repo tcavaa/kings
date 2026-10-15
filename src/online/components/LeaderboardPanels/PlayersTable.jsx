@@ -1,5 +1,12 @@
 import AvatarImg from "../AvatarImg";
-export default function PlayersTable({ aggregated, onPlayerSelect }) {
+import FormGuide from "./FormGuide";
+import { recentForm } from "../../lib/playerStats";
+export default function PlayersTable({
+  aggregated,
+  games = [],
+  onPlayerSelect,
+  onSelectGame,
+}) {
   return (
     <div className="k-rank-table-wrap">
       <table className="k-rank-table">
@@ -7,6 +14,7 @@ export default function PlayersTable({ aggregated, onPlayerSelect }) {
           <tr>
             <th>#</th>
             <th>მოთამაშე</th>
+            <th>ფორმა</th>
             <th>თამაში</th>
             <th>მოგება</th>
             <th>ქულა</th>
@@ -25,6 +33,14 @@ export default function PlayersTable({ aggregated, onPlayerSelect }) {
                   <AvatarImg avatar={p.avatar} size={36} />
                   <strong>{p.name}</strong>
                 </button>
+              </td>
+              <td className="k-form-cell">
+                <FormGuide
+                  form={recentForm(games, p.name, 5)}
+                  name={p.name}
+                  onSelectGame={onSelectGame}
+                  size="sm"
+                />
               </td>
               <td>{p.gamesPlayed}</td>
               <td>

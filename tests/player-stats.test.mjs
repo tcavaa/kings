@@ -1,0 +1,96 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  resultOf,
+  recentForm,
+  streaksOf,
+  comparePlayers,
+  allTimeRecords,
+} from "../src/online/lib/playerStats.js";
+
+let day = 0;
+// A finished game: scores by name, winners = every top score (ties shared).
+const game = (scores, extra = {}) => {
+  const players = Object.entries(scores).map(([name, score], seat) => ({ name, score, seat }));
+  const top = Math.max(...players.map((p) => p.score));
+  return {
+    id: `g${++day}`,
+    playedAt: new Date(Date.UTC(2026, 0, day)).toISOString(),
+    type: "online",
+    players,
+    winners: players.filter((p) => p.score === top).map(({ name, score }) => ({ name, score })),
+    roundDetails: [],
+    ...extra,
+  };
+};
+
+test("results read W, D on a shared win, L otherwise", () => {
+  const g = game({ A: 50, B: 50, C: 10 });
+  assert.equal(resultOf(g, "A"), "D");
+  assert.equal(resultOf(g, "C"), "L");
+  assert.equal(resultOf(g, "Z"), null);
+  assert.equal(resultOf(game({ A: 9, B: 1 }), "A"), "W");
+});
+
+test("form is newest first, with the table sorted by score", () => {
+  const games = [game({ A: 1, B: 9 }), game({ A: 9, B: 1 }), game({ B: 5, C: 2 })];
+  const form = recentForm(games, "A", 5);
+  assert.deepEqual(form.map((f) => f.result), ["W", "L"]);
+  assert.deepEqual(form[1].players.map((p) => p.name), ["B", "A"]);
+  assert.equal(recentForm(games, "B", 1).length, 1);
+});
+
+test("streaks track the current run and the longest win and loss runs", () => {
+  const games = [
+    game({ A: 9, B: 1 }),
+    game({ A: 9, B: 9 }),
+    game({ A: 9, B: 1 }),
+    game({ A: 1, B: 9 }),
+    game({ A: 1, B: 9 }),
+  ];
+  const s = streaksOf(games, "A");
+  assert.deepEqual(s.current, { result: "L", length: 2 });
+  assert.equal(s.longestWin, 3);
+  assert.equal(s.longestLoss, 2);
+});
+
+test("comparison counts shared games, finishing ahead and the live split", () => {
+  const games = [
+    game({ A: 30, B: 20, C: 10 }),
+    game({ A: 10, B: 40, C: 0 }, { type: "live" }),
+    game({ A: 5, C: 50 }),
+  ];
+  const cmp = comparePlayers(games, ["A", "B"]);
+  assert.equal(cmp.shared.length, 2);
+  assert.equal(cmp.live, 1);
+  assert.equal(cmp.online, 1);
+  assert.equal(cmp.ahead.A.B, 1);
+  assert.equal(cmp.ahead.B.A, 1);
+  const a = cmp.rows.find((r) => r.name === "A");
+  assert.equal(a.games, 2);
+  assert.equal(a.wins, 1);
+  assert.equal(a.avg, 20);
+  assert.equal(a.avgPlace, 1.5);
+  assert.equal(comparePlayers(games, ["A", "B"], { scope: "all" }).rows[0].games, 3);
+});
+
+test("records find the extremes and skip removed players", () => {
+  const games = [
+    game({ A: 80, B: 10 }, { durationSeconds: 3600 }),
+    game({ A: 30, B: 28 }),
+    game({ A: 10, B: -60 }),
+    game({ A: 200, Gone: -5 }),
+  ];
+  games[3].players[1].profileId = null;
+  games[3].players[0].profileId = null;
+  games[1].roundDetails = [{ gameType: "P1", scores: { 0: 8, 1: 64 } }];
+  const r = allTimeRecords(games);
+  assert.equal(r.highScore.value, 80);
+  assert.equal(r.lowScore.name, "B");
+  assert.equal(r.biggestMargin.value, 70);
+  assert.equal(r.closestFinish.value, 2);
+  assert.deepEqual([r.bestRound.name, r.bestRound.value, r.bestRound.gameType], ["B", 64, "P1"]);
+  assert.equal(r.longestStreak.name, "A");
+  assert.equal(r.longestStreak.value, 3);
+  assert.equal(r.longestGame.value, 3600);
+});
