@@ -14,6 +14,7 @@ import { useProfiles } from "../hooks/useProfiles";
 import ProfileSheet from "./ProfileSheet";
 import PublicRoomPanel from "./PublicRoomPanel";
 import LiveTables from "./LiveTables";
+import SeasonHero from "./SeasonHero";
 // Small, and shown on the first tab click: not worth a lazy chunk.
 import TournamentPanel from "./Tournament/TournamentPanel";
 import ClubShell, { openScoreApp } from "./ui/ClubShell";
@@ -47,7 +48,9 @@ export default function Lobby({ onOpenLeaderboard }) {
   const [top, linkCode = ""] = segments;
   const inviteCode = top === "room" ? linkCode.toUpperCase().slice(0, 6) : "";
   const mode = top === "tournament" ? "tournament" : "championship";
-  const setMode = (id) => navigate(id === "tournament" ? "/tournament" : "/");
+  // A tab only swaps the panel under it: stay where the player is.
+  const setMode = (id) =>
+    navigate(id === "tournament" ? "/tournament" : "/", { scroll: false });
   const [dialog, setDialog] = useState(() => (inviteCode ? "private" : null));
   const profileState = useProfiles();
   const { active } = profileState;
@@ -176,20 +179,7 @@ export default function Lobby({ onOpenLeaderboard }) {
           <span className="k-eyebrow">
             <span className="k-live-dot" /> THE GAME HAS CHANGED
           </span>
-          <h1>
-            ითამაშე
-            <br />
-            <span>სხვანაირად.</span>
-            <i>↗</i>
-          </h1>
-          <p>
-            კარტი იგივეა. გამოცდილება — სრულიად ახალი.
-            <br />
-            იპოვე შენი რიტმი, შენი მეტოქე, შენი თამაში.
-          </p>
-          <a className="k-link" href="#games">
-            შენი შემდეგი სვლა <ArrowRight size={19} />
-          </a>
+          <SeasonHero profiles={profileState.profiles} />
         </div>
         <div className="k-deck-art" aria-hidden="true">
           <span className="k-art-orbit" />

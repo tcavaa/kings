@@ -232,6 +232,19 @@ export default function GameLayout() {
         : gamePhase === "discard"
           ? "2 კარტის გადადებას"
           : "";
+  // TopBar is memoised: hand it the same object and handlers until they
+  // change, or it re-renders with every chat line and game event.
+  const waiting = useMemo(
+    () =>
+      leaderBusy
+        ? { name: leaderName, label: leaderBusyLabel }
+        : showWaiting
+          ? { name: turnName, label: "სვლას" }
+          : null,
+    [leaderBusy, leaderName, leaderBusyLabel, showWaiting, turnName],
+  );
+  const openMatrix = useCallback(() => openDrawer("matrix"), [openDrawer]);
+  const view3D = useCallback(() => changeView("3d"), [changeView]);
 
   // ── On-our-turn handling: vibrate + force a canvas resync ──────────────────
   // The vibrate is the original mobile nicety. The force-render is a desync
@@ -313,18 +326,12 @@ export default function GameLayout() {
       )}
       {viewMode === "2d" && (
         <TopBar
-          waiting={
-            leaderBusy
-              ? { name: leaderName, label: leaderBusyLabel }
-              : showWaiting
-                ? { name: turnName, label: "სვლას" }
-                : null
-          }
-          onToggleRounds={() => openDrawer("matrix")}
+          waiting={waiting}
+          onToggleRounds={openMatrix}
           onToggleMenu={toggleMenu}
           onToggleScores={openScores}
           onToggleChat={toggleChat}
-          onView3D={() => changeView("3d")}
+          onView3D={view3D}
         />
       )}
 

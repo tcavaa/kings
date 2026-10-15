@@ -1,6 +1,5 @@
 import { useMemo } from "react";
 import HeadToHeadPanel from "./HeadToHeadPanel";
-import GameTypePerformance from "./GameTypePerformance";
 import RivalryGraph from "./RivalryGraph";
 import LifetimeCardStats from "./LifetimeCardStats";
 import AchievementsPanel from "./AchievementsPanel";
@@ -16,7 +15,6 @@ export default function Insights({
   return (
     <div className="k-insights-grid">
       <HeadToHeadPanel pairs={pairs} players={players} />
-      <GameTypePerformance games={games} players={players} />
       <RivalryGraph pairs={pairs} />
       <LifetimeCardStats players={players} gameType={gameType} />
       <RecordsPanel games={games} onSelectGame={onSelectGame} />

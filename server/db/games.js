@@ -177,6 +177,15 @@ function listGamesWithoutAvatars(limit = 50, mode = 'all', type = 'all') {
   return listGames(limit, mode, type, { avatars: false });
 }
 
+/** One game, without photos (null when there's no such game). */
+async function getGameWithoutAvatars(id) {
+  await gameMirror.sync();
+  const e = gameMirror.entries.get(id);
+  if (!e) return null;
+  if (!e.bareGame) e.bareGame = rowToGame(e, barePayload(e));
+  return e.bareGame;
+}
+
 async function getGame(id) {
   const rows = await db()`
     SELECT id, type, played_at, winner_name, winner_seat, winner_score, is_championship, payload
@@ -363,7 +372,7 @@ async function getChampionshipQuota(name) {
 
 module.exports = {
   CHAMPIONSHIP_DAILY_LIMIT,
-  listGames, listGamesWithoutAvatars, getGame, saveFinishedGame, saveScoreSheetGame, rowToGame,
+  listGames, listGamesWithoutAvatars, getGame, getGameWithoutAvatars, saveFinishedGame, saveScoreSheetGame, rowToGame,
   getLifetimeStats, getChampionshipQuota,
   // for seasons.js
   gameEntries, barePayload,

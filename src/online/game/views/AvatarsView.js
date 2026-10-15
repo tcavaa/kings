@@ -47,7 +47,10 @@ function pillTexture(scene) {
 }
 
 // The three player plates: photo, name, score, card count, leader pill.
-// Each seat is rebuilt only when something it shows changes.
+// Each seat is rebuilt only when something it shows changes. The two things
+// that change on almost every card — whose turn it is and how many cards a
+// player holds — are updated in place instead: a rebuild makes several new
+// Text objects, each drawn to its own canvas and uploaded to the GPU.
 export class AvatarsView {
   constructor(scene, onPhotoReady) {
     this.scene = scene;
@@ -96,15 +99,32 @@ export class AvatarsView {
           this.photos.resolve(player) ||
           (this.scene.textures.exists("avatar-default") ? "avatar-default" : null),
       };
-      const key = JSON.stringify(view);
-      if (slot.key === key) return;
+      const { isActive, cardCount, ...fixed } = view;
+      const key = JSON.stringify({ ...fixed, badge: cardCount > 0 && !view.round1Hide });
+      if (slot.key === key) {
+        if (slot.isActive !== isActive) {
+          const radius = view.isOwn ? 38 : 36;
+          slot.parts.plate.setTexture(plateTexture(this.scene, radius, isActive));
+          slot.parts.badge?.setTexture(badgeTexture(this.scene, isActive));
+          slot.isActive = isActive;
+        }
+        if (slot.cardCount !== cardCount) {
+          slot.parts.count?.setText(String(cardCount));
+          slot.cardCount = cardCount;
+        }
+        return;
+      }
       this._clear(slot);
       slot.key = key;
-      slot.container = this._draw(view, rel, L);
+      slot.isActive = isActive;
+      slot.cardCount = cardCount;
+      slot.parts = {};
+      slot.container = this._draw(view, rel, L, slot.parts);
     });
   }
 
-  _draw(v, rel, L) {
+  /** Builds a seat's plate; `parts` gets the pieces render() updates in place. */
+  _draw(v, rel, L, parts = {}) {
     const { scene } = this;
     const pos = L.AVATAR_POS[rel];
     const radius = v.isOwn ? 38 : 36;
@@ -113,7 +133,8 @@ export class AvatarsView {
     // (The photo is a pre-cut texture, not a mask, so it scales with the rest.)
     if (v.portrait) container.setScale(1.4);
 
-    container.add(bakedImage(scene, 0, 0, plateTexture(scene, radius, v.isActive)));
+    parts.plate = bakedImage(scene, 0, 0, plateTexture(scene, radius, v.isActive));
+    container.add(parts.plate);
 
     if (v.photo) {
       const edge = radius * 2 - 6;
@@ -135,17 +156,16 @@ export class AvatarsView {
     if (v.cardCount > 0 && !v.round1Hide) {
       const bx = radius - 4,
         by = -radius + 4;
-      container.add(bakedImage(scene, bx, by, badgeTexture(scene, v.isActive)));
-      container.add(
-        scene.add
-          .text(bx, by - 1, String(v.cardCount), {
-            fontSize: "13px",
-            color: "#ffffff",
-            fontFamily: "Arial",
-            fontStyle: "bold",
-          })
-          .setOrigin(0.5),
-      );
+      parts.badge = bakedImage(scene, bx, by, badgeTexture(scene, v.isActive));
+      parts.count = scene.add
+        .text(bx, by - 1, String(v.cardCount), {
+          fontSize: "13px",
+          color: "#ffffff",
+          fontFamily: "Arial",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+      container.add([parts.badge, parts.count]);
     }
 
     // Name + score chip (mimics 'Frank / 1,860' style). The bottom seat
@@ -214,5 +234,6 @@ export class AvatarsView {
     slot.container?.destroy();
     slot.container = null;
     slot.key = null;
+    slot.parts = null;
   }
 }

@@ -867,8 +867,10 @@
   padding: 0 26px 10px;
 }
 
-/* Records. */
-.k-insights-grid > .k-records-panel {
+/* Records, and the lifetime card stats (on its own row since the by-type
+   panel left). */
+.k-insights-grid > .k-records-panel,
+.k-insights-grid > .k-lifetime-panel {
   grid-column: 1/-1;
 }
 .k-records {

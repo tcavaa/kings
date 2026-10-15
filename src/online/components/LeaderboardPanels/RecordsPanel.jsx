@@ -45,7 +45,7 @@ export default function RecordsPanel({ games, onSelectGame }) {
     <section className="k-analysis-panel k-records-panel">
       <header>
         <div>
-          <span className="k-eyebrow">05 / RECORD BOOK</span>
+          <span className="k-eyebrow">04 / RECORD BOOK</span>
           <h2>რეკორდები</h2>
         </div>
       </header>

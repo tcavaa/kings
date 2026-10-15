@@ -1,7 +1,10 @@
+import { lazy, Suspense } from 'react'
 import { Timer } from 'lucide-react'
-import ScoreChart from './ScoreChart'
 import GameAnalytics from './GameAnalytics'
 import { formatDuration } from '../../../shared/duration.js'
+
+// The chart library loads with the first game opened, not with the history list.
+const ScoreChart = lazy(() => import('./ScoreChart'))
 
 export default function GameDetailPage({ detail, result, onBack }) {
   const { players, rounds } = detail
@@ -36,7 +39,7 @@ export default function GameDetailPage({ detail, result, onBack }) {
         </div>
       </div>
 
-      <ScoreChart players={players} rounds={rounds} />
+      <Suspense fallback={null}><ScoreChart players={players} rounds={rounds} /></Suspense>
 
       <GameAnalytics players={players} rounds={rounds} participants={result?.participants} />
 

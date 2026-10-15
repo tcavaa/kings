@@ -43,7 +43,7 @@ export default function AchievementsPanel({
     <section className="k-analysis-panel k-achievement-panel">
       <header>
         <div>
-          <span className="k-eyebrow">06 / THE COLLECTION</span>
+          <span className="k-eyebrow">05 / THE COLLECTION</span>
           <h2>მიღწევების კოლექცია</h2>
         </div>
         {!playerName && (

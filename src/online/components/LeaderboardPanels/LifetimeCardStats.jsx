@@ -32,10 +32,10 @@ export default function LifetimeCardStats({ players, gameType = "all" }) {
   }, [name, gameType, attempt]);
   if (!players.length) return null;
   return (
-    <section className="k-analysis-panel">
+    <section className="k-analysis-panel k-lifetime-panel">
       <header>
         <div>
-          <span className="k-eyebrow">04 / PLAYER PROFILE</span>
+          <span className="k-eyebrow">03 / PLAYER PROFILE</span>
           <h2>საერთო სტატისტიკა</h2>
         </div>
         <PlayerSelect

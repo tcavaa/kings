@@ -1,15 +1,16 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, lazy, Suspense, useMemo } from 'react'
 import { goBack, navigate, pathOf, useLocation } from '../../../shared/router'
 import { Handshake, Trophy } from 'lucide-react'
 import { useGameData } from '../lib/gameData'
 import { usePaged } from '../hooks/usePaged'
 import { onlineWinnerNames, isOnlineWinner } from '../utils/winners'
 import { CardTypeIcon } from '../utils/gameIcons'
-import ScoreChart from './ScoreChart'
 import GameAnalytics from './GameAnalytics'
 import ShowMore from './ShowMore'
 
 const NONE = []
+// The chart library loads with the first game opened, not with the list.
+const ScoreChart = lazy(() => import('./ScoreChart'))
 
 // ─── Detail view ─────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
       {detail && (
         <>
           {/* Score Progression chart */}
-          <ScoreChart players={detail.players} rounds={detail.rounds} />
+          <Suspense fallback={null}><ScoreChart players={detail.players} rounds={detail.rounds} /></Suspense>
 
           {/* Score by Type + Card Collection + Awards */}
           <GameAnalytics players={detail.players} rounds={detail.rounds} participants={result?.participants} />

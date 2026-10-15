@@ -40,24 +40,6 @@ export function computeGameStats(players, rounds) {
   return stats
 }
 
-// Returns { [playerId]: { [typeCode]: totalScore } } — score contribution per type
-export function computeScoresByType(players, rounds) {
-  const result = {}
-  players.forEach(p => {
-    result[p.id] = byType(() => 0)
-  })
-  rounds.forEach(round => {
-    if (!round.scores) return
-    const code = round.gameTypeCode
-    players.forEach(p => {
-      if (result[p.id] && code in result[p.id]) {
-        result[p.id][code] += round.scores[p.id] || 0
-      }
-    })
-  })
-  return result
-}
-
 export function getGameAwards(players, stats, participants) {
   if (!players?.length) return []
   const awards = []
@@ -177,61 +159,6 @@ export function computeComparison(selected, allDetails, allResults = []) {
     .sort((a, b) => b.wins - a.wins)
 
   return { rows, h2h, localShared, onlineShared, totalShared: localShared + onlineShared }
-}
-
-// Returns { [leaderName]: { [targetName]: count } } — how many times leader sent King to target
-export function computeKingMatrix(allDetails) {
-  const matrix = {}
-  allDetails.forEach(detail => {
-    const { players, rounds } = detail
-    if (!players || !rounds) return
-    const nameById = {}
-    players.forEach(p => { nameById[p.id] = p.name })
-    rounds.forEach(round => {
-      if (round.gameTypeCode !== 'K') return
-      const leaderName = nameById[round.leaderPlayerId]
-      const targetName = nameById[round.singleTargetPlayerId]
-      if (!leaderName || !targetName) return
-      if (!matrix[leaderName]) matrix[leaderName] = {}
-      matrix[leaderName][targetName] = (matrix[leaderName][targetName] || 0) + 1
-    })
-  })
-  return matrix
-}
-
-// Returns { [playerName]: { [typeCode]: avgScorePerGame } }
-export function computeTypeEfficiency(allDetails) {
-  const playerGames = {}   // { name: { typeCode: [scores] } }
-  allDetails.forEach(detail => {
-    const { players, rounds } = detail
-    if (!players || !rounds) return
-    const nameById = {}
-    players.forEach(p => { nameById[p.id] = p.name })
-    players.forEach(p => {
-      const name = p.name
-      if (!playerGames[name]) {
-        playerGames[name] = byType(() => [])
-      }
-    })
-    rounds.forEach(round => {
-      const code = round.gameTypeCode
-      if (!round.scores) return
-      players.forEach(p => {
-        const name = nameById[p.id]
-        if (name && playerGames[name] && code in playerGames[name]) {
-          playerGames[name][code].push(round.scores[p.id] || 0)
-        }
-      })
-    })
-  })
-  const result = {}
-  Object.entries(playerGames).forEach(([name, typeSets]) => {
-    result[name] = {}
-    Object.entries(typeSets).forEach(([code, scores]) => {
-      result[name][code] = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null
-    })
-  })
-  return result
 }
 
 export function getGlobalAwards(playerMap) {

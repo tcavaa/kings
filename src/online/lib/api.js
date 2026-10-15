@@ -137,7 +137,10 @@ export const api = {
 
   // Finished games (read only — the game server saves them). Players' photos
   // are left out: the leaderboard shows each player's current profile photo.
-  listGames: (limit = 50)     => request(`/api/games?limit=${limit}&avatars=0`),
+  listGames: (limit = 50, { rounds = true } = {}) =>
+    request(`/api/games?limit=${limit}&avatars=0${rounds ? '' : '&rounds=0'}`),
+  // One game with its rounds, without photos.
+  getGame: (id) => request(`/api/games/${encodeURIComponent(id)}`),
 
   // King Score's seasons, for the leaderboard's seasons tab.
   listSeasons: () => request('/api/seasons'),

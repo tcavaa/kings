@@ -11,7 +11,7 @@ export default function RivalryGraph({ pairs }) {
     <section className="k-analysis-panel">
       <header>
         <div>
-          <span className="k-eyebrow">03 / RIVALRIES</span>
+          <span className="k-eyebrow">02 / RIVALRIES</span>
           <h2>მეტოქეობა</h2>
         </div>
         <span className="k-muted">{data.length} წყვილი</span>

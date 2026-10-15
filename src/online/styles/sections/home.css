@@ -36,6 +36,57 @@
 .k-welcome-copy .k-link {
   font-size: 11px;
 }
+/* The current season and its top three, in place of the old headline. */
+.k-welcome-copy h1.k-season-title {
+  font-size: clamp(28px, 3vw, 46px);
+  letter-spacing: -1.5px;
+  line-height: 1.2;
+  margin: 22px 0 14px;
+}
+.k-welcome-copy h1.k-season-title i {
+  font-size: 40px;
+  right: -46px;
+  top: -14px;
+}
+.k-season-top {
+  max-width: 560px;
+}
+.k-season-top .k-rank-table td {
+  padding: 13px 10px;
+}
+.k-season-top tr.is-leader td strong {
+  font-weight: 650;
+}
+.k-season-avatar {
+  position: relative;
+  display: inline-flex;
+}
+.k-season-crown {
+  position: absolute;
+  left: 50%;
+  top: -13px;
+  transform: translateX(-50%) rotate(-8deg);
+  color: #c9a227;
+  fill: #e8c547;
+  filter: drop-shadow(0 1px 1px #17191940);
+}
+@media (max-width: 760px) {
+  .k-season-top .k-rank-table th,
+  .k-season-top .k-rank-table td {
+    padding: 12px 4px;
+  }
+  .k-season-top .k-player-link {
+    gap: 7px;
+  }
+  .k-season-top .k-rank-table td strong {
+    font-size: 11px;
+    max-width: 92px;
+  }
+}
+.k-season-top-note {
+  font-size: 12px;
+  color: #737b6c;
+}
 .k-deck-art {
   height: 380px;
   background: #d7fa52;

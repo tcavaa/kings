@@ -96,6 +96,7 @@ async function shutdown(signal) {
   shuttingDown = true;
   console.log(`[server] ${signal}: saving live games before exit…`);
   io.close();
+  gameManager.flushPersists();
   const flushed = await store.flushLiveWrites(8000).catch(() => false);
   if (!flushed) console.warn('[server] some live-game snapshots were not saved in time.');
   process.exit(0);

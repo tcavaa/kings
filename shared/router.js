@@ -27,15 +27,19 @@ const currentUrl = () => window.location.pathname + window.location.search
 // in the history entry itself so a reload remembers it.
 const depthOf = (state) => (Number.isInteger(state?.kingDepth) ? state.kingDepth : 0)
 
-/** Go to `to` (a path, optionally with ?query). `replace` swaps the current entry. */
-export function navigate(to, { replace = false } = {}) {
+/**
+ * Go to `to` (a path, optionally with ?query). `replace` swaps the current
+ * entry. A new page starts at the top; `scroll: false` keeps the place (a tab
+ * switching what's under it, say).
+ */
+export function navigate(to, { replace = false, scroll = true } = {}) {
   if (to === currentUrl()) return
   const depth = depthOf(window.history.state)
   if (replace) {
     window.history.replaceState({ ...window.history.state, kingDepth: depth }, '', to)
   } else {
     window.history.pushState({ kingDepth: depth + 1 }, '', to)
-    window.scrollTo(0, 0)
+    if (scroll) window.scrollTo(0, 0)
   }
   notify()
 }

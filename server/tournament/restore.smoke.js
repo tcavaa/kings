@@ -46,6 +46,7 @@ run(async () => {
   const [tableA, tableB] = t.tables;
   rooms.push(tableA.roomCode, tableB.roomCode);
   tm1.reportResult(tableA.roomCode, resultOf(gm1.getRoom(tableA.roomCode)));
+  gm1.flushPersists();   // room saves wait up to a second; a restart flushes them
   await store.flushLiveWrites();
 
   const gm2 = new GameManager();
@@ -85,6 +86,7 @@ run(async () => {
   Object.assign(gm3.getRoom(lone.roomCode), { tournamentId: `t_GONE${RUN}`, tournamentStage: 'semifinal', tournamentTable: 0 });
   gm3.startGame(lone.roomCode);
   rooms.push(lone.roomCode);
+  gm3.flushPersists();
   await store.flushLiveWrites();
   const gm4 = new GameManager();
   await gm4.hydrateAll();
@@ -109,6 +111,7 @@ run(async () => {
   gm6.joinRoom(roomCode, `r2-${RUN}`, ident('R2'));
   gm6.startGame(roomCode);
   rooms.push(roomCode);
+  gm6.flushPersists();
   await store.flushLiveWrites();
   const gm7 = new GameManager();
   const [r1, r2] = await Promise.all([gm7.tryLoadFromDB(roomCode), gm7.tryLoadFromDB(roomCode)]);

@@ -12,7 +12,8 @@ import {
 } from "recharts";
 import { api } from "../../lib/api";
 import { isWinnerName } from "../../lib/leaderboard";
-import { inSeason, seasonTable, winnerNames } from "../../../../server/games/results.js";
+import { inSeason } from "../../../../server/games/results.js";
+import { currentSeasonOf, gamesSince, leagueGames, standingsOf } from "../../lib/seasons";
 import AvatarImg from "../AvatarImg";
 import { signed, winRate, averageScore } from "../../utils/format";
 import {
@@ -24,25 +25,10 @@ import {
   lineProps,
 } from "../../utils/chartTheme";
 
-// Seasons are King Score's: each has a start, an end (none while it runs)
-// and a champion. A season counts league games — online ones and the ones
-// recorded at a table — by the rule the server crowns the champion with,
-// the same one the score app's season tables use (server/games/results.js).
+// Seasons and their tables: lib/seasons.js.
 const RACE_PLAYERS = 5;
 const fmt = (d) =>
   new Date(d).toLocaleDateString("ka-GE", { day: "2-digit", month: "short", year: "numeric" });
-
-/** The season's table rows, with each player's photo from their games. */
-function standingsOf(games) {
-  const avatars = new Map();
-  for (const g of games) {
-    for (const p of g.players || []) if (p.avatar && !avatars.has(p.name)) avatars.set(p.name, p.avatar);
-  }
-  const table = seasonTable(
-    games.map((g) => ({ playedAt: g.playedAt, type: g.type, players: g.players, winners: winnerNames(g) })),
-  );
-  return table.map((r) => ({ ...r, gamesPlayed: r.games, avatar: avatars.get(r.name) || null }));
-}
 
 // A season's champions as a list (rows saved before the list existed have
 // only the joined "A & B" text).
@@ -146,15 +132,10 @@ export default function SeasonsPanel({ games }) {
     };
   }, []);
 
-  const league = useMemo(() => games.filter((g) => g.isChampionship !== false), [games]);
-  const current = seasons?.find((s) => !s.ended_at) || null;
+  const league = useMemo(() => leagueGames(games), [games]);
+  const { season: current, start: currentStart } = currentSeasonOf(seasons);
   const past = useMemo(() => (seasons || []).filter((s) => s.ended_at), [seasons]);
-  // A season starts where its row says, or where the last one ended.
-  const currentStart = current?.started_at || past[0]?.ended_at || null;
-  const currentGames = useMemo(
-    () => (currentStart ? league.filter((g) => inSeason(g.playedAt, currentStart)) : []),
-    [league, currentStart],
-  );
+  const currentGames = useMemo(() => gamesSince(games, currentStart), [games, currentStart]);
   const currentPlayers = useMemo(() => standingsOf(currentGames), [currentGames]);
   const pastRows = useMemo(
     () =>

@@ -6,7 +6,7 @@ import {
   ArrowRight,
   Trophy,
 } from "lucide-react";
-import { listGames, aggregatePlayers } from "../lib/leaderboard";
+import { aggregatePlayers } from "../lib/leaderboard";
 import { api } from "../lib/api";
 import { withCurrentAvatars } from "../lib/playerAvatars";
 import { winRate } from "../utils/format";
@@ -36,8 +36,20 @@ const BASE = "/leaderboard";
 //   /leaderboard/game/<id>                             one game
 // with ?type=online|live for the game-type filter. `home` is where the
 // logo goes back to (the lobby, or the table whose game just ended).
+//
+// The rankings, the history list and the seasons need only each game's
+// result, so that is what loads first. The round-by-round details (a few MB
+// over every game) load only for the views that read them: insights,
+// compare and a player's profile. A game's own page fetches just that game.
+const NEEDS_ROUNDS = ["insights", "compare", "player"];
+
 export default function Leaderboard({ home = "/" }) {
-  const [allGames, setAllGames] = useState([]);
+  const [results, setResults] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [withRounds, setWithRounds] = useState(null);
+  const [oneGame, setOneGame] = useState(null); // { id, game } for a game page
+  // Every view reads the same games; the fuller copy once it is here.
+  const allGames = withRounds || results;
   const { segments, query: params } = useLocation();
   const [, view, key] = segments;
   const gameType = ["online", "live"].includes(params.get("type"))
@@ -53,10 +65,14 @@ export default function Leaderboard({ home = "/" }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const selected = useMemo(
-    () => (gameId ? allGames.find((g) => String(g.id) === gameId) || null : null),
-    [allGames, gameId],
-  );
+  const roundsPending = NEEDS_ROUNDS.includes(view) && !withRounds;
+  const selected = useMemo(() => {
+    if (!gameId) return null;
+    const found = withRounds?.find((g) => String(g.id) === gameId);
+    if (found) return found;
+    return oneGame?.id === gameId ? oneGame.game : null;
+  }, [withRounds, oneGame, gameId]);
+  const gamePending = !!gameId && !selected && oneGame?.id !== gameId;
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("wins");
   const [page, setPage] = useState(0);
@@ -101,15 +117,15 @@ export default function Leaderboard({ home = "/" }) {
     let cancelled = false;
     setLoading(true);
     setError(false);
-    Promise.all([listGames("all"), api.listProfiles().catch(() => [])])
-      .then(([list, profiles]) => {
-        if (!cancelled)
-          setAllGames(
-            withCurrentAvatars(
-              Array.isArray(list) ? list : [],
-              Array.isArray(profiles) ? profiles : [],
-            ),
-          );
+    Promise.all([
+      api.listGames("all", { rounds: false }),
+      api.listProfiles().catch(() => []),
+    ])
+      .then(([list, people]) => {
+        if (cancelled) return;
+        const current = Array.isArray(people) ? people : [];
+        setProfiles(current);
+        setResults(withCurrentAvatars(Array.isArray(list) ? list : [], current));
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -121,6 +137,37 @@ export default function Leaderboard({ home = "/" }) {
       cancelled = true;
     };
   }, [attempt]);
+  // The round-by-round details, the first time a view needs them.
+  const needsRounds = NEEDS_ROUNDS.includes(view);
+  const roundsRequested = useRef(false);
+  useEffect(() => {
+    if (!needsRounds || loading || error || roundsRequested.current) return;
+    roundsRequested.current = true;
+    api.listGames("all").then(
+      (list) => setWithRounds(withCurrentAvatars(Array.isArray(list) ? list : [], profiles)),
+      () => {
+        roundsRequested.current = false;
+        setError(true);
+      },
+    );
+  }, [needsRounds, loading, error, profiles]);
+  // A game's page: just that game, unless every game is already here.
+  useEffect(() => {
+    if (!gameId || loading || withRounds || oneGame?.id === gameId) return;
+    let cancelled = false;
+    api.getGame(gameId).then(
+      (game) => {
+        if (!cancelled)
+          setOneGame({ id: gameId, game: game ? withCurrentAvatars([game], profiles)[0] : null });
+      },
+      () => {
+        if (!cancelled) setOneGame({ id: gameId, game: null });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, loading, withRounds, oneGame, profiles]);
   const leader = aggregated[0];
   const count = section === "history" ? games.length : ranked.length;
   const pages = Math.ceil(count / PAGE_SIZE);
@@ -128,7 +175,8 @@ export default function Leaderboard({ home = "/" }) {
     type === "all" ? path : `${path}?type=${type}`;
   const sectionPath = (id, type) =>
     withType(pathOf(BASE, id === "rankings" ? null : id), type);
-  const changeSection = (id) => navigate(sectionPath(id));
+  // The section tabs sit under the page's heading: switching keeps the place.
+  const changeSection = (id) => navigate(sectionPath(id), { scroll: false });
   const changeType = (type) =>
     navigate(sectionPath(section, type), { replace: true });
   const setSelected = (game) =>
@@ -247,7 +295,11 @@ export default function Leaderboard({ home = "/" }) {
             </p>
           }
         >
-          {selected ? (
+          {roundsPending || gamePending ? (
+            <p className="k-empty" role="status">
+              იტვირთება…
+            </p>
+          ) : selected ? (
             <div className="k-detail">
               <GameDetail game={selected} onBack={() => setSelected(null)} />
             </div>

@@ -37,7 +37,7 @@ export default function WinnersPage({ seasons }) {
   const historyTab = tab === 'online' || tab === 'seasons' ? tab : 'local'
   const subView = tab === 'game' && gameId ? 'detail' : 'list'
   const selectedResultId = subView === 'detail' ? gameId : null
-  const setHistoryTab = key => navigate(key === 'local' ? '/score/history' : `/score/history/${key}`)
+  const setHistoryTab = key => navigate(key === 'local' ? '/score/history' : `/score/history/${key}`, { scroll: false })
   const backToList = () => goBack('/score/history')
 
   const detailById = useMemo(() => new Map(details.map(d => [d.game_result_id, d])), [details])

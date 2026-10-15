@@ -78,9 +78,15 @@ export class TableScene {
       antialias: true,
       powerPreference: "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+    // Phones report 3x pixels; 1.5x looks the same at arm's length and draws
+    // about a quarter fewer pixels than 1.75x.
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    // The room is still; only the players and the cards move. The shadow map
+    // is redrawn by the render loop (see below), not on every frame.
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.25;
@@ -134,6 +140,7 @@ export class TableScene {
     canvas.addEventListener(
       "pointermove",
       (e) => {
+        this.lastInputAt = performance.now();
         if (this.drag) {
           this.look.x = THREE.MathUtils.clamp(
             this.look.x + (e.clientX - this.drag.x) * 0.002,
@@ -191,11 +198,25 @@ export class TableScene {
       "(prefers-reduced-motion: reduce)",
     ).matches;
     let before = performance.now();
+    let frame = 0;
     const aim = new THREE.Vector3();
+    // Frame pacing: 60 fps while something moves (a card in flight, the
+    // pointer over the table), 30 when the table is just breathing. A 120 Hz
+    // screen would otherwise draw the ~200-mesh room twice as often for
+    // nothing, and a phone pays for it in heat and battery.
+    this.lastInputAt = 0;
     this.renderer.setAnimationLoop((now) => {
+      if (document.hidden) return;
+      const busy = this.tweens.length > 0 || now - this.lastInputAt < 1500;
+      if (now - before < (busy ? 1000 / 60 : 1000 / 30) - 2) return;
       const dt = Math.min((now - before) / 1000, 0.05);
       before = now;
-      if (document.hidden) return;
+      frame++;
+      // Shadows follow moving cards every frame, the players' small
+      // movements about 15 times a second.
+      if (this.tweens.length > 0 || frame % (busy ? 4 : 2) === 0) {
+        this.renderer.shadowMap.needsUpdate = true;
+      }
       this.time += dt;
       const t = this.time,
         still = this.reducedMotion;
@@ -415,6 +436,7 @@ export class TableScene {
   }
   refresh() {
     if (!this.state || this.disposed) return;
+    this.renderer.shadowMap.needsUpdate = true; // the table's objects change
     const s = this.state,
       old = this.previous;
     this.targets = [];
@@ -457,7 +479,9 @@ export class TableScene {
         },
       );
       bubble.lookAt(this.camera.position);
-      bubble.material = new THREE.MeshBasicMaterial({ map: bubble.material.map, toneMapped: false });
+      const lit = bubble.material;
+      bubble.material = new THREE.MeshBasicMaterial({ map: lit.map, toneMapped: false });
+      lit.dispose(); // the texture stays: the new material uses it
     });
     // The deck: a stack of backs at the leader's left.
     const deck = new THREE.Group();

@@ -11,6 +11,12 @@ const { TOTAL_ROUNDS } = require('./constants');
 // next boot still skips the row (see _isOver).
 const RETIRE_RETRY_MS = [2000, 10000, 30000];
 
+// Snapshots are written at most this often per room. A move used to snapshot
+// and serialise the whole room (round details and all) before its broadcast
+// went out — some 800 writes a game. Now the move goes out first and one
+// write a second carries the latest state; a crash loses at most that second.
+const PERSIST_EVERY_MS = 1000;
+
 /** A snapshot of a game that has already been played out. */
 function _isOver(snap) {
   const phase = snap?.gameState?.phase;
@@ -104,11 +110,37 @@ const persistenceMethods = {
   },
 
   /**
+   * Save the room soon: within PERSIST_EVERY_MS, with whatever state it has
+   * then. Calls in between share the one write.
+   */
+  _persist(roomCode) {
+    const timers = (this._persistTimers ||= new Map());
+    if (timers.has(roomCode)) return;
+    const t = setTimeout(() => {
+      timers.delete(roomCode);
+      this._persistNow(roomCode);
+    }, PERSIST_EVERY_MS);
+    if (typeof t.unref === 'function') t.unref();
+    timers.set(roomCode, t);
+  },
+
+  /** Write every save still waiting (a shutdown, before the queue drains). */
+  flushPersists() {
+    const timers = this._persistTimers;
+    if (!timers) return;
+    for (const [roomCode, t] of timers) {
+      clearTimeout(t);
+      this._persistNow(roomCode);
+    }
+    timers.clear();
+  },
+
+  /**
    * Fire-and-forget snapshot to the database. Awaits internally but errors are only
    * logged — the in-memory state has already been updated and broadcast,
    * losing one snapshot is recoverable.
    */
-  _persist(roomCode) {
+  _persistNow(roomCode) {
     const room = this.rooms.get(roomCode);
     if (!room || room.dbRetired) {
       // Room was deleted, or the game ended and `retireRoom` already dropped

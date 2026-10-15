@@ -1,20 +1,12 @@
 import { useMemo } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ReferenceLine,
-} from 'recharts'
-import { computeGameStats, computeScoresByType, getGameAwards, TYPE_ROWS } from '../utils/analytics'
+import { computeGameStats, getGameAwards, TYPE_ROWS } from '../utils/analytics'
 import { computePerGameAchievements, countCodes } from '../utils/achievements'
 import { CardTypeIcon } from '../utils/gameIcons'
-import { useChartTheme } from '../utils/chartTheme'
 import AchievementBadges from './AchievementBadges'
 import AwardsGrid from './AwardsGrid'
-import { PLAYER_COLORS as COLORS } from '../constants/colors'
 
 export default function GameAnalytics({ players, rounds, participants }) {
-  const chart = useChartTheme()
   const stats = useMemo(() => computeGameStats(players, rounds), [players, rounds])
-  const scoresByType = useMemo(() => computeScoresByType(players, rounds), [players, rounds])
   const awards = useMemo(() => getGameAwards(players, stats, participants), [players, stats, participants])
   const perGameAchievements = useMemo(() => computePerGameAchievements(players, rounds), [players, rounds])
 
@@ -27,47 +19,8 @@ export default function GameAnalytics({ players, rounds, participants }) {
     return maps
   }, [players, perGameAchievements])
 
-  // Bar chart: score contribution per game type per player (only non-zero
-  // types). One series per sheet column, so equal names don't merge.
-  const barData = useMemo(() => {
-    return TYPE_ROWS.map(tr => {
-      const point = { type: tr.label }
-      let anyNonZero = false
-      players.forEach((p, i) => {
-        const score = scoresByType[p.id]?.[tr.code] || 0
-        point[`s${i}`] = score
-        if (score !== 0) anyNonZero = true
-      })
-      return anyNonZero ? point : null
-    }).filter(Boolean)
-  }, [players, scoresByType])
-
   return (
     <>
-      {/* Score by Game Type bar chart */}
-      <div className="card">
-        <h2>Score by Game Type</h2>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={barData} margin={{ top: 8, right: 16, left: 0, bottom: 64 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
-            <XAxis
-              dataKey="type"
-              tick={chart.tick}
-              angle={-35}
-              textAnchor="end"
-              interval={0}
-            />
-            <YAxis tick={chart.tick} width={44} />
-            <ReferenceLine y={0} stroke={chart.text} strokeDasharray="4 2" />
-            <Tooltip contentStyle={chart.tooltipStyle} />
-            <Legend wrapperStyle={{ fontSize: 13, paddingTop: 12 }} />
-            {players.map((p, i) => (
-              <Bar key={p.id} dataKey={`s${i}`} name={p.name} fill={COLORS[i % COLORS.length]} radius={[3, 3, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
       {/* Card Collection breakdown table */}
       <div className="card">
         <h2>Card Collection</h2>
