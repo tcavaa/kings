@@ -44,17 +44,17 @@ export default function ComparePlayersPage({ players, details, results, onBack }
       {/* Header */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}><Swords size={17} /> Compare Players</h2>
-          <button className="link" onClick={onBack}>← Analytics</button>
+          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}><Swords size={17} /> მოთამაშეების შედარება</h2>
+          <button className="link" onClick={onBack}>← სტატისტიკა</button>
         </div>
         <p style={{ color: 'var(--muted)', margin: '8px 0 0', fontSize: 13 }}>
-          Select 2–4 players to see their head-to-head record across games they all played together.
+          აირჩიე 2–4 მოთამაშე და ნახე მათი პირისპირ შედეგები თამაშებში, სადაც ყველა ერთად თამაშობდა.
         </p>
       </div>
 
       {/* Player selector */}
       <div className="card">
-        <h2>Players ({selected.length}/{MAX_SELECT})</h2>
+        <h2>მოთამაშეები ({selected.length}/{MAX_SELECT})</h2>
         <div className="compare-chips">
           {players.map(p => {
             const active = selectedIds.includes(p.id)
@@ -73,7 +73,7 @@ export default function ComparePlayersPage({ players, details, results, onBack }
         </div>
         {selected.length < 2 && (
           <p style={{ color: 'var(--muted)', marginTop: 12, fontSize: 13 }}>
-            Pick at least 2 players to compare.
+            შესადარებლად აირჩიე მინიმუმ 2 მოთამაშე.
           </p>
         )}
       </div>
@@ -81,7 +81,7 @@ export default function ComparePlayersPage({ players, details, results, onBack }
       {cmp && cmp.totalShared === 0 && (
         <div className="card">
           <p style={{ color: 'var(--muted)', margin: 0 }}>
-            No shared games yet — {selected.map(s => s.name).join(', ')} haven’t all played in the same game.
+            საერთო თამაშები ჯერ არ არის — {selected.map(s => s.name).join(', ')} ერთსა და იმავე თამაშში ჯერ არ უთამაშიათ.
           </p>
         </div>
       )}
@@ -90,10 +90,10 @@ export default function ComparePlayersPage({ players, details, results, onBack }
         <>
           {/* Head-to-head summary */}
           <div className="card">
-            <h2>Head to Head</h2>
+            <h2>პირისპირ</h2>
             <p style={{ color: 'var(--muted)', margin: '0 0 14px', fontSize: 13 }}>
-              {cmp.totalShared} shared game{cmp.totalShared !== 1 ? 's' : ''}
-              {' · '}{cmp.localShared} live · {cmp.onlineShared} online
+              {cmp.totalShared} საერთო თამაში
+              {' · '}{cmp.localShared} ლაივი · {cmp.onlineShared} ონლაინ
             </p>
 
             {isPair ? (
@@ -105,14 +105,14 @@ export default function ComparePlayersPage({ players, details, results, onBack }
 
           {/* Wins / Games / Win% table */}
           <div className="card">
-            <h2>Record (Shared Games)</h2>
+            <h2>შედეგები (საერთო თამაშები)</h2>
             <div className="table">
               <div className="thead">
                 <div className="tr compare-tr">
-                  <div className="th">Player</div>
-                  <div className="th center">All Wins</div>
-                  <div className="th center">All Games</div>
-                  <div className="th center">Win%</div>
+                  <div className="th">მოთამაშე</div>
+                  <div className="th center">მოგება</div>
+                  <div className="th center">თამაში</div>
+                  <div className="th center">მოგ. %</div>
                 </div>
               </div>
               <div className="tbody">
@@ -130,14 +130,14 @@ export default function ComparePlayersPage({ players, details, results, onBack }
               </div>
             </div>
             <p style={{ color: 'var(--muted)', margin: '10px 0 0', fontSize: 12 }}>
-              Wins counted across local + online games every selected player played in.
+              მოგებები ითვლება ლაივ და ონლაინ თამაშებში, სადაც ყველა არჩეული მოთამაშე თამაშობდა.
             </p>
           </div>
         </>
       )}
 
       <div className="actions">
-        <button className="primary" onClick={onBack}>Back to Analytics</button>
+        <button className="primary" onClick={onBack}>სტატისტიკაში დაბრუნება</button>
       </div>
     </div>
   )
@@ -161,17 +161,17 @@ function PairRecord({ cmp, a, b }) {
       <div className="h2h-side">
         <div className="h2h-name">{a.name}</div>
         <div className={`h2h-score ${aWins > bWins ? 'pos' : ''}`}>{aWins}</div>
-        <div className="h2h-sub">win{aWins !== 1 ? 's' : ''}</div>
+        <div className="h2h-sub">მოგება</div>
       </div>
       <div className="h2h-dash">–</div>
       <div className="h2h-side">
         <div className="h2h-name">{b.name}</div>
         <div className={`h2h-score ${bWins > aWins ? 'pos' : ''}`}>{bWins}</div>
-        <div className="h2h-sub">win{bWins !== 1 ? 's' : ''}</div>
+        <div className="h2h-sub">მოგება</div>
       </div>
       <div className="h2h-ties">
-        {others > 0 && <>{others} game{others !== 1 ? 's' : ''} won by others · </>}
-        finished ahead: {a.name} {aAhead}× · {b.name} {bAhead}×
+        {others > 0 && <>{others} თამაში სხვებმა მოიგეს · </>}
+        წინ დაასრულა: {a.name} {aAhead}× · {b.name} {bAhead}×
       </div>
     </div>
   )
@@ -182,7 +182,7 @@ function H2HMatrix({ selected, h2h, nameById }) {
   const players = selected.map(s => ({ key: s.id, label: nameById[s.id] }))
   return (
     <HeatMatrix
-      corner="Beat ↓ / vs →"
+      corner="აჯობა ↓ / ვის →"
       rows={players}
       cols={players}
       countOf={(row, col) => h2h[row]?.[col]}

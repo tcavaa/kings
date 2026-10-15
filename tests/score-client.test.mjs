@@ -18,12 +18,12 @@ test("card counts are whole numbers, and every count is checked", () => {
   assert.equal(normalizeCount("-3"), 0);
   assert.equal(normalizeCount(""), 0);
   assert.equal(normalizeCount("abc"), 0);
-  assert.equal(validateRound(Q, { a: 1.5, b: 2.5 }), "Card counts must be whole numbers");
-  assert.match(validateRound(Q, { a: 1, b: 2 }), /exactly 4 Queens/);
+  assert.equal(validateRound(Q, { a: 1.5, b: 2.5 }), "კარტების რაოდენობა მთელი რიცხვი უნდა იყოს");
+  assert.match(validateRound(Q, { a: 1, b: 2 }), /დამები: მოთამაშეებს ზუსტად 4/);
   assert.equal(validateRound(Q, { a: 1, b: 3 }), "");
-  assert.equal(validateRound(K, {}, null), "Select the player who took it");
+  assert.equal(validateRound(K, {}, null), "აირჩიე, ვინ აიღო");
   assert.equal(validateRound(K, {}, "a"), "");
-  assert.equal(validateRound(null), "Choose a game type");
+  assert.equal(validateRound(null), "აირჩიე თამაში");
 });
 
 test("totals survive malformed rounds from another phone", () => {

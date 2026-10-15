@@ -19,15 +19,15 @@ export function countsSum(countsByPlayerId) {
  * whole game over one non-integer count, so every count is checked here.
  */
 export function validateRound(type, countsByPlayerId, singleTargetPlayerId) {
-  if (!type) return 'Choose a game type'
+  if (!type) return 'აირჩიე თამაში'
   if (type.kind === 'count') {
     const counts = Object.values(countsByPlayerId || {})
-    if (counts.some(v => !Number.isInteger(v) || v < 0)) return 'Card counts must be whole numbers'
+    if (counts.some(v => !Number.isInteger(v) || v < 0)) return 'კარტების რაოდენობა მთელი რიცხვი უნდა იყოს'
     if (countsSum(countsByPlayerId) !== type.totalUnits) {
-      return `Distribute exactly ${type.totalUnits} ${type.unitLabel || 'units'} across players`
+      return `${type.unitLabel || 'ერთეულები'}: მოთამაშეებს ზუსტად ${type.totalUnits} გაუნაწილე`
     }
   }
-  if (type.kind === 'single' && !singleTargetPlayerId) return 'Select the player who took it'
+  if (type.kind === 'single' && !singleTargetPlayerId) return 'აირჩიე, ვინ აიღო'
   return ''
 }
 

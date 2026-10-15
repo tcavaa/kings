@@ -23,14 +23,14 @@ export default function GameAnalytics({ players, rounds, participants }) {
     <>
       {/* Card Collection breakdown table */}
       <div className="card">
-        <h2>Card Collection</h2>
+        <h2>აღებული კარტები</h2>
         <p style={{ margin: '0 0 10px', color: 'var(--muted)', fontSize: 13 }}>
-          How many of each card type each player collected across all rounds. Bold = most in that row.
+          რამდენი კარტი აიღო თითოეულმა მოთამაშემ ყველა რაუნდში. მუქი = ყველაზე მეტი ამ რიგში.
         </p>
         <div className="table">
           <div className="thead">
             <div className="tr analytics-tr" style={{ '--ac': players.length }}>
-              <div className="th">Type</div>
+              <div className="th">ტიპი</div>
               {players.map(p => <div key={p.id} className="th center">{p.name}</div>)}
             </div>
           </div>
@@ -62,14 +62,14 @@ export default function GameAnalytics({ players, rounds, participants }) {
 
       {/* Game Awards */}
       <div className="card">
-        <h2>Game Awards</h2>
-        <AwardsGrid awards={awards} emptyText="No awards data available." />
+        <h2>თამაშის ჯილდოები</h2>
+        <AwardsGrid awards={awards} emptyText="ჯილდოების მონაცემები არ არის." />
       </div>
 
       {/* Per-game Achievements */}
       {Object.keys(playerAchievementMaps).length > 0 && (
         <div className="card">
-          <h2>Achievements</h2>
+          <h2>მიღწევები</h2>
           <div className="game-achievements-grid">
             {players.map(p => {
               const achs = playerAchievementMaps[p.id]

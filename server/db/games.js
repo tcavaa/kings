@@ -224,6 +224,8 @@ async function saveFinishedGame(record) {
     winners,
     isTie: winners.length > 1,
     ...(record.tournamentId && { tournamentId: String(record.tournamentId) }),
+    // 'semifinal' or 'final': the final's winners win the tournament.
+    ...(record.tournamentId && record.tournamentStage && { tournamentStage: String(record.tournamentStage) }),
   });
 
   // ON CONFLICT DO NOTHING makes a retry after an unclear failure safe.
@@ -312,6 +314,9 @@ function rowToGame(row, parsed) {
     ...(payload.legacy && { legacy: payload.legacy }),
     // A ჩაწერა game someone surrendered before the last round.
     ...(payload.surrenderedBySeat != null && { surrenderedBySeat: payload.surrenderedBySeat }),
+    // A tournament table, and whether it was the final.
+    ...(payload.tournamentId && { tournamentId: payload.tournamentId }),
+    ...(payload.tournamentStage && { tournamentStage: payload.tournamentStage }),
   };
 }
 

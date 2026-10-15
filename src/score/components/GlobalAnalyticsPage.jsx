@@ -30,15 +30,15 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
     return (
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>Global Analytics</h2>
-          <button className="link" onClick={onBack}>← Back</button>
+          <h2 style={{ margin: 0 }}>საერთო სტატისტიკა</h2>
+          <button className="link" onClick={onBack}>← უკან</button>
         </div>
         {filter}
         <p style={{ color: 'var(--muted)', marginTop: 12 }}>
-          No detailed game data yet. Play a game to start seeing analytics.
+          დეტალური მონაცემები ჯერ არ არის. ითამაშე, რომ სტატისტიკა გამოჩნდეს.
         </p>
         <div className="actions">
-          <button className="primary" onClick={onBack}>Back to History</button>
+          <button className="primary" onClick={onBack}>ისტორიაში დაბრუნება</button>
         </div>
       </div>
     )
@@ -60,11 +60,11 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
       {/* Header */}
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h2 style={{ margin: 0 }}>Global Analytics</h2>
-          <button className="link" onClick={onBack}>← Back</button>
+          <h2 style={{ margin: 0 }}>საერთო სტატისტიკა</h2>
+          <button className="link" onClick={onBack}>← უკან</button>
         </div>
         <p style={{ color: 'var(--muted)', margin: '8px 0 0', fontSize: 13 }}>
-          {details.length} recorded game{details.length !== 1 ? 's' : ''} · {players.length} player{players.length !== 1 ? 's' : ''}
+          {details.length} ჩაწერილი თამაში · {players.length} მოთამაშე
         </p>
         {filter}
       </div>
@@ -72,26 +72,26 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
       {/* Compare entry point */}
       <div className="card compare-cta">
         <div>
-          <strong>Compare Players</strong>
+          <strong>მოთამაშეების შედარება</strong>
           <p style={{ color: 'var(--muted)', margin: '4px 0 0', fontSize: 13 }}>
-            Head-to-head stats for 2–4 players across the games they shared.
+            პირისპირ სტატისტიკა 2–4 მოთამაშისთვის მათ საერთო თამაშებში.
           </p>
         </div>
-        <button className="primary icon-btn" onClick={() => setView('compare')}><Swords size={14} /> Compare</button>
+        <button className="primary icon-btn" onClick={() => setView('compare')}><Swords size={14} /> შედარება</button>
       </div>
 
       {/* Player Summary Table */}
       <div className="card">
-        <h2>Player Summary</h2>
+        <h2>მოთამაშეების შეჯამება</h2>
         <div className="table">
           <div className="thead">
             <div className="tr summary-tr">
-              <div className="th">Player</div>
-              <div className="th center">Games</div>
-              <div className="th center">Wins</div>
-              <div className="th center"><Medal size={11} /> 2nd</div>
-              <div className="th center">Win%</div>
-              <div className="th center">Avg Score</div>
+              <div className="th">მოთამაშე</div>
+              <div className="th center">თამაში</div>
+              <div className="th center">მოგება</div>
+              <div className="th center"><Medal size={11} /> მე-2</div>
+              <div className="th center">მოგ. %</div>
+              <div className="th center">საშ. ქულა</div>
               <div className="th center"><CardTypeIcon code="Q" size={11} /> Q</div>
               <div className="th center"><CardTypeIcon code="J" size={11} /> J</div>
               <div className="th center"><CardTypeIcon code="H" size={11} /> H</div>
@@ -130,15 +130,15 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
 
       {/* Hall of Fame */}
       <div className="card">
-        <h2>Hall of Fame</h2>
+        <h2>დიდების დარბაზი</h2>
         <AwardsGrid awards={awards} />
       </div>
 
       {/* Category Leaderboards */}
       <div className="card">
-        <h2>Category Leaderboards</h2>
+        <h2>ლიდერები კატეგორიებით</h2>
         <p style={{ margin: '0 0 12px', color: 'var(--muted)', fontSize: 13 }}>
-          All-time totals per card type, ranked.
+          ყველა დროის ჯამი თითოეული კარტის ტიპით, რეიტინგის მიხედვით.
         </p>
         <div className="leaderboard-grid">
           {TYPE_ROWS.map(tr => {
@@ -161,7 +161,7 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
 
       {/* Per-player breakdown cards */}
       <div className="card">
-        <h2>Per-Player Breakdown</h2>
+        <h2>თითოეული მოთამაშე</h2>
         <div className="player-breakdown-grid">
           {players.map((p, pi) => {
             const plusTotal = p.P1 + p.P2 + p.P3
@@ -171,18 +171,18 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
               <div key={p.id} className="player-breakdown-card" style={{ borderColor: COLORS[pi % COLORS.length] }}>
                 <div className="pb-header" style={{ background: COLORS[pi % COLORS.length] }}>
                   <span className="pb-name">{p.name}</span>
-                  <span className="pb-record">{p.wins}W / {p.gamesPlayed - p.wins}L</span>
+                  <span className="pb-record">{p.wins}მ / {p.gamesPlayed - p.wins}წ</span>
                 </div>
                 <div className="pb-body">
-                  <div className="pb-stat"><span>Win Rate</span><strong>{winPct}%</strong></div>
-                  <div className="pb-stat"><span>Avg Score</span><strong className={+avgScore >= 0 ? 'pos' : 'neg'}>{avgScore}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="Q" /> Queens</span><strong>{p.Q}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="J" /> Jacks</span><strong>{p.J}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="H" /> Hearts</span><strong>{p.H}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="K" /> Kings</span><strong>{p.K}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="L2" /> Last 2</span><strong>{p.L2}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="T" /> Bad Tricks</span><strong>{p.T}</strong></div>
-                  <div className="pb-stat"><span><CardTypeIcon code="P" /> Plus Tricks</span><strong className="pos">{plusTotal}</strong></div>
+                  <div className="pb-stat"><span>მოგების %</span><strong>{winPct}%</strong></div>
+                  <div className="pb-stat"><span>საშ. ქულა</span><strong className={+avgScore >= 0 ? 'pos' : 'neg'}>{avgScore}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="Q" /> დამები</span><strong>{p.Q}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="J" /> ვალეტები</span><strong>{p.J}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="H" /> გულები</span><strong>{p.H}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="K" /> მეფეები</span><strong>{p.K}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="L2" /> ბოლო ორი</span><strong>{p.L2}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="T" /> მინუსები</span><strong>{p.T}</strong></div>
+                  <div className="pb-stat"><span><CardTypeIcon code="P" /> პლიუსები</span><strong className="pos">{plusTotal}</strong></div>
                 </div>
               </div>
             )
@@ -191,7 +191,7 @@ export default function GlobalAnalyticsPage({ details, results, filter = null, o
       </div>
 
       <div className="actions">
-        <button className="primary" onClick={onBack}>Back to History</button>
+        <button className="primary" onClick={onBack}>ისტორიაში დაბრუნება</button>
       </div>
     </div>
   )

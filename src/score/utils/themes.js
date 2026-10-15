@@ -8,27 +8,27 @@ import { Club, Sun, Mountain, TreePine } from 'lucide-react'
 export const SEASON_THEMES = [
   {
     id: 'casual',
-    label: 'Casual',
+    label: 'ჩვეულებრივი',
     Icon: Club,
-    tagline: 'Clean & classic — the everyday table',
+    tagline: 'სუფთა და კლასიკური — ყოველდღიური მაგიდა',
   },
   {
     id: 'summer',
-    label: 'Summer',
+    label: 'ზაფხული',
     Icon: Sun,
-    tagline: 'Sun, sea and sandy scoreboards',
+    tagline: 'მზე, ზღვა და ქვიშიანი ქულები',
   },
   {
     id: 'mountain',
-    label: 'Mountain',
+    label: 'მთა',
     Icon: Mountain,
-    tagline: 'Pine forests, stone and calm air',
+    tagline: 'ფიჭვნარი, ქვა და მშვიდი ჰაერი',
   },
   {
     id: 'christmas',
-    label: 'Christmas',
+    label: 'შობა',
     Icon: TreePine,
-    tagline: 'Snow, lights and festive reds',
+    tagline: 'თოვლი, შუქები და სადღესასწაულო წითელი',
   },
 ]
 

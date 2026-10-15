@@ -13,24 +13,24 @@ const ScoreChart = lazy(() => import('./ScoreChart'))
 
 function ago(iso) {
   const min = Math.max(0, Math.round((Date.now() - new Date(iso)) / 60000))
-  return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : `${Math.floor(min / 60)} h ago`
+  return min < 1 ? 'ახლახან' : min < 60 ? `${min} წთ-ის წინ` : `${Math.floor(min / 60)} სთ-ის წინ`
 }
 
 function SheetView({ sheet, onBack }) {
   const target = sheet.players.length * GAME_TYPES.length
   const finished = sheet.rounds.length >= target || !!sheet.surrenderedBy
-  const surrendered = sheet.surrenderedBy ? sheet.players.find(p => p.id === sheet.surrenderedBy)?.name ?? 'A player' : null
+  const surrendered = sheet.surrenderedBy ? sheet.players.find(p => p.id === sheet.surrenderedBy)?.name ?? 'მოთამაშე' : null
   return (
     <>
       <div className="card">
         <div className="history-header">
-          <h2 style={{ margin: 0 }} className="icon-btn"><Radio size={16} color="#dc2626" /> Live game</h2>
-          <button className="link icon-btn" onClick={onBack}><ArrowLeft size={13} /> Back</button>
+          <h2 style={{ margin: 0 }} className="icon-btn"><Radio size={16} color="#dc2626" /> ლაივ თამაში</h2>
+          <button className="link icon-btn" onClick={onBack}><ArrowLeft size={13} /> უკან</button>
         </div>
         <p className="more-hint" style={{ margin: 0 }}>
-          {surrendered ? `${surrendered} surrendered — waiting to be saved`
-            : finished ? 'All rounds played — waiting to be saved' : `Round ${sheet.rounds.length + 1} / ${target} · leader ${sheet.players[sheet.activePlayerIndex]?.name ?? '—'}`}
-          {' · updated '}{ago(sheet.updatedAt)}
+          {surrendered ? `${surrendered} დანებდა — ელოდება შენახვას`
+            : finished ? 'ყველა რაუნდი ითამაშა — ელოდება შენახვას' : `რაუნდი ${sheet.rounds.length + 1} / ${target} · წამყვანი ${sheet.players[sheet.activePlayerIndex]?.name ?? '—'}`}
+          {' · განახლდა '}{ago(sheet.updatedAt)}
         </p>
       </div>
       <ScoreTable players={sheet.players} rounds={sheet.rounds} gameFinished={finished} playerColors={PLAYER_COLORS} />
@@ -64,10 +64,10 @@ export default function LiveSheets({ children }) {
     return (
       <div className="card">
         <div className="history-header">
-          <h2 style={{ margin: 0 }}>Live game</h2>
-          <button className="link icon-btn" onClick={() => setOpenId(null)}><ArrowLeft size={13} /> Back</button>
+          <h2 style={{ margin: 0 }}>ლაივ თამაში</h2>
+          <button className="link icon-btn" onClick={() => setOpenId(null)}><ArrowLeft size={13} /> უკან</button>
         </div>
-        <p className="more-hint" style={{ margin: 0 }}>This game isn’t live any more — once saved it shows up in History.</p>
+        <p className="more-hint" style={{ margin: 0 }}>ეს თამაში ლაივში აღარ არის — შენახვის შემდეგ ისტორიაში გამოჩნდება.</p>
       </div>
     )
   }
@@ -76,7 +76,7 @@ export default function LiveSheets({ children }) {
   return (
     <>
     <div className="card">
-      <h2 className="icon-btn" style={{ justifyContent: 'flex-start' }}><Radio size={16} color="#dc2626" /> Live now</h2>
+      <h2 className="icon-btn" style={{ justifyContent: 'flex-start' }}><Radio size={16} color="#dc2626" /> ახლა თამაშობენ</h2>
       <div style={{ display: 'grid', gap: 8 }}>
         {sheets.map(sheet => {
           const totals = totalsByPlayer(sheet.players, sheet.rounds)
@@ -94,7 +94,7 @@ export default function LiveSheets({ children }) {
                 ))}
               </span>
               <span className="more-hint" style={{ margin: 0 }}>
-                Round {Math.min(sheet.rounds.length + 1, target)} / {target} · updated {ago(sheet.updatedAt)}
+                რაუნდი {Math.min(sheet.rounds.length + 1, target)} / {target} · განახლდა {ago(sheet.updatedAt)}
               </span>
             </button>
           )

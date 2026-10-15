@@ -4,8 +4,8 @@
 export default function ScoreError({ reset }) {
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
-      <p>Something went wrong.</p>
-      <button onClick={() => reset()}>Try again</button>
+      <p>რაღაც შეცდომა მოხდა.</p>
+      <button onClick={() => reset()}>სცადე ხელახლა</button>
     </div>
   )
 }

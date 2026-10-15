@@ -70,7 +70,7 @@ export default function GameTypeSelector({
 
   return (
     <div className="card game-type-selector">
-      <h2>Choose a game type — {activePlayer.name}</h2>
+      <h2>აირჩიე თამაში — {activePlayer.name}</h2>
 
       <div className="type-grid">
         {availableTypesForActive.map((t) => (
@@ -88,7 +88,7 @@ export default function GameTypeSelector({
 
       {selectedType && selectedType.kind === 'count' && (
         <div className="inputs">
-          <h3>Distribute {selectedType.totalUnits} {selectedType.unitLabel || 'units'}</h3>
+          <h3>გაანაწილე {selectedType.unitLabel || 'ერთეულები'}: {selectedType.totalUnits}</h3>
           <div className="inputs-grid">
             {players.map((p, i) => (
               <label key={p.id} className="input-row">
@@ -111,13 +111,13 @@ export default function GameTypeSelector({
               </label>
             ))}
           </div>
-          <div className="sum-note">Sum: {sumCounts} / {selectedType.totalUnits}</div>
+          <div className="sum-note">ჯამი: {sumCounts} / {selectedType.totalUnits}</div>
         </div>
       )}
 
       {selectedType && selectedType.kind === 'single' && (
         <div className="inputs">
-          <h3>Select the player who took it</h3>
+          <h3>აირჩიე, ვინ აიღო</h3>
           <div className="radio-grid">
             {players.map((p) => (
               <label key={p.id} className="radio-row">
@@ -140,7 +140,7 @@ export default function GameTypeSelector({
 
       <div className="actions sticky-footer">
         <button type="button" className="primary" disabled={Boolean(validationMessage)} onClick={endRound}>
-          End Round
+          რაუნდის დასრულება
         </button>
       </div>
     </div>

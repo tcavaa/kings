@@ -23,7 +23,7 @@ export default function WinProbability({ players, rounds, playerColors = [] }) {
 
   return (
     <div className="card win-prob-card">
-      <h2>Win Probability</h2>
+      <h2>მოგების ალბათობა</h2>
       <div className="win-prob-bars">
         {probs.map(({ player, prob, color }) => (
           <div key={player.id} className="win-prob-row">

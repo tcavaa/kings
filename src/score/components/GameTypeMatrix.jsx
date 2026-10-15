@@ -6,10 +6,10 @@ import { MATRIX_CELL_DECOR } from '../utils/decorations'
 export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlayerIndex, onPreselect, playerColors = [], currentChampion }) {
   return (
     <div className="card matrix" style={{ '--player-count': players.length }}>
-      <h2>Game Types Availability</h2>
+      <h2>ხელმისაწვდომი თამაშები</h2>
       <div className="matrix-grid">
         <div className="matrix-header">
-          <div className="cell type-col">Type</div>
+          <div className="cell type-col">ტიპი</div>
           {players.map((p, idx) => (
             <div
               key={p.id}
@@ -45,8 +45,8 @@ export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlaye
         ))}
       </div>
       <div className="legend">
-        <span className="dot available">•</span> Available
-        <span className="dot used">✕</span> Used
+        <span className="dot available">•</span> თავისუფალი
+        <span className="dot used">✕</span> ნათამაშები
       </div>
     </div>
   )

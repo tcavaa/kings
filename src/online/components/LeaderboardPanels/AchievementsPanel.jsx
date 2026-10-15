@@ -7,6 +7,7 @@ import {
   clubAchievementStats,
   ACHIEVEMENT_DEFS,
 } from "../../utils/achievements";
+import { useSeasonList } from "../../lib/champions";
 const VIEWS = [
   ["player", "მოთამაშე"],
   ["club", "კლუბი"],
@@ -16,20 +17,20 @@ export default function AchievementsPanel({
   players = [],
   playerName,
 }) {
+  const seasons = useSeasonList();
   const lifetime = useMemo(
-    () => computeAllLifetimeAchievements(games),
-    [games],
+    () => computeAllLifetimeAchievements(games, { seasons }),
+    [games, seasons],
   );
   // Ranked players only: removed ჩაწერა players still have badges in
   // `lifetime`, but appear nowhere else.
   const names = useMemo(() => players.map((p) => p.name), [players]);
   const [chosen, setChosen] = usePlayerChoice(names);
   const [view, setView] = useState("player");
-  // The club view needs every ranked player's games, so a profile (one
-  // player's games only) shows just their own collection.
+  // A profile shows just that player's collection, without the club view.
   const club = useMemo(
-    () => (playerName ? null : clubAchievementStats(games, names)),
-    [games, names, playerName],
+    () => (playerName ? null : clubAchievementStats(games, names, { seasons })),
+    [games, names, playerName, seasons],
   );
   const rarity = useMemo(
     () => club && Object.fromEntries(club.badges.map((b) => [b.code, b])),

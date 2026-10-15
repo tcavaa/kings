@@ -106,11 +106,11 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
 
   return (
     <div className="card score-table" style={{ '--player-count': players.length }}>
-      <h2>Scores</h2>
+      <h2>ქულები</h2>
       <div className="table">
         <div className="thead">
           <div className="tr">
-            <div className="th">Round / Type</div>
+            <div className="th">რაუნდი / ტიპი</div>
             {players.map((p, i) => (
               <div
                 key={p.id}
@@ -143,17 +143,17 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
                       {!isEditing && (
                         <>
                           {onEditLastRound && (
-                            <button className="link icon-btn" onClick={startEdit} title="Edit last round"><Pencil size={11} /> Edit</button>
+                            <button className="link icon-btn" onClick={startEdit} title="ბოლო რაუნდის რედაქტირება"><Pencil size={11} /> შეცვლა</button>
                           )}
                           {onUndoLastRound && (
-                            <button className="link icon-btn" onClick={onUndoLastRound} title="Undo last round" style={{ color: 'var(--muted)' }}><Undo2 size={11} /> Undo</button>
+                            <button className="link icon-btn" onClick={onUndoLastRound} title="ბოლო რაუნდის გაუქმება" style={{ color: 'var(--muted)' }}><Undo2 size={11} /> გაუქმება</button>
                           )}
                         </>
                       )}
                       {isEditing && (
                         <>
-                          <button className="link" disabled={Boolean(validationMessage)} onClick={saveEdit}>Save</button>
-                          <button className="link" onClick={cancelEdit}>Cancel</button>
+                          <button className="link" disabled={Boolean(validationMessage)} onClick={saveEdit}>შენახვა</button>
+                          <button className="link" onClick={cancelEdit}>გაუქმება</button>
                         </>
                       )}
                     </span>
@@ -178,7 +178,7 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
                 })}
                 {isEditing && isLast && selectedType && selectedType.kind === 'count' && (
                   <div className="td center" style={{ gridColumn: `1 / span ${players.length + 1}` }}>
-                    <div className="sum-note">Sum: {draftSum} / {selectedType.totalUnits}</div>
+                    <div className="sum-note">ჯამი: {draftSum} / {selectedType.totalUnits}</div>
                     {validationMessage && <div className="validation">{validationMessage}</div>}
                   </div>
                 )}
@@ -186,7 +186,7 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
             )
           })}
           <div className="tr totals-tr">
-            <div className="td bold">Totals</div>
+            <div className="td bold">სულ</div>
             {players.map((p) => {
               const val = totals[p.id]
               const inDanger = dangerIds.has(p.id)
@@ -210,8 +210,8 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
       {gameFinished && leaders.size > 0 && (
         <div className="winner">
           {isTie
-            ? <><Handshake size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} />Tie: <strong>{players.filter(p => leaders.has(p.id)).map(p => p.name).join(' & ')}</strong> with {maxTotal} points</>
-            : <><Crown size={15} style={{ verticalAlign: '-2px', marginRight: 5, color: 'var(--accent-gold)' }} />Winner: <strong>{players.find(p => leaders.has(p.id))?.name}</strong> with {maxTotal} points</>
+            ? <><Handshake size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} />ფრე: <strong>{players.filter(p => leaders.has(p.id)).map(p => p.name).join(' & ')}</strong> — {maxTotal} ქულა</>
+            : <><Crown size={15} style={{ verticalAlign: '-2px', marginRight: 5, color: 'var(--accent-gold)' }} />გამარჯვებული: <strong>{players.find(p => leaders.has(p.id))?.name}</strong> — {maxTotal} ქულა</>
           }
         </div>
       )}

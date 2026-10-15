@@ -19,13 +19,13 @@ export default function ScoreChart({ players, rounds }) {
 
   return (
     <div className="card">
-      <h2>Score Progression</h2>
+      <h2>ქულების დინამიკა</h2>
       <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 24 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} />
           <XAxis
             dataKey="round"
-            label={{ value: 'Round', position: 'insideBottom', offset: -12, fill: chart.muted, fontSize: 12 }}
+            label={{ value: 'რაუნდი', position: 'insideBottom', offset: -12, fill: chart.muted, fontSize: 12 }}
             tick={chart.tick}
           />
           <YAxis tick={chart.tick} width={40} />

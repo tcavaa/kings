@@ -34,12 +34,12 @@ const SEP = ' & ';
 function scoresForRound(round, ids) {
   const rule = gameTypeRule(round.gameTypeCode);
   if (rule.kind === 'single') {
-    if (round.singleTargetPlayerId == null) throw invalid('Invalid round target.');
+    if (round.singleTargetPlayerId == null) throw invalid('არასწორი რაუნდი: გაურკვეველია, ვინ აიღო.');
     return roundScores(rule.code, ids, { target: round.singleTargetPlayerId });
   }
   const counts = round.countsByPlayerId || {};
   const handedOut = ids.reduce((sum, id) => sum + (counts[id] || 0), 0);
-  if (handedOut !== rule.totalUnits) throw invalid('Invalid round counts.');
+  if (handedOut !== rule.totalUnits) throw invalid('არასწორი რაუნდი: კარტების რაოდენობა არ ემთხვევა.');
   return roundScores(rule.code, ids, { counts });
 }
 
@@ -122,55 +122,55 @@ const SHEET_ID_RE = /^[A-Za-z0-9_-]{8,58}$/;
  */
 function fromScoreSheet({ sheetId, players, rounds, durationSeconds, surrenderedBy } = {}, resolve) {
   if (!Array.isArray(players) || players.length < 3 || players.length > 4) {
-    throw invalid('A game needs 3 or 4 players.');
+    throw invalid('თამაშს 3 ან 4 მოთამაშე სჭირდება.');
   }
   const ids = players.map((p) => p && p.id);
   if (ids.some((id) => typeof id !== 'string' || !id) || new Set(ids).size !== ids.length) {
-    throw invalid('Players must be distinct.');
+    throw invalid('მოთამაშეები არ უნდა მეორდებოდეს.');
   }
   const slots = players.map(({ id, name }) => {
     // resolve(id, name): the profile, a name-only player ({ id: null, name })
     // for someone removed while the sheet was open, or null.
     const profile = resolve(id, name);
-    if (!profile) throw invalid('Unknown player — reload the player list.');
+    if (!profile) throw invalid('უცნობი მოთამაშე — განაახლე მოთამაშეების სია.');
     return { id, name: profile.name, profileId: profile.id || null };
   });
   const who = slots.map((s) => s.profileId || `name:${s.name.toLowerCase()}`);
-  if (new Set(who).size !== slots.length) throw invalid('Players must be distinct.');
+  if (new Set(who).size !== slots.length) throw invalid('მოთამაშეები არ უნდა მეორდებოდეს.');
   // A finished sheet: every player led every game type once. A player may
   // surrender after at least one round, which ends the game early: like a
   // surrender in King Online, the highest score at that point wins.
   const fullLength = ids.length * GAME_TYPES.length;
   if (surrenderedBy != null) {
-    if (!ids.includes(surrenderedBy)) throw invalid('Unknown surrendering player.');
+    if (!ids.includes(surrenderedBy)) throw invalid('დანებებული მოთამაშე უცნობია.');
     if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length >= fullLength) {
-      throw invalid('A game can be surrendered after its first round and before its last.');
+      throw invalid('დანებება შეიძლება პირველი რაუნდის შემდეგ და ბოლო რაუნდამდე.');
     }
   } else if (!Array.isArray(rounds) || rounds.length !== fullLength) {
-    throw invalid('The game is not finished: every player leads every game type once.');
+    throw invalid('თამაში არ დასრულებულა: ყველა მოთამაშე ყველა თამაშს ერთხელ ირჩევს.');
   }
   const idSet = new Set(ids);
   const played = new Set();   // each leader plays each type once
   const isPoints = (v) => Number.isInteger(v) && Math.abs(v) <= 1000;
   const isUnits = (v) => Number.isInteger(v) && v >= 0 && v <= 10;
   for (const r of rounds) {
-    if (!r || !GAME_TYPES.includes(r.gameTypeCode) || !idSet.has(r.leaderPlayerId)) throw invalid('Invalid round.');
+    if (!r || !GAME_TYPES.includes(r.gameTypeCode) || !idSet.has(r.leaderPlayerId)) throw invalid('არასწორი რაუნდი.');
     if (!r.scores || typeof r.scores !== 'object' || Object.entries(r.scores).some(([k, v]) => !idSet.has(k) || !isPoints(v))) {
-      throw invalid('Invalid round scores.');
+      throw invalid('რაუნდის არასწორი ქულები.');
     }
     if (r.countsByPlayerId != null && (typeof r.countsByPlayerId !== 'object'
         || Object.entries(r.countsByPlayerId).some(([k, v]) => !idSet.has(k) || !isUnits(v)))) {
-      throw invalid('Invalid round counts.');
+      throw invalid('არასწორი რაუნდი: კარტების რაოდენობა არ ემთხვევა.');
     }
-    if (r.singleTargetPlayerId != null && !idSet.has(r.singleTargetPlayerId)) throw invalid('Invalid round target.');
+    if (r.singleTargetPlayerId != null && !idSet.has(r.singleTargetPlayerId)) throw invalid('არასწორი რაუნდი: გაურკვეველია, ვინ აიღო.');
     const pair = `${r.leaderPlayerId}:${r.gameTypeCode}`;
-    if (played.has(pair)) throw invalid('A leader played the same game type twice.');
+    if (played.has(pair)) throw invalid('წამყვანმა ერთი და იგივე თამაში ორჯერ აირჩია.');
     played.add(pair);
     // The totals and winners come from the scores, so they must be the ones
     // the recorded cards give.
     const expected = scoresForRound(r, ids);
     if (ids.some((id) => (r.scores[id] || 0) !== expected[id])) {
-      throw invalid('Round scores do not match the recorded cards.');
+      throw invalid('რაუნდის ქულები ჩაწერილ კარტებს არ ემთხვევა.');
     }
   }
   const clean = rounds.map((r) => ({

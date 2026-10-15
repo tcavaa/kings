@@ -108,7 +108,8 @@ export default function PlayerProfile({
           </div>
         </dl>
       </section>
-      <AchievementsPanel games={matches} playerName={player.name} />
+      {/* Every game: breaking someone's streak needs their games too. */}
+      <AchievementsPanel games={games} playerName={player.name} />
       <section className="k-profile-history">
         <header>
           <span className="k-eyebrow">RECENT PLAY</span>

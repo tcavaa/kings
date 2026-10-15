@@ -8,15 +8,15 @@ const byType = (make) => Object.fromEntries(GAME_TYPE_CODES.map(code => [code, m
 // Icons for these rows come from utils/gameIcons.jsx (CardTypeIcon by code);
 // chart labels use the plain `label` text.
 export const TYPE_ROWS = [
-  { code: 'K',  label: 'King ♥',     group: 'penalty' },
-  { code: 'Q',  label: 'Queens',     group: 'penalty' },
-  { code: 'J',  label: 'Jacks',      group: 'penalty' },
-  { code: 'H',  label: 'Hearts',     group: 'penalty' },
-  { code: 'L2', label: 'Last 2',     group: 'penalty' },
-  { code: 'T',  label: 'Bad Tricks', group: 'penalty' },
-  { code: 'P1', label: 'Plus (1)',   group: 'bonus' },
-  { code: 'P2', label: 'Plus (2)',   group: 'bonus' },
-  { code: 'P3', label: 'Plus (3)',   group: 'bonus' },
+  { code: 'K',  label: 'კინგი ♥',    group: 'penalty' },
+  { code: 'Q',  label: 'დამები',     group: 'penalty' },
+  { code: 'J',  label: 'ვალეტები',   group: 'penalty' },
+  { code: 'H',  label: 'გულები',     group: 'penalty' },
+  { code: 'L2', label: 'ბოლო ორი',   group: 'penalty' },
+  { code: 'T',  label: 'მინუსი',     group: 'penalty' },
+  { code: 'P1', label: 'პლიუსი 1',   group: 'bonus' },
+  { code: 'P2', label: 'პლიუსი 2',   group: 'bonus' },
+  { code: 'P3', label: 'პლიუსი 3',   group: 'bonus' },
 ]
 
 // Returns { [playerId]: { K, Q, J, H, L2, T, P1, P2, P3 } } — units collected per player
@@ -51,19 +51,19 @@ export function getGameAwards(players, stats, participants) {
     if (p && val >= 1) awards.push({ icon, title, player: p.name, value: fmt(val) })
   }
 
-  add('Q',  'Queen Hoarder',       p => stats[p.id]?.Q || 0,                           v => `${v} queen${v !== 1 ? 's' : ''}`)
-  add('H',  'Heartbreaker',        p => stats[p.id]?.H || 0,                           v => `${v} heart${v !== 1 ? 's' : ''}`)
-  add('J',  'Jack Magnet',         p => stats[p.id]?.J || 0,                           v => `${v} jack${v !== 1 ? 's' : ''}`)
-  add('K',  'King Taker',          p => stats[p.id]?.K || 0,                           v => `got king ${v}x`)
-  add('L2', 'Last-Card Hoarder',   p => stats[p.id]?.L2 || 0,                          v => `${v} last-2 card${v !== 1 ? 's' : ''}`)
-  add('T',  'Trick Sponge',        p => stats[p.id]?.T || 0,                           v => `${v} bad trick${v !== 1 ? 's' : ''}`)
-  add('P',  'Plus Master',         p => (stats[p.id]?.P1||0)+(stats[p.id]?.P2||0)+(stats[p.id]?.P3||0), v => `${v} plus trick${v !== 1 ? 's' : ''}`)
+  add('Q',  'დამების მკრეფავი',    p => stats[p.id]?.Q || 0,                           v => `${v} დამა`)
+  add('H',  'გულების მონადირე',    p => stats[p.id]?.H || 0,                           v => `${v} გული`)
+  add('J',  'ვალეტების მაგნიტი',   p => stats[p.id]?.J || 0,                           v => `${v} ვალეტი`)
+  add('K',  'მეფის მაგნიტი',       p => stats[p.id]?.K || 0,                           v => `მეფე აიღო ${v}-ჯერ`)
+  add('L2', 'ბოლო ორის მკრეფავი',  p => stats[p.id]?.L2 || 0,                          v => `${v} ბოლო მინუსი`)
+  add('T',  'მინუსების ღრუბელი',   p => stats[p.id]?.T || 0,                           v => `${v} მინუსი`)
+  add('P',  'პლიუსის ოსტატი',      p => (stats[p.id]?.P1||0)+(stats[p.id]?.P2||0)+(stats[p.id]?.P3||0), v => `${v} მინუსი პლიუსში`)
 
   if (participants?.length) {
     const winner = participants.reduce((b, p) => !b || p.score > b.score ? p : b, null)
     const loser  = participants.reduce((b, p) => !b || p.score < b.score ? p : b, null)
-    if (winner) awards.push({ icon: 'winner', title: 'Game Winner', player: winner.name, value: `${winner.score} pts` })
-    if (loser && loser.name !== winner?.name) awards.push({ icon: 'loser', title: 'Biggest Loser', player: loser.name, value: `${loser.score} pts` })
+    if (winner) awards.push({ icon: 'winner', title: 'გამარჯვებული', player: winner.name, value: `${winner.score} ქულა` })
+    if (loser && loser.name !== winner?.name) awards.push({ icon: 'loser', title: 'ბოლო ადგილი', player: loser.name, value: `${loser.score} ქულა` })
   }
 
   return awards
@@ -172,16 +172,16 @@ export function getGlobalAwards(playerMap) {
     if (p) awards.push({ icon, title, player: p.name, value: fmt(p) })
   }
 
-  add('champion', 'All-time Champion',   p => p.wins,                           p => `${p.wins} win${p.wins !== 1 ? 's' : ''} in ${p.gamesPlayed} game${p.gamesPlayed !== 1 ? 's' : ''}`)
-  add('Q',        'Queen Magnet',        p => p.Q,                              p => `${p.Q} queens total`)
-  add('H',        'Most Heartless',      p => p.H,                              p => `${p.H} hearts total`)
-  add('J',        'Jack Collector',      p => p.J,                              p => `${p.J} jacks total`)
-  add('K',        'King Slayer',         p => p.K,                              p => `grabbed king ${p.K}x`)
-  add('L2',       'Last-Card Hoarder',   p => p.L2,                             p => `${p.L2} last-2 cards`)
-  add('T',        'Trick Goblin',        p => p.T,                              p => `${p.T} bad tricks taken`)
-  add('P',        'Plus Wizard',         p => p.P1 + p.P2 + p.P3,              p => `${p.P1 + p.P2 + p.P3} plus tricks`)
-  add('avg',      'Highest Avg Score',   p => p.gamesPlayed > 0 ? p.totalScore / p.gamesPlayed : -Infinity, p => `avg ${(p.totalScore / p.gamesPlayed).toFixed(1)} pts/game`)
-  add('games',    'Most Dedicated',      p => p.gamesPlayed,                    p => `${p.gamesPlayed} game${p.gamesPlayed !== 1 ? 's' : ''} played`)
+  add('champion', 'ყველა დროის ჩემპიონი', p => p.wins,                          p => `${p.wins} მოგება ${p.gamesPlayed} თამაშიდან`)
+  add('Q',        'დამების მაგნიტი',     p => p.Q,                              p => `სულ ${p.Q} დამა`)
+  add('H',        'ყველაზე უგულო',       p => p.H,                              p => `სულ ${p.H} გული`)
+  add('J',        'ვალეტების კოლექციონერი', p => p.J,                            p => `სულ ${p.J} ვალეტი`)
+  add('K',        'მეფის მონადირე',      p => p.K,                              p => `მეფე აიღო ${p.K}-ჯერ`)
+  add('L2',       'ბოლო ორის მკრეფავი',  p => p.L2,                             p => `${p.L2} ბოლო მინუსი`)
+  add('T',        'მინუსების გობლინი',   p => p.T,                              p => `${p.T} მინუსი აიღო`)
+  add('P',        'პლიუსის ჯადოქარი',    p => p.P1 + p.P2 + p.P3,              p => `${p.P1 + p.P2 + p.P3} მინუსი პლიუსში`)
+  add('avg',      'საუკეთესო საშუალო',   p => p.gamesPlayed > 0 ? p.totalScore / p.gamesPlayed : -Infinity, p => `საშუალოდ ${(p.totalScore / p.gamesPlayed).toFixed(1)} ქულა თამაშზე`)
+  add('games',    'ყველაზე ერთგული',     p => p.gamesPlayed,                    p => `${p.gamesPlayed} თამაში ითამაშა`)
 
   return awards
 }

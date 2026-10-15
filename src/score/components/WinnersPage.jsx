@@ -10,6 +10,7 @@ import ShowMore from './ShowMore'
 import { computePerGameAchievements, ACHIEVEMENT_DEFS } from '../utils/achievements'
 import { winnerNamesOf, isWinnerOf, isTieResult } from '../utils/winners'
 import { goBack, navigate, pathOf, useLocation } from '../../../shared/router'
+import { formatDate } from '../utils/dates'
 
 const NONE = []
 
@@ -51,7 +52,7 @@ export default function WinnersPage({ seasons }) {
   }, [visible, detailById])
 
   if (subView === 'detail' && loading && !data) {
-    return <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>Loading…</p></div>
+    return <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>იტვირთება…</p></div>
   }
 
   if (subView === 'detail') {
@@ -60,10 +61,10 @@ export default function WinnersPage({ seasons }) {
     if (!detail) {
       return (
         <div className="card">
-          <h2>Game Details</h2>
-          <p style={{ color: 'var(--muted)' }}>No detailed data for this game.</p>
+          <h2>თამაშის დეტალები</h2>
+          <p style={{ color: 'var(--muted)' }}>ამ თამაშის დეტალები არ არის.</p>
           <div className="actions">
-            <button className="primary" onClick={backToList}>Back</button>
+            <button className="primary" onClick={backToList}>უკან</button>
           </div>
         </div>
       )
@@ -74,15 +75,15 @@ export default function WinnersPage({ seasons }) {
   return (
     <div className="card">
       <div className="history-header">
-        <h2 style={{ margin: 0 }}>Game History</h2>
+        <h2 style={{ margin: 0 }}>თამაშების ისტორია</h2>
       </div>
 
       {/* Tab switcher */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {[
-          { key: 'local',   label: 'Local Games', Icon: null },
-          { key: 'online',  label: 'Online',      Icon: Globe },
-          { key: 'seasons', label: 'Seasons',     Icon: Trophy },
+          { key: 'local',   label: 'ლაივი',      Icon: null },
+          { key: 'online',  label: 'ონლაინ',     Icon: Globe },
+          { key: 'seasons', label: 'სეზონები',   Icon: Trophy },
         ].map(t => (
           <button
             key={t.key}
@@ -98,9 +99,9 @@ export default function WinnersPage({ seasons }) {
       {/* Tab content */}
       {historyTab === 'local' && (
         loading ? (
-          <p style={{ color: 'var(--muted)' }}>Loading...</p>
+          <p style={{ color: 'var(--muted)' }}>იტვირთება…</p>
         ) : results.length === 0 ? (
-          <p style={{ color: 'var(--muted)' }}>No games recorded yet.</p>
+          <p style={{ color: 'var(--muted)' }}>ჯერ არცერთი თამაში არ ჩაწერილა.</p>
         ) : (
           <>
           <div className="history-list">
@@ -112,7 +113,7 @@ export default function WinnersPage({ seasons }) {
                 <div key={r.id} className="history-card">
                   <div className="history-card-top">
                     <span className="history-date">
-                      {new Date(r.played_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {formatDate(r.played_at)}
                       {r.duration_seconds != null && (
                         <span className="history-duration">
                           <Timer size={11} /> {formatDuration(r.duration_seconds)}
@@ -121,10 +122,10 @@ export default function WinnersPage({ seasons }) {
                     </span>
                     {hasDetail ? (
                       <button className="link history-details-btn" onClick={() => navigate(pathOf('/score/history', 'game', r.id))}>
-                        Details →
+                        დეტალები →
                       </button>
                     ) : (
-                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>No details</span>
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>დეტალები არ არის</span>
                     )}
                   </div>
                   <div className="history-winner">
@@ -132,7 +133,7 @@ export default function WinnersPage({ seasons }) {
                       ? <Handshake size={15} style={{ verticalAlign: '-2px', marginRight: 5 }} />
                       : <Crown size={15} style={{ verticalAlign: '-2px', marginRight: 5, color: 'var(--accent-gold)' }} />}
                     {winnerNamesOf(r).join(' & ') || r.winner_name}
-                    {isTieResult(r) && <span className="history-tie-tag">tie — shared win</span>}
+                    {isTieResult(r) && <span className="history-tie-tag">ფრე — გაყოფილი მოგება</span>}
                   </div>
                   <div className="history-participants">
                     {sorted.map((p, i) => {

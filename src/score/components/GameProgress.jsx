@@ -13,7 +13,7 @@ export default function GameProgress({ playedRounds, totalRounds }) {
 
   return (
     <div className="card game-progress-card">
-      <h2>Game Progress</h2>
+      <h2>თამაშის პროგრესი</h2>
       <div className="game-progress-ring-wrap">
         <svg width={size} height={size} className="game-progress-ring">
           <circle
@@ -40,12 +40,12 @@ export default function GameProgress({ playedRounds, totalRounds }) {
         </svg>
         <div className="game-progress-center">
           <div className="game-progress-fraction">{playedRounds} / {totalRounds}</div>
-          <div className="game-progress-label">ROUNDS</div>
+          <div className="game-progress-label">რაუნდი</div>
         </div>
       </div>
       <div className="game-progress-footer">
-        <div className="game-progress-remaining-label">Remaining</div>
-        <div className="game-progress-remaining-value">{remaining} round{remaining === 1 ? '' : 's'} left</div>
+        <div className="game-progress-remaining-label">დარჩა</div>
+        <div className="game-progress-remaining-value">{remaining} რაუნდი</div>
       </div>
     </div>
   )

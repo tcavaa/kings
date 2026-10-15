@@ -7,6 +7,7 @@ import { onlineWinnerNames, isOnlineWinner } from '../utils/winners'
 import { CardTypeIcon } from '../utils/gameIcons'
 import GameAnalytics from './GameAnalytics'
 import ShowMore from './ShowMore'
+import { formatDate, formatDateTime } from '../utils/dates'
 
 const NONE = []
 // The chart library loads with the first game opened, not with the list.
@@ -31,7 +32,7 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
     })
   }, [game])
 
-  const date = new Date(game.playedAt).toLocaleString()
+  const date = formatDateTime(game.playedAt)
 
   return (
     <div>
@@ -39,19 +40,19 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px' }}>Online Game Details</h2>
+            <h2 style={{ margin: '0 0 4px' }}>ონლაინ თამაშის დეტალები</h2>
             <div style={{ color: 'var(--muted)', fontSize: 13 }}>{date}</div>
             <div style={{ marginTop: 6 }}>
               {onlineWinnerNames(game).length > 1
-                ? <><Handshake size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />Tie — Winners:</>
-                : 'Winner:'}{' '}
+                ? <><Handshake size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />ფრე — გამარჯვებულები:</>
+                : 'გამარჯვებული:'}{' '}
               <strong>{onlineWinnerNames(game).join(' & ') || game.winner?.name}</strong>
               <span style={{ color: 'var(--muted)', fontSize: 13, marginLeft: 8 }}>
                 ({seatPlayers.map(p => `${p.name} (${p.score > 0 ? '+' : ''}${p.score})`).join(' · ')})
               </span>
             </div>
           </div>
-          <button className="link" onClick={onBack}>← Back</button>
+          <button className="link" onClick={onBack}>← უკან</button>
         </div>
       </div>
 
@@ -68,13 +69,13 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
       {/* Round-by-round breakdown table */}
       {roundDetails.length > 0 && (
         <div className="card">
-          <h2>Round Breakdown</h2>
+          <h2>რაუნდების მიხედვით</h2>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 480 }}>
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--line)' }}>
-                  <th style={thStyle}>Rnd</th>
-                  <th style={thStyle}>Type</th>
+                  <th style={thStyle}>რაუნდი</th>
+                  <th style={thStyle}>ტიპი</th>
                   {seatPlayers.map(p => (
                     <th key={p.seat} style={{ ...thStyle, color: isOnlineWinner(game, p.name) ? 'var(--accent-good)' : 'var(--text)' }}>
                       {p.name}
@@ -102,7 +103,7 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
                         })}
                       </tr>
                       <tr style={{ borderBottom: '2px solid var(--line)', background: 'var(--cell-bg)' }}>
-                        <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }} colSpan={2}>Σ after round {rd.round}</td>
+                        <td style={{ ...tdStyle, color: 'var(--muted)', fontSize: 11 }} colSpan={2}>Σ {rd.round} რაუნდის შემდეგ</td>
                         {seatPlayers.map(p => (
                           <td key={p.seat} style={{ ...tdStyle, fontWeight: 700 }}>{cum[p.seat]}</td>
                         ))}
@@ -113,7 +114,7 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: '2px solid var(--line)', background: 'var(--cell-bg)' }}>
-                  <td style={{ ...tdStyle, fontWeight: 700 }} colSpan={2}>Final</td>
+                  <td style={{ ...tdStyle, fontWeight: 700 }} colSpan={2}>საბოლოო</td>
                   {seatPlayers.map(p => (
                     <td key={p.seat} style={{ ...tdStyle, fontWeight: 700, color: isOnlineWinner(game, p.name) ? 'var(--accent-good)' : 'var(--text)' }}>
                       {p.score > 0 ? '+' : ''}{p.score}
@@ -128,7 +129,7 @@ function OnlineGameDetail({ game, detail, result, onBack }) {
       )}
 
       <div className="actions">
-        <button className="primary" onClick={onBack}>Back to Online Games</button>
+        <button className="primary" onClick={onBack}>ონლაინ თამაშებში დაბრუნება</button>
       </div>
     </div>
   )
@@ -162,25 +163,25 @@ export default function OnlineHistoryTab() {
     return <OnlineGameDetail game={selectedGame} detail={rows.detail} result={rows.result} onBack={() => setSelectedGame(null)} />
   }
 
-  if (loading && !data) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>Loading online games…</p>
-  if (!data)   return <p style={{ color: 'var(--accent-bad)', padding: '8px 0' }}>Failed to load: {error}</p>
-  if (!games.length) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>No online games recorded yet.</p>
+  if (loading && !data) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>ონლაინ თამაშები იტვირთება…</p>
+  if (!data)   return <p style={{ color: 'var(--accent-bad)', padding: '8px 0' }}>ჩატვირთვა ვერ მოხერხდა: {error}</p>
+  if (!games.length) return <p style={{ color: 'var(--muted)', padding: '8px 0' }}>ონლაინ თამაშები ჯერ არ არის.</p>
 
   return (
     <>
     <div className="table">
       <div className="thead">
         <div className="tr history-tr">
-          <div className="th">Date</div>
-          <div className="th">Winner</div>
-          <div className="th">Players &amp; Scores</div>
+          <div className="th">თარიღი</div>
+          <div className="th">გამარჯვებული</div>
+          <div className="th">მოთამაშეები და ქულები</div>
           <div className="th"></div>
         </div>
       </div>
       <div className="tbody">
         {visible.map(g => (
           <div key={g.id} className="tr history-tr">
-            <div className="td">{new Date(g.playedAt).toLocaleDateString()}</div>
+            <div className="td">{formatDate(g.playedAt)}</div>
             <div className="td bold">
               {onlineWinnerNames(g).length > 1 && <Handshake size={13} style={{ verticalAlign: '-2px', marginRight: 4 }} />}
               {onlineWinnerNames(g).join(' & ') || g.winner?.name}
@@ -194,7 +195,7 @@ export default function OnlineHistoryTab() {
                 onClick={() => setSelectedGame(g)}
                 style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontWeight: 600, fontSize: 13, padding: 0 }}
               >
-                Details
+                დეტალები
               </button>
             </div>
           </div>

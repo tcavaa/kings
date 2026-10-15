@@ -24,7 +24,7 @@ export default function GameTimer({ startedAt, endedAt }) {
   return (
     <div
       className={`game-timer ${endedAt ? 'game-timer-finished' : ''}`}
-      title={endedAt ? 'Final game duration' : 'Game in progress'}
+      title={endedAt ? 'თამაშის საბოლოო ხანგრძლივობა' : 'თამაში მიმდინარეობს'}
     >
       <Timer size={13} />
       <span className="game-timer-value">{formatDuration(seconds)}</span>

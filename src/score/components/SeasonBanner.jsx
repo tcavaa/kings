@@ -69,9 +69,9 @@ export default function SeasonBanner({ seasonName, themeId, champion }) {
     <div className={`season-hero season-hero-${theme.id}`}>
       <HeroDecor themeId={theme.id} />
       <div className="season-hero-content">
-        <h2 className="season-hero-title">{seasonName || 'Unnamed Season'}</h2>
+        <h2 className="season-hero-title">{seasonName || 'უსახელო სეზონი'}</h2>
         {champions.length > 0 && (
-          <div className="season-hero-champion" title={`Last season champion${champions.length > 1 ? 's' : ''}`}>
+          <div className="season-hero-champion" title={champions.length > 1 ? 'წინა სეზონის ჩემპიონები' : 'წინა სეზონის ჩემპიონი'}>
             <Trophy size={16} />
             <strong>{champions.join(' & ')}</strong>
           </div>

@@ -5,7 +5,7 @@
 const TABS = [
   {
     key: 'home',
-    label: 'Score',
+    label: 'თამაში',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7.5" height="7.5" rx="1.5" />
@@ -17,7 +17,7 @@ const TABS = [
   },
   {
     key: 'history',
-    label: 'History',
+    label: 'ისტორია',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
@@ -27,7 +27,7 @@ const TABS = [
   },
   {
     key: 'stats',
-    label: 'Stats',
+    label: 'სტატისტიკა',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <line x1="5" y1="20" x2="5" y2="12" />
@@ -39,7 +39,7 @@ const TABS = [
   },
   {
     key: 'more',
-    label: 'More',
+    label: 'მეტი',
     icon: (
       <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
@@ -56,7 +56,7 @@ export default function BottomNav({ view, onNavigate }) {
   const activeKey = view === 'players' ? 'more' : view
 
   return (
-    <nav className="bottom-nav" aria-label="Main navigation">
+    <nav className="bottom-nav" aria-label="მთავარი ნავიგაცია">
       {TABS.map(t => (
         <button
           key={t.key}

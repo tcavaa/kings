@@ -20,34 +20,34 @@ export default function MorePage({
   return (
     <div className="more-page">
       <div className="card">
-        <h2>Players</h2>
-        <p className="more-hint">Everyone's games, wins and badges. Players are added and removed by the admin.</p>
-        <button className="primary icon-btn" onClick={onOpenPlayers}><Users size={15} /> Players</button>
+        <h2>მოთამაშეები</h2>
+        <p className="more-hint">ყველას თამაშები, მოგებები და ბეჯები. მოთამაშეებს ადმინი ამატებს და შლის.</p>
+        <button className="primary icon-btn" onClick={onOpenPlayers}><Users size={15} /> მოთამაშეები</button>
       </div>
 
       <div className="card">
         <h2>King Online</h2>
-        <p className="more-hint">Play live games and see the online leaderboard.</p>
+        <p className="more-hint">ითამაშე ონლაინ და ნახე ონლაინ ლიდერბორდი.</p>
         {/* King Online is the site's home page (its own root layout) */}
-        <button className="primary icon-btn" onClick={() => window.location.assign('/')}><Spade size={15} /> Open King Online</button>
+        <button className="primary icon-btn" onClick={() => window.location.assign('/')}><Spade size={15} /> King Online-ის გახსნა</button>
       </div>
 
       <div className="card">
-        <h2>Current Season</h2>
+        <h2>მიმდინარე სეზონი</h2>
         <div className="more-season-row">
           <span className="more-season-chip">
-            <ThemeIcon size={15} /> {seasonName || 'Unnamed season'}
+            <ThemeIcon size={15} /> {seasonName || 'უსახელო სეზონი'}
           </span>
         </div>
-        <p className="more-hint">The season's name, theme and end are set by the admin.</p>
+        <p className="more-hint">სეზონის სახელს, თემას და დასრულებას ადმინი ადგენს.</p>
       </div>
 
       <div className="card">
-        <h2>Preferences</h2>
+        <h2>პარამეტრები</h2>
         <div className="more-toggle-row">
           <div>
-            <strong>Sounds</strong>
-            <p className="more-hint">Round chimes, win fanfare, penalty womp.</p>
+            <strong>ხმები</strong>
+            <p className="more-hint">რაუნდის ზარი, მოგების ფანფარა, ჯარიმის ხმა.</p>
           </div>
           <button
             className={`toggle-switch ${soundEnabled ? 'on' : ''}`}
@@ -60,8 +60,8 @@ export default function MorePage({
         </div>
         <div className="more-toggle-row">
           <div>
-            <strong>Dark mode</strong>
-            <p className="more-hint">Easy on the eyes for late-night rounds.</p>
+            <strong>მუქი რეჟიმი</strong>
+            <p className="more-hint">თვალს არ ღლის გვიან ღამით.</p>
           </div>
           <button
             className={`toggle-switch ${darkMode ? 'on' : ''}`}
@@ -75,20 +75,20 @@ export default function MorePage({
       </div>
 
       <div className="card danger-card">
-        <h2>Reset</h2>
-        <p className="more-hint">Clears the game in progress. Finished games in history stay safe.</p>
-        <button className="link danger-link icon-btn" onClick={onResetGame}><Trash2 size={13} /> Reset current game</button>
+        <h2>გაუქმება</h2>
+        <p className="more-hint">შლის მიმდინარე თამაშს. ისტორიაში დასრულებული თამაშები უსაფრთხოდ რჩება.</p>
+        <button className="link danger-link icon-btn" onClick={onResetGame}><Trash2 size={13} /> მიმდინარე თამაშის გაუქმება</button>
       </div>
 
       <div className="card about-card">
-        <h2>About</h2>
+        <h2>აპის შესახებ</h2>
         <p className="more-hint">
-          <strong>King Score</strong> — score keeper for the King card game.
-          Tracks rounds, seasons, achievements and analytics for 3–4 players,
-          and pulls championship games in from King Online.
+          <strong>King Score</strong> (ჩაწერა) — ქულების ჩამწერი კინგის თამაშისთვის.
+          აღრიცხავს რაუნდებს, სეზონებს, მიღწევებს და სტატისტიკას 3–4 მოთამაშისთვის,
+          და King Online-იდან ჩემპიონატის თამაშებსაც იღებს.
         </p>
         <p className="more-hint" style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Handshake size={14} /> Ties are shared: everyone on the top score takes the win.
+          <Handshake size={14} /> ფრე იყოფა: ყველა, ვისაც უმაღლესი ქულა აქვს, მოგებას იღებს.
         </p>
       </div>
     </div>

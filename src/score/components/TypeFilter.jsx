@@ -4,7 +4,7 @@ import { Globe } from 'lucide-react'
 // Which games the stats count: all of them, King Online's, or the ones
 // recorded here at a table. Remembered on this device.
 const KEY = 'king-score-game-type'
-const TYPES = [['all', 'All'], ['online', 'Online'], ['live', 'Live']]
+const TYPES = [['all', 'ყველა'], ['online', 'ონლაინ'], ['live', 'ლაივი']]
 
 export function useTypeFilter() {
   const [type, setType] = useState(() => {
@@ -22,7 +22,7 @@ export function useTypeFilter() {
 
 export default function TypeFilter({ value, onChange }) {
   return (
-    <div role="group" aria-label="Games to count" style={{ display: 'flex', gap: 8, margin: '12px 0 0' }}>
+    <div role="group" aria-label="რომელი თამაშები ჩაითვალოს" style={{ display: 'flex', gap: 8, margin: '12px 0 0' }}>
       {TYPES.map(([key, label]) => (
         <button
           key={key}

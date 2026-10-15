@@ -103,15 +103,15 @@ test("ties crown every top scorer", () => {
 
 test("bad sheets are refused", () => {
   const withRound = (i, r) => ({ ...sheet, rounds: sheet.rounds.map((x, j) => (j === i ? r : x)) });
-  assert.throws(() => fromScoreSheet({ ...sheet, players: sheet.players.slice(0, 2) }, resolve), /3 or 4 players/);
-  assert.throws(() => fromScoreSheet({ ...sheet, players: [...sheet.players.slice(0, 3), { id: "p_9" }] }, resolve), /Unknown player/);
-  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], gameTypeCode: "X" }), resolve), /Invalid round/);
-  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], scores: { p_1: "a" } }), resolve), /scores/);
+  assert.throws(() => fromScoreSheet({ ...sheet, players: sheet.players.slice(0, 2) }, resolve), /3 ან 4 მოთამაშე/);
+  assert.throws(() => fromScoreSheet({ ...sheet, players: [...sheet.players.slice(0, 3), { id: "p_9" }] }, resolve), /უცნობი მოთამაშე/);
+  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], gameTypeCode: "X" }), resolve), /არასწორი რაუნდი/);
+  assert.throws(() => fromScoreSheet(withRound(0, { ...opening[0], scores: { p_1: "a" } }), resolve), /არასწორი ქულები/);
 });
 
 test("only a finished sheet can be saved", () => {
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [] }, resolve), /not finished/);
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: sheet.rounds.slice(0, 35) }, resolve), /not finished/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [] }, resolve), /არ დასრულებულა/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: sheet.rounds.slice(0, 35) }, resolve), /არ დასრულებულა/);
 });
 
 test("a surrendered sheet saves early, and the highest score at that point wins", () => {
@@ -126,18 +126,18 @@ test("a surrendered sheet saves early, and the highest score at that point wins"
 });
 
 test("a surrender needs a player of the game and a game in progress", () => {
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: opening, surrenderedBy: "p_9" }, resolve), /surrendering player/);
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [], surrenderedBy: "p_1" }, resolve), /surrendered after/);
-  assert.throws(() => fromScoreSheet({ ...sheet, surrenderedBy: "p_1" }, resolve), /surrendered after/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: opening, surrenderedBy: "p_9" }, resolve), /დანებებული მოთამაშე/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [], surrenderedBy: "p_1" }, resolve), /დანებება შეიძლება/);
+  assert.throws(() => fromScoreSheet({ ...sheet, surrenderedBy: "p_1" }, resolve), /დანებება შეიძლება/);
 });
 
 test("scores must be the ones the recorded cards give", () => {
   const forged = sheet.rounds.map((r, i) => (i === 0 ? { ...r, scores: { ...r.scores, p_1: 1000 } } : r));
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: forged }, resolve), /do not match/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: forged }, resolve), /არ ემთხვევა/);
   const short = sheet.rounds.map((r, i) => (i === 1 ? round(ids, "p_2", "L2", { p_3: 1 }) : r));
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: short }, resolve), /counts/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: short }, resolve), /კარტების რაოდენობა/);
   const noTarget = sheet.rounds.map((r, i) => (i === 0 ? { ...r, singleTargetPlayerId: null } : r));
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: noTarget }, resolve), /target/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: noTarget }, resolve), /ვინ აიღო/);
 });
 
 test("old ჩაწერა rows import with online names, keeping unlinked players by name", () => {
@@ -185,7 +185,7 @@ test("the sheet's own id is the game id, so a retried save stores one game", () 
 
 test("a leader can't play the same game type twice", () => {
   const twice = sheet.rounds.map((r, i) => (i === sheet.rounds.length - 1 ? opening[0] : r));
-  assert.throws(() => fromScoreSheet({ ...sheet, rounds: twice }, resolve), /same game type twice/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: twice }, resolve), /ორჯერ აირჩია/);
 });
 
 test("a player removed while the sheet was open is saved by name", () => {
@@ -196,5 +196,5 @@ test("a player removed while the sheet was open is saved by name", () => {
   assert.equal(dato.profileId, null);
   assert.equal(dato.score, totals[3]);
   // Without a name to fall back on it's still refused.
-  assert.throws(() => fromScoreSheet(sheet, (id) => (id === "p_4" ? null : profiles.get(id))), /Unknown player/);
+  assert.throws(() => fromScoreSheet(sheet, (id) => (id === "p_4" ? null : profiles.get(id))), /უცნობი მოთამაშე/);
 });

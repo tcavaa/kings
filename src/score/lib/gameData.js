@@ -10,7 +10,7 @@ import { liveGameToLegacy, onlineGameToLegacy } from './gameShapes'
 async function request(url, options) {
   const res = await fetch(url, options)
   const body = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(body?.error || `Request failed (${res.status})`)
+  if (!res.ok) throw new Error(body?.error || `მოთხოვნა ვერ შესრულდა (${res.status})`)
   return body
 }
 

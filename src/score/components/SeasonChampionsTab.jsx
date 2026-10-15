@@ -4,8 +4,9 @@ import TrophyIcon from './TrophyIcon'
 import { isChampionName, seasonChampions } from '../utils/winners'
 import { seasonStandings } from '../utils/seasonStandings'
 import { getTheme } from '../utils/themes'
+import { formatDate } from '../utils/dates'
 
-const fmt = d => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+const fmt = formatDate
 
 // The season's table, counted the way its champion was crowned (see
 // utils/seasonStandings.js): every game recorded here and every King Online
@@ -17,10 +18,10 @@ function SeasonStats({ season, data, loading }) {
   )
 
   if (loading && !data) return (
-    <p style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>Loading…</p>
+    <p style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>იტვირთება…</p>
   )
   if (!players.length) return (
-    <p style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>No games in this season.</p>
+    <p style={{ color: 'var(--muted)', fontSize: 13, padding: '8px 0' }}>ამ სეზონში თამაში არ ყოფილა.</p>
   )
 
   return (
@@ -28,13 +29,13 @@ function SeasonStats({ season, data, loading }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr style={{ borderBottom: '2px solid rgba(0,0,0,0.15)' }}>
-            <th style={th}>Player</th>
-            <th style={{ ...th, textAlign: 'center' }}>Local W</th>
-            <th style={{ ...th, textAlign: 'center' }}><Globe size={10} /> W</th>
-            <th style={{ ...th, textAlign: 'center' }}>All W</th>
-            <th style={{ ...th, textAlign: 'center' }}>Games</th>
-            <th style={{ ...th, textAlign: 'center' }}>Win%</th>
-            <th style={{ ...th, textAlign: 'center' }}>Avg</th>
+            <th style={th}>მოთამაშე</th>
+            <th style={{ ...th, textAlign: 'center' }}>ლაივი მოგ.</th>
+            <th style={{ ...th, textAlign: 'center' }}><Globe size={10} /> მოგ.</th>
+            <th style={{ ...th, textAlign: 'center' }}>სულ მოგ.</th>
+            <th style={{ ...th, textAlign: 'center' }}>თამაში</th>
+            <th style={{ ...th, textAlign: 'center' }}>მოგ. %</th>
+            <th style={{ ...th, textAlign: 'center' }}>საშ.</th>
           </tr>
         </thead>
         <tbody>
@@ -82,17 +83,17 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
         }}>
           <TrophyIcon size={64} color="#ffe566" />
         </div>
-        <div className="engraved-title">Season Champions</div>
+        <div className="engraved-title">სეზონის ჩემპიონები</div>
         {seasons[0] && (
           <div className="engraved-subtitle">
-            Current champion: <strong>{seasons[0].champion_name}</strong>
+            მოქმედი ჩემპიონი: <strong>{seasons[0].champion_name}</strong>
           </div>
         )}
       </div>
 
       {/* Season list */}
       {seasons.length === 0 ? (
-        <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 16 }}>No seasons have been declared yet.</p>
+        <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 16 }}>სეზონები ჯერ არ გამოცხადებულა.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 16 }}>
           {seasons.map((s, i) => {
@@ -113,7 +114,7 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
                               const ThemeIcon = getTheme(s.theme).Icon
                               return <><ThemeIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{s.name}</>
                             })()
-                          : `Season ${seasonNum}`}
+                          : `სეზონი ${seasonNum}`}
                       </div>
                       <div className="engraved-period">{fmt(s.started_at)} — {fmt(s.ended_at)}</div>
                     </div>
@@ -122,8 +123,8 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
                     <div className="engraved-champion">{s.champion_name}</div>
                     <div className="engraved-label">
                       {seasonChampions(s).length > 1
-                        ? <>Co-Champions <Handshake size={10} style={{ verticalAlign: '-1px' }} /></>
-                        : 'Champion'}
+                        ? <>თანაჩემპიონები <Handshake size={10} style={{ verticalAlign: '-1px' }} /></>
+                        : 'ჩემპიონი'}
                     </div>
                   </div>
                 </button>

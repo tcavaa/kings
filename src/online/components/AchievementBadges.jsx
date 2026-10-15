@@ -6,6 +6,18 @@ const GENERATED = new Set([
   "NEVER_BELOW_ZERO",
   "UNDERDOG",
   "RUNAWAY_WIN",
+  "SHARED_WIN",
+  "COMEBACK",
+  "WIRE_TO_WIRE",
+  "LAST_ROUND_STEAL",
+  "PHOTO_FINISH",
+  "CLEAN_SHEET",
+  "KING_MAGNET",
+  "DISASTER",
+  "UGLY_WIN",
+  "STREAK_BREAKER",
+  "TOURNAMENT_WINNER",
+  "SEASON_CHAMPION",
   "PERFECT_PLUS_HAT_TRICK",
   "GAMES_50",
   "GAMES_100",
@@ -23,6 +35,7 @@ const GENERATED = new Set([
   "WIN_STREAK_3",
   "WIN_STREAK_5",
   "WIN_STREAK_10",
+  "CLUB_REGULAR",
 ]);
 export function Emblem({ code, def }) {
   if (GENERATED.has(code))

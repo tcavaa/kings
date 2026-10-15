@@ -148,16 +148,22 @@ export default function ClubAchievements({ stats, players }) {
                     <Fact label="ყველაზე ხშირად" holder={b.most}>
                       {b.most && `×${b.most.count}`}
                     </Fact>
-                    <Fact
-                      label={
-                        b.code === "PERFECT_PLUS"
-                          ? "უმაღლესი % პლიუს რაუნდებში"
-                          : "უმაღლესი % თამაშებში"
-                      }
-                      holder={b.bestRate}
-                    >
-                      {b.bestRate && `${(b.bestRate.rate * 100).toFixed(1)}%`}
-                    </Fact>
+                    {b.perGame ? (
+                      <Fact
+                        label={
+                          b.code === "PERFECT_PLUS"
+                            ? "უმაღლესი % პლიუს რაუნდებში"
+                            : "უმაღლესი % თამაშებში"
+                        }
+                        holder={b.bestRate}
+                      >
+                        {b.bestRate && `${(b.bestRate.rate * 100).toFixed(1)}%`}
+                      </Fact>
+                    ) : (
+                      <Fact label="პირველი" holder={b.first}>
+                        {b.first && dateOf(b.first.first)}
+                      </Fact>
+                    )}
                   </>
                 ) : (
                   <>

@@ -2,20 +2,21 @@ import { lazy, Suspense } from 'react'
 import { Timer } from 'lucide-react'
 import GameAnalytics from './GameAnalytics'
 import { formatDuration } from '../../../shared/duration.js'
+import { formatDate } from '../utils/dates'
 
 // The chart library loads with the first game opened, not with the history list.
 const ScoreChart = lazy(() => import('./ScoreChart'))
 
 export default function GameDetailPage({ detail, result, onBack }) {
   const { players, rounds } = detail
-  const date = new Date(detail.played_at).toLocaleDateString()
+  const date = formatDate(detail.played_at)
 
   return (
     <div>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px' }}>Game Details</h2>
+            <h2 style={{ margin: '0 0 4px' }}>თამაშის დეტალები</h2>
             <div style={{ color: 'var(--muted)', fontSize: 14, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
               {date} · {players.map(p => p.name).join(', ')}
               {result?.duration_seconds != null && (
@@ -26,7 +27,7 @@ export default function GameDetailPage({ detail, result, onBack }) {
             </div>
             {result && (
               <div style={{ marginTop: 6 }}>
-                Winner: <strong>{result.winner_name}</strong>
+                გამარჯვებული: <strong>{result.winner_name}</strong>
                 {result.participants && (
                   <span style={{ color: 'var(--muted)', fontSize: 13, marginLeft: 8 }}>
                     ({result.participants.map(p => `${p.name} ${p.score}`).join(' · ')})
@@ -35,7 +36,7 @@ export default function GameDetailPage({ detail, result, onBack }) {
               </div>
             )}
           </div>
-          <button className="link" onClick={onBack}>← Back</button>
+          <button className="link" onClick={onBack}>← უკან</button>
         </div>
       </div>
 
@@ -44,7 +45,7 @@ export default function GameDetailPage({ detail, result, onBack }) {
       <GameAnalytics players={players} rounds={rounds} participants={result?.participants} />
 
       <div className="actions">
-        <button className="primary" onClick={onBack}>Back to History</button>
+        <button className="primary" onClick={onBack}>ისტორიაში დაბრუნება</button>
       </div>
     </div>
   )

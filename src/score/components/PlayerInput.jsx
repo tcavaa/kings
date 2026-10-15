@@ -31,10 +31,10 @@ export default function PlayerInput({ onStart }) {
 
   return (
     <div className="card player-input">
-      <h2>Set up players</h2>
+      <h2>მოთამაშეების არჩევა</h2>
       <div className="row">
         <label className="inline">
-          <span>Number of players</span>
+          <span>მოთამაშეების რაოდენობა</span>
           <select value={numPlayers} onChange={(e) => setNumPlayers(Number(e.target.value))}>
             <option value={3}>3</option>
             <option value={4}>4</option>
@@ -43,22 +43,22 @@ export default function PlayerInput({ onStart }) {
       </div>
 
       {loading ? (
-        <p style={{ color: 'var(--muted)', marginTop: 8 }}>Loading players...</p>
+        <p style={{ color: 'var(--muted)', marginTop: 8 }}>მოთამაშეები იტვირთება…</p>
       ) : savedPlayers.length < numPlayers ? (
         <p className="validation" style={{ marginTop: 8 }}>
-          Not enough players saved. Go to <strong>Players</strong> in the menu to add at least {numPlayers}.
+          საკმარისი მოთამაშე არ არის შენახული. გადადი მენიუში <strong>მოთამაშეები</strong> და დაამატე მინიმუმ {numPlayers}.
         </p>
       ) : (
         <div className="inputs-grid">
           {Array.from({ length: numPlayers }).map((_, i) => (
             <label key={i} className="input-row">
-              <span>Player {i + 1}</span>
+              <span>მოთამაშე {i + 1}</span>
               <select
                 value={selectedIds[i]}
                 onChange={(e) => updateSelection(i, e.target.value)}
                 style={{ flex: 1 }}
               >
-                <option value="">-- Select --</option>
+                <option value="">-- აირჩიე --</option>
                 {savedPlayers.map((p) => (
                   <option
                     key={p.id}
@@ -76,7 +76,7 @@ export default function PlayerInput({ onStart }) {
 
       <div className="actions">
         <button type="button" className="primary" style={{ minHeight: 44 }} disabled={!canStart} onClick={startGame}>
-          Start Game
+          თამაშის დაწყება
         </button>
       </div>
     </div>

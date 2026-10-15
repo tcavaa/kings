@@ -74,6 +74,7 @@ export function onlineGameToLegacy(game, idOfName) {
     winners,
     participants: (game.players || []).map(p => ({ name: p.name, score: p.score })),
     type: 'online',
+    tournamentFinal: game.tournamentStage === 'final',
   }
   if (!game.roundDetails?.length) return { result, detail: null }
   const rounds = game.roundDetails.map(rd => {

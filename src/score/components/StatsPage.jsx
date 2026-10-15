@@ -24,8 +24,8 @@ export default function StatsPage({ currentSeasonStart, onBack }) {
   if (loading) {
     return (
       <div className="card">
-        <h2>Global Analytics</h2>
-        <p style={{ color: 'var(--muted)' }}>Loading…</p>
+        <h2>საერთო სტატისტიკა</h2>
+        <p style={{ color: 'var(--muted)' }}>იტვირთება…</p>
       </div>
     )
   }

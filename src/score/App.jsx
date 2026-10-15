@@ -36,7 +36,7 @@ const ScoreChart = lazy(() => import('./components/ScoreChart.jsx'))
 const GameAnalytics = lazy(() => import('./components/GameAnalytics.jsx'))
 
 const PageLoading = (
-  <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>Loading…</p></div>
+  <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>იტვირთება…</p></div>
 )
 
 const STATE_KEY = 'king-score-state'
@@ -197,7 +197,7 @@ function App() {
       })
       saved = true
     } catch (err) {
-      window.alert(`The game could not be saved (${err.message}). It is still here — try again.`)
+      window.alert(`თამაში ვერ შეინახა (${err.message}). ის ისევ აქ არის — სცადე ხელახლა.`)
     }
     setSaving(false)
     if (!saved) return
@@ -257,7 +257,7 @@ function App() {
   }, [soundEnabled])
 
   const handleReset = useCallback(() => {
-    const ok = window.confirm('Are you sure you want to reset the current game? This will clear all progress.')
+    const ok = window.confirm('ნამდვილად გინდა მიმდინარე თამაშის გაუქმება? მთელი პროგრესი წაიშლება.')
     if (!ok) return
     endLiveSheet(sheetId)
     dispatch({ type: 'RESET' })
@@ -270,7 +270,7 @@ function App() {
       <header className="app-header">
         {/* King Online is the site's home page (its own root layout) */}
         <a className="home-link" href="/" title="King Online"><ArrowLeft size={16} /> King Online</a>
-        <button className="brand" onClick={() => setView('home')} title="Home">
+        <button className="brand" onClick={() => setView('home')} title="მთავარი">
           <img className="logo" src="/12427687.png" alt="" />
           <h1>KING</h1>
         </button>
@@ -287,7 +287,7 @@ function App() {
       <main className="app-content">
         <Suspense fallback={PageLoading}>
           {view === 'players' && (
-            <PlayersPage onBack={() => goBack('/score/more')} currentChampion={currentChampion} />
+            <PlayersPage onBack={() => goBack('/score/more')} currentChampion={currentChampion} seasons={seasons} />
           )}
 
           {view === 'history' && (
@@ -328,7 +328,7 @@ function App() {
             <div className="game-toolbar">
               <SurrenderButton players={players} roundsPlayed={rounds.length} onSurrender={onSurrender} />
               <button type="button" className="link danger-link reset-game-btn" onClick={handleReset}>
-                <Trash2 size={13} /> Reset game
+                <Trash2 size={13} /> თამაშის გაუქმება
               </button>
             </div>
             <GameTypeMatrix
@@ -360,8 +360,8 @@ function App() {
             <WinProbability players={players} rounds={rounds} playerColors={PLAYER_COLORS} />
             <GameProgress playedRounds={rounds.length} totalRounds={targetRoundsCount} />
             <div className="meta">
-              <div>Round {rounds.length + 1} / {targetRoundsCount}</div>
-              <div>Leader: {players[activePlayerIndex].name}</div>
+              <div>რაუნდი {rounds.length + 1} / {targetRoundsCount}</div>
+              <div>წამყვანი: {players[activePlayerIndex].name}</div>
             </div>
           </>
         )}
@@ -373,9 +373,9 @@ function App() {
             {surrenderedBy && (
               <div className="surrender-note">
                 <Flag size={14} />
-                <span><strong>{surrenderedName ?? 'A player'}</strong> surrendered after round {rounds.length} of {targetRoundsCount}.</span>
+                <span><strong>{surrenderedName ?? 'მოთამაშე'}</strong> დანებდა {targetRoundsCount}-დან {rounds.length} რაუნდის შემდეგ.</span>
                 <button type="button" className="link reset-game-btn" disabled={saving} onClick={() => dispatch({ type: 'RESUME' })}>
-                  Resume game
+                  თამაშის გაგრძელება
                 </button>
               </div>
             )}
@@ -390,15 +390,15 @@ function App() {
             />
             {durationSeconds != null && (
               <div className="game-duration-note">
-                <Timer size={14} /> Game time: <strong>{formatDuration(durationSeconds)}</strong>
+                <Timer size={14} /> თამაშის დრო: <strong>{formatDuration(durationSeconds)}</strong>
               </div>
             )}
             <div className="actions center">
               <button className="primary" disabled={saving} onClick={() => finishGame()}>
-                {saving ? 'Saving...' : 'Complete'}
+                {saving ? 'ინახება…' : 'დასრულება'}
               </button>
               <button className="primary success" disabled={saving} onClick={() => finishGame({ rematch: true })}>
-                {saving ? '...' : <><RefreshCw size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />Rematch</>}
+                {saving ? '...' : <><RefreshCw size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />რევანში</>}
               </button>
             </div>
             <Suspense fallback={null}>

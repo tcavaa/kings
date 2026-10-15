@@ -118,6 +118,7 @@ function finishGame(ctx, room, roomCode, extra = {}) {
     isChampionship: mode === 'championship',
     // Bracket tables are league games that don't use up the daily quota.
     tournamentId: room.tournamentId || null,
+    tournamentStage: room.tournamentStage || null,
     roundDetails: gs.roundDetails || [],
   }).then((saved) => { if (saved) room.saved = true; });
 

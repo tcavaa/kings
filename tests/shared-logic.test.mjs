@@ -38,7 +38,7 @@ test("one game-type table: both apps and the server read the same rules", () => 
   }
   // Each app keeps its own wording.
   assert.equal(ONLINE_TYPES[0].name, "კინგი");
-  assert.equal(SCORE_TYPES[0].label, "K — No King of hearts");
+  assert.equal(SCORE_TYPES[0].label, "K — არ აიღო გულის მეფე");
   // The server's positiveScoring flag (tournament tiebreak) comes from the rules.
   assert.deepEqual(GAME_TYPE_CODES.filter((c) => SERVER_TYPES[c].positiveScoring), ["P1", "P2", "P3"]);
 });
@@ -127,10 +127,11 @@ test("per-game achievements: perfection, clean leading, never below zero, runawa
   const g = onlineGame();
   const bySeat = onlineAch.computePerGameAchievements(g.players, g.roundDetails);
   assert.deepEqual(countCodes(bySeat[0]), {
-    PERFECT_PLUS: 9, PLUS_PERFECTIONIST: 1, UNTOUCHABLE: 1, NEVER_BELOW_ZERO: 1, RUNAWAY_WIN: 1,
+    PERFECT_PLUS: 9, PLUS_PERFECTIONIST: 1, UNTOUCHABLE: 1, NEVER_BELOW_ZERO: 1, RUNAWAY_WIN: 1, CLEAN_SHEET: 1,
   });
-  assert.deepEqual(bySeat[1], []);
-  assert.deepEqual(bySeat[2], []);
+  // Beka and Gio pay for all of it.
+  assert.deepEqual(bySeat[1], ["DISASTER"]);
+  assert.deepEqual(bySeat[2], ["DISASTER"]);
 });
 
 test("ჩაწერა and King Online give the same achievements for the same game", () => {
@@ -157,7 +158,12 @@ test("ties: every tied winner can be an underdog, nobody gets a runaway", () => 
     r("P1", { a: 40, b: 40, c: -0 }),
   ];
   // a and b both finish on 0, c on 0 too → a three-way tie, no "others".
-  assert.deepEqual(perGameAchievements(["a", "b", "c"], rounds), { a: [], b: [], c: ["NEVER_BELOW_ZERO"] });
+  // a and b trailed c going into the last round, so they stole it.
+  assert.deepEqual(perGameAchievements(["a", "b", "c"], rounds), {
+    a: ["SHARED_WIN", "LAST_ROUND_STEAL"],
+    b: ["SHARED_WIN", "LAST_ROUND_STEAL"],
+    c: ["NEVER_BELOW_ZERO", "SHARED_WIN"],
+  });
   // a and b sit last for two rounds, c for one, then a and b tie 160 clear.
   const two = [r("T", { a: -40, b: -40, c: 0 }), r("Q", { a: 0, b: 0, c: 0 }), r("P1", { a: 200, b: 200, c: 0 })];
   const out = perGameAchievements(["a", "b", "c"], two);
@@ -181,7 +187,74 @@ test("lifetime milestones, tie-aware wins and the longest streak", () => {
   }
   const out = lifetimeAchievements(games.reverse()); // order given doesn't matter
   assert.deepEqual(out.Ana, { GAMES_50: 1, WINS_10: 1, WIN_STREAK_3: 1, WIN_STREAK_5: 1, WIN_STREAK_10: 1 });
-  assert.deepEqual(out.Beka, { GAMES_50: 1, WINS_10: 1, WINS_25: 1, WIN_STREAK_3: 1, WIN_STREAK_5: 1, WIN_STREAK_10: 1 });
+  // Beka's first win ended Ana's ten in a row.
+  assert.deepEqual(out.Beka, { GAMES_50: 1, WINS_10: 1, WINS_25: 1, WIN_STREAK_3: 1, WIN_STREAK_5: 1, WIN_STREAK_10: 1, STREAK_BREAKER: 1 });
+});
+
+test("how a game played out: comeback, wire to wire, photo finish, steal", () => {
+  const r = (code, scores, extra = {}) => ({ code, leader: null, scores, counts: null, target: null, ...extra });
+  // b trails a by 200, then takes it back by 5 in the last round.
+  const comeback = perGameAchievements(["a", "b", "c"], [
+    r("T", { a: 0, b: -40, c: -40 }),
+    r("P1", { a: 80, b: -80, c: 0 }),
+    r("P2", { a: 0, b: 0, c: 0 }),
+    r("P3", { a: 0, b: 205, c: 0 }),
+  ]);
+  assert.deepEqual(comeback.b, ["COMEBACK", "LAST_ROUND_STEAL", "UNDERDOG", "PHOTO_FINISH"]);
+  assert.deepEqual(comeback.a, ["NEVER_BELOW_ZERO"]);
+  // a alone in front after every round, and 8 clear at the end.
+  const wire = perGameAchievements(["a", "b"], [r("P1", { a: 16, b: 0 }), r("Q", { a: 0, b: 8 })]);
+  assert.deepEqual(wire.a, ["NEVER_BELOW_ZERO", "WIRE_TO_WIRE", "PHOTO_FINISH"]);
+  // A level start is nobody's lead.
+  const level = perGameAchievements(["a", "b"], [r("P1", { a: 0, b: 0 }), r("P2", { a: 40, b: 0 })]);
+  assert.ok(!level.a.includes("WIRE_TO_WIRE"));
+});
+
+test("bad days: every King of Hearts, a −200 finish, a win below zero", () => {
+  const r = (code, scores, extra = {}) => ({ code, leader: null, scores, counts: null, target: null, ...extra });
+  const out = perGameAchievements(["a", "b", "c"], [
+    r("K", { a: -40, b: 0, c: 0 }, { target: "a" }),
+    r("K", { a: -40, b: 0, c: 0 }, { target: "a" }),
+    r("K", { a: -40, b: 0, c: 0 }, { target: "a" }),
+    r("H", { a: -80, b: -10, c: -20 }),
+  ]);
+  assert.deepEqual(out.a, ["KING_MAGNET", "DISASTER"]);
+  assert.deepEqual(out.b, ["UGLY_WIN"]);
+  // Two of three King rounds isn't every one.
+  const two = perGameAchievements(["a", "b", "c"], [
+    r("K", { a: -40, b: 0, c: 0 }, { target: "a" }),
+    r("K", { a: -40, b: 0, c: 0 }, { target: "a" }),
+    r("K", { a: 0, b: -40, c: 0 }, { target: "b" }),
+  ]);
+  assert.ok(!two.a.includes("KING_MAGNET"));
+});
+
+test("club badges: tournament finals, season champions, ten different people", () => {
+  const games = [];
+  for (let i = 0; i < 4; i++) {
+    games.push({
+      playedAt: new Date(Date.UTC(2026, 0, 1, i)).toISOString(),
+      // Ana plays with a new pair each time: 8 different people in all.
+      players: [{ key: 0, name: "Ana" }, { key: 1, name: `p${i}a` }, { key: 2, name: `p${i}b` }],
+      winners: ["Ana"],
+      rounds: [],
+      tournamentFinal: i === 3,
+    });
+  }
+  const seasons = [
+    { ended_at: "2026-02-01T00:00:00Z", champion_names: ["Ana"] },
+    { ended_at: "2026-03-01T00:00:00Z", champion_name: "Ana & p0a" },
+    { ended_at: null, champion_name: null },
+  ];
+  let out = lifetimeAchievements(games, { seasons });
+  assert.equal(out.Ana.TOURNAMENT_WINNER, 1);
+  assert.equal(out.Ana.SEASON_CHAMPION, 2);
+  assert.equal(out.p0a.SEASON_CHAMPION, 1);
+  assert.equal(out.Ana.CLUB_REGULAR, undefined);
+  games.push({ ...games[0], playedAt: "2026-01-02T00:00:00Z", tournamentFinal: false,
+    players: [{ key: 0, name: "Ana" }, { key: 1, name: "x" }, { key: 2, name: "y" }] });
+  out = lifetimeAchievements(games, { seasons });
+  assert.equal(out.Ana.CLUB_REGULAR, 1);
 });
 
 test("each app labels every achievement, in one order", () => {
@@ -189,7 +262,7 @@ test("each app labels every achievement, in one order", () => {
   assert.deepEqual(Object.keys(onlineAch.ACHIEVEMENT_DEFS), codes);
   assert.deepEqual(Object.keys(scoreAch.ACHIEVEMENT_DEFS), codes);
   assert.equal(onlineAch.ACHIEVEMENT_DEFS.GAMES_50.label, "ერთგული");
-  assert.equal(scoreAch.ACHIEVEMENT_DEFS.GAMES_50.label, "Dedicated");
+  assert.equal(scoreAch.ACHIEVEMENT_DEFS.GAMES_50.label, "ერთგული");
   assert.equal(scoreAch.ACHIEVEMENT_DEFS.GAMES_50.repeatable, false);
   assert.throws(() => defineAchievements({ PERFECT_PLUS: { label: "x" } }), /No label/);
 });

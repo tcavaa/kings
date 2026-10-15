@@ -8,7 +8,7 @@ import { computeAllLifetimeAchievements } from '../utils/achievements'
 import { isChampionName } from '../utils/winners'
 import { standingsOf } from '../utils/seasonStandings'
 
-export default function PlayersPage({ onBack, currentChampion }) {
+export default function PlayersPage({ onBack, currentChampion, seasons }) {
   // One list with King Online. Players are added and removed in /admin.
   const { players, loading } = usePlayers()
   const { data, loading: resultsLoading } = useGameData()
@@ -22,19 +22,19 @@ export default function PlayersPage({ onBack, currentChampion }) {
   )
 
   const lifetimeAchievements = useMemo(
-    () => computeAllLifetimeAchievements(allDetails, results),
-    [allDetails, results]
+    () => computeAllLifetimeAchievements(allDetails, results, { seasons }),
+    [allDetails, results, seasons]
   )
 
   return (
     <div className="card">
-      <h2>Players</h2>
+      <h2>მოთამაშეები</h2>
       <TypeFilter value={type} onChange={setType} />
 
       {loading || resultsLoading ? (
-        <p style={{ color: 'var(--muted)', marginTop: 12 }}>Loading...</p>
+        <p style={{ color: 'var(--muted)', marginTop: 12 }}>იტვირთება…</p>
       ) : players.length === 0 ? (
-        <p style={{ color: 'var(--muted)', marginTop: 12 }}>No players yet.</p>
+        <p style={{ color: 'var(--muted)', marginTop: 12 }}>მოთამაშეები ჯერ არ არის.</p>
       ) : (
         <ul className="player-list">
           {players.map((p) => {
@@ -50,10 +50,10 @@ export default function PlayersPage({ onBack, currentChampion }) {
                   </span>
                   {s && s.games > 0 ? (
                     <span className="player-stats">
-                      {s.games} games · {s.wins} wins · {winRate}% win rate · avg {avgScore > 0 ? '+' : ''}{avgScore}
+                      {s.games} თამაში · {s.wins} მოგება · {winRate}% მოგება · საშ. {avgScore > 0 ? '+' : ''}{avgScore}
                     </span>
                   ) : (
-                    <span className="player-stats">No games yet</span>
+                    <span className="player-stats">თამაშები ჯერ არ არის</span>
                   )}
                   <AchievementBadges achievements={lifetimeAchievements[p.name] || {}} />
                 </div>
@@ -64,7 +64,7 @@ export default function PlayersPage({ onBack, currentChampion }) {
       )}
 
       <div className="actions">
-        <button className="primary" onClick={onBack}>Back to Game</button>
+        <button className="primary" onClick={onBack}>თამაშში დაბრუნება</button>
       </div>
 
     </div>

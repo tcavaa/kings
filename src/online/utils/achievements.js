@@ -13,6 +13,8 @@ import {
   Star, Gem, Shield, TrendingUp, Flame, Rocket,
   Sparkles, Gamepad2, Joystick, Crown, Sparkle, Sun, Medal,
   Trophy, Skull, Swords, Zap, CloudLightning, Award,
+  Handshake, RotateCcw, Flag, Hourglass, Camera, ShieldCheck, Magnet, Bomb,
+  TrendingDown, Hammer, Users,
 } from 'lucide-react'
 import { unitCountsOf } from '../../../server/game/gameTypes.js'
 import { winnerNames } from '../../../server/games/results.js'
@@ -35,6 +37,18 @@ export const ACHIEVEMENT_DEFS = defineAchievements({
   NEVER_BELOW_ZERO:       { Icon: TrendingUp,    color: '#16803c', label: 'მუდამ პლიუსში',      desc: 'ანგარიში ნულს ქვემოთ არასდროს ჩავარდნილა' },
   UNDERDOG:               { Icon: Flame,         color: '#9c5a24', label: 'აუტსაიდერი',         desc: 'ყველაზე დიდხანს ბოლო ადგილზე იჯექი და მაინც მოიგე' },
   RUNAWAY_WIN:            { Icon: Rocket,        color: '#6b3151', label: 'გაქცეული',           desc: 'მეორე ადგილს 100+ ქულით გაუსწარი' },
+  SHARED_WIN:             { Icon: Handshake,     color: '#0f766e', label: 'ფრე',                desc: 'მოგება გაიყავი — თამაში ქულებით თანაბრად დაასრულეთ' },
+  COMEBACK:               { Icon: RotateCcw,     color: '#9a3412', label: 'დაბრუნება',          desc: 'ლიდერს 175+ ქულით ჩამორჩებოდი და მაინც მოიგე' },
+  WIRE_TO_WIRE:           { Icon: Flag,          color: '#166534', label: 'თავიდან ბოლომდე',    desc: 'ყოველი რაუნდის შემდეგ მარტო იყავი პირველი და მოიგე' },
+  LAST_ROUND_STEAL:       { Icon: Hourglass,     color: '#7c2d12', label: 'ბოლო წუთის ქურდი',   desc: 'ბოლო რაუნდამდე არ ლიდერობდი, მაგრამ მოიგე' },
+  PHOTO_FINISH:           { Icon: Camera,        color: '#1e40af', label: 'ფოტოფინიში',         desc: 'მოიგე 8 ან ნაკლები ქულის სხვაობით' },
+  CLEAN_SHEET:            { Icon: ShieldCheck,   color: '#15803d', label: 'სუფთა ფურცელი',      desc: 'მთელი თამაში ერთი ჯარიმის ქულის გარეშე' },
+  KING_MAGNET:            { Icon: Magnet,        color: '#b91c1c', label: 'მეფის მაგნიტი',      desc: 'თამაშის ყველა კინგის რაუნდში გულის მეფე შენ აიღე' },
+  DISASTER:               { Icon: Bomb,          color: '#3f3f46', label: 'კატასტროფა',         desc: 'თამაში −200 ან ნაკლები ქულით დაასრულე' },
+  UGLY_WIN:               { Icon: TrendingDown,  color: '#854d0e', label: 'მინუსში მოგება',     desc: 'მოიგე უარყოფითი ქულით' },
+  STREAK_BREAKER:         { Icon: Hammer,        color: '#57534e', label: 'სერიის გამწყვეტი',   desc: 'მოიგე თამაში, რომელმაც ვინმეს 5+ მოგების სერია გაწყვიტა' },
+  TOURNAMENT_WINNER:      { Icon: Trophy,        color: '#a16207', label: 'ტურნირის ჩემპიონი',  desc: 'მოიგე ტურნირის ფინალი' },
+  SEASON_CHAMPION:        { Icon: Crown,         color: '#b45309', label: 'სეზონის ჩემპიონი',   desc: 'სეზონი პირველ ადგილზე დაასრულე' },
 
   // ── Lifetime milestones (earned once) ─────────────────────────────────────
   PERFECT_PLUS_HAT_TRICK: { Icon: Sparkles,      color: '#b45309', label: 'ჰეთ-ტრიკი პლიუსში',  desc: '10/10 პლიუს რაუნდში 3-ჯერ ან მეტჯერ (სულ)' },
@@ -54,6 +68,7 @@ export const ACHIEVEMENT_DEFS = defineAchievements({
   WIN_STREAK_3:           { Icon: Zap,           color: '#8e6a1e', label: '3 ზედიზედ',          desc: 'ზედიზედ 3 თამაში მოიგე' },
   WIN_STREAK_5:           { Icon: CloudLightning,color: '#4d7c0f', label: '5 ზედიზედ',          desc: 'ზედიზედ 5 თამაში მოიგე' },
   WIN_STREAK_10:          { Icon: Award,         color: '#b45309', label: '10 ზედიზედ',         desc: 'ზედიზედ 10 თამაში მოიგე' },
+  CLUB_REGULAR:           { Icon: Users,         color: '#0e7490', label: 'კლუბის სული',        desc: 'ითამაშე 10 სხვადასხვა ადამიანთან' },
 })
 
 /** A King Online round record in the shared rules' shape. */
@@ -79,11 +94,12 @@ export function computePerGameAchievements(players, rounds) {
  * Lifetime achievements across every stored game.
  * @param {object[]} games  records from listGames() — each has
  *   { playedAt, winners/winner, players:[{seat,name}], roundDetails:[…] }
+ * @param {{ seasons?: object[] }} options  the API's seasons, for SEASON_CHAMPION
  * @returns {{ [playerName:string]: { [code:string]: count } }}
  *   Only players with ≥1 achievement are included.
  */
-export function computeAllLifetimeAchievements(games = []) {
-  return lifetimeAchievements(games.map(toSharedGame))
+export function computeAllLifetimeAchievements(games = [], { seasons } = {}) {
+  return lifetimeAchievements(games.map(toSharedGame), { seasons })
 }
 
 const toSharedGame = (g) => ({
@@ -91,6 +107,7 @@ const toSharedGame = (g) => ({
   players: (g.players || []).map(p => ({ key: p.seat, name: p.name })),
   winners: winnerNames(g),
   rounds: (g.roundDetails || []).map(toRound),
+  tournamentFinal: g.tournamentStage === 'final',
 })
 
 /** Rarity by the share of players holding a badge. */
@@ -104,20 +121,21 @@ export function rarityOf(share) {
 
 /**
  * The club's view of the collection, over the ranked players `names`:
- *  - `badges`: per achievement (display order) { code, holders, share,
- *    rarity, total, most, bestRate, first, latest }. holders are
+ *  - `badges`: per achievement (display order) { code, perGame, holders,
+ *    share, rarity, total, most, bestRate, first, latest }. holders are
  *    { name, count, rate, first, last }, most first; `rate` is the share of
  *    their games it came in (PERFECT_PLUS: of their Plus rounds), for
- *    repeatable badges only, and `bestRate` counts players with `minGames`+.
+ *    per-game badges only, and `bestRate` counts players with `minGames`+.
+ *    `seasons` (the API's) crown the season champions.
  *  - `collectors`: { name, unique, total }, most unique badges first.
  *  - `rarest`: the earned badge the fewest hold; `latest`: the newest unlock
  *    { code, name, at }; `total`: every badge won, repeats included.
  */
-export function clubAchievementStats(games = [], names = [], { minGames = 10 } = {}) {
-  const timeline = achievementTimeline(games.map(toSharedGame))
+export function clubAchievementStats(games = [], names = [], { minGames = 10, seasons } = {}) {
+  const timeline = achievementTimeline(games.map(toSharedGame), { seasons })
   const ranked = names.filter((n) => timeline[n])
   const time = (t) => new Date(t).getTime() || 0
-  const badges = Object.values(ACHIEVEMENT_DEFS).map(({ id: code, repeatable }) => {
+  const badges = Object.values(ACHIEVEMENT_DEFS).map(({ id: code, repeatable, perGame }) => {
     const holders = ranked
       .filter((n) => timeline[n].earned[code])
       .map((n) => {
@@ -127,7 +145,8 @@ export function clubAchievementStats(games = [], names = [], { minGames = 10 } =
         return {
           name: n,
           count: e.count,
-          rate: repeatable && chances ? e.count / chances : null,
+          // Per-game badges only: a season or a tournament isn't won per game.
+          rate: perGame && chances ? e.count / chances : null,
           games: t.games,
           first: e.first,
           last: e.last,
@@ -140,6 +159,7 @@ export function clubAchievementStats(games = [], names = [], { minGames = 10 } =
     return {
       code,
       repeatable,
+      perGame,
       holders,
       share,
       rarity: rarityOf(share),
