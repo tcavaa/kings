@@ -168,30 +168,45 @@ export function perGameAchievements(keys, rounds) {
 }
 
 /**
- * Lifetime achievements across every game.
+ * Every player's achievements across every game, with when each was won.
  * @param {object[]} games  { playedAt, players: [{ key, name }],
  *   winners: [name] (every winner of a tie), rounds: [round] }
- * @returns {{ [name]: { [code]: count } }} only players with ≥1 achievement.
- *   Milestones count 1 when earned.
+ * @returns {{ [name]: { games, wins, plusRounds,
+ *   earned: { [code]: { count, first, last } } } }} every player who played;
+ *   `first` / `last` are the playedAt of the game it was first / last won in
+ *   (a milestone is won once). `plusRounds` counts the Plus rounds played
+ *   with their counts known, the chances at a PERFECT_PLUS.
  */
-export function lifetimeAchievements(games = []) {
-  const perName = new Map()  // name -> per-game counts, games, wins, streaks
+export function achievementTimeline(games = []) {
+  const perName = new Map()
   const tallyOf = (name) => {
-    if (!perName.has(name)) perName.set(name, { counts: {}, games: 0, wins: 0, streak: 0, maxStreak: 0 })
+    if (!perName.has(name)) {
+      perName.set(name, { games: 0, wins: 0, plusRounds: 0, streak: 0, maxStreak: 0, earned: {} })
+    }
     return perName.get(name)
   }
+  const earn = (t, code, at) => {
+    const e = t.earned[code]
+    if (e) { e.count++; e.last = at }
+    else t.earned[code] = { count: 1, first: at, last: at }
+  }
+  const milestone = (t, code, at) => { if (!t.earned[code]) earn(t, code, at) }
 
-  // Oldest first, for the win streaks.
+  // Oldest first, for the win streaks and the dates.
   const ordered = games.slice().sort((a, b) => new Date(a.playedAt) - new Date(b.playedAt))
   for (const g of ordered) {
     const players = g.players || []
+    const at = g.playedAt ?? null
+    const plusRounds = (g.rounds || []).filter((r) => PLUS_CODES.includes(r.code) && r.counts).length
 
     // 1. Repeatable per-game achievements.
     const perKey = perGameAchievements(players.map(p => p.key), g.rounds || [])
     for (const p of players) {
       if (!p.name) continue
-      const { counts } = tallyOf(p.name)
-      for (const code of perKey[p.key] || []) counts[code] = (counts[code] || 0) + 1
+      const t = tallyOf(p.name)
+      t.plusRounds += plusRounds
+      for (const code of perKey[p.key] || []) earn(t, code, at)
+      if ((t.earned.PERFECT_PLUS?.count || 0) >= HAT_TRICK) milestone(t, 'PERFECT_PLUS_HAT_TRICK', at)
     }
 
     // 2. Games, wins and streaks. Tie-aware: a shared top score is a win for
@@ -208,17 +223,31 @@ export function lifetimeAchievements(games = []) {
       } else {
         t.streak = 0
       }
+      GAMES_MILESTONES.forEach(([n, code]) => { if (t.games >= n) milestone(t, code, at) })
+      WINS_MILESTONES.forEach(([n, code]) => { if (t.wins >= n) milestone(t, code, at) })
+      STREAK_MILESTONES.forEach(([n, code]) => { if (t.maxStreak >= n) milestone(t, code, at) })
     }
   }
 
   const result = {}
-  for (const [name, t] of perName) {
-    const r = { ...t.counts }
-    if ((r.PERFECT_PLUS || 0) >= HAT_TRICK) r.PERFECT_PLUS_HAT_TRICK = 1
-    GAMES_MILESTONES.forEach(([n, code]) => { if (t.games >= n) r[code] = 1 })
-    WINS_MILESTONES.forEach(([n, code]) => { if (t.wins >= n) r[code] = 1 })
-    STREAK_MILESTONES.forEach(([n, code]) => { if (t.maxStreak >= n) r[code] = 1 })
-    if (Object.keys(r).length) result[name] = r
+  for (const [name, { games, wins, plusRounds, earned }] of perName) {
+    result[name] = { games, wins, plusRounds, earned }
+  }
+  return result
+}
+
+/**
+ * Lifetime achievements across every game.
+ * @param {object[]} games  as achievementTimeline takes them
+ * @returns {{ [name]: { [code]: count } }} only players with ≥1 achievement.
+ *   Milestones count 1 when earned.
+ */
+export function lifetimeAchievements(games = []) {
+  const result = {}
+  for (const [name, { earned }] of Object.entries(achievementTimeline(games))) {
+    const codes = Object.keys(earned)
+    if (!codes.length) continue
+    result[name] = Object.fromEntries(codes.map((code) => [code, earned[code].count]))
   }
   return result
 }

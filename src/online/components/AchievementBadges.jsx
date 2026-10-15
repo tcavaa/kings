@@ -24,7 +24,7 @@ const GENERATED = new Set([
   "WIN_STREAK_5",
   "WIN_STREAK_10",
 ]);
-function Emblem({ code, def }) {
+export function Emblem({ code, def }) {
   if (GENERATED.has(code))
     return (
       <img
@@ -57,7 +57,15 @@ function Emblem({ code, def }) {
     </span>
   );
 }
-export default function AchievementBadges({ achievements, showLocked = false }) {
+/**
+ * `rarity` (optional): clubAchievementStats' badges by code, to say how
+ * many players hold each one.
+ */
+export default function AchievementBadges({
+  achievements,
+  showLocked = false,
+  rarity,
+}) {
   const entries = Object.keys(ACHIEVEMENT_DEFS)
     .map((code) => [code, achievements?.[code] || 0])
     .filter(([, count]) => showLocked || count > 0);
@@ -81,6 +89,15 @@ export default function AchievementBadges({ achievements, showLocked = false }) 
               {showLocked && (
                 <span className="k-achievement-status">
                   {count > 0 ? "მოპოვებულია" : "ჯერ მოსაპოვებელია"}
+                </span>
+              )}
+              {rarity?.[code] && (
+                <span
+                  className={`k-rarity is-${rarity[code].rarity.id}`}
+                  title={`${rarity[code].holders.length} მოთამაშეს აქვს`}
+                >
+                  {rarity[code].rarity.label} ·{" "}
+                  {Math.round(rarity[code].share * 100)}%
                 </span>
               )}
             </div>

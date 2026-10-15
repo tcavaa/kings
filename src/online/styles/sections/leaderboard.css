@@ -961,3 +961,276 @@
     height: 16px;
   }
 }
+
+/* Achievements: rarity and the club's view of the collection. */
+.k-achievement-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.k-rarity {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 7px;
+  font-size: 9px;
+  letter-spacing: 0.3px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.k-rarity.is-legendary {
+  color: #f0b84a;
+}
+.k-rarity.is-epic {
+  color: #c79bf0;
+}
+.k-rarity.is-rare {
+  color: #7fc4f0;
+}
+.k-rarity.is-common {
+  color: #a4b394;
+}
+.k-rarity.is-unclaimed {
+  color: #6f7a66;
+}
+.k-achievement .k-rarity {
+  display: table;
+}
+.k-club-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid #ffffff14;
+}
+.k-club-facts > div {
+  padding: 24px 26px;
+  border-right: 1px solid #ffffff14;
+  min-width: 0;
+}
+.k-club-facts > div:last-child {
+  border-right: 0;
+}
+.k-club-facts span {
+  font-size: 10px;
+  color: #a4b394;
+}
+.k-club-facts strong {
+  display: block;
+  margin: 10px 0 8px;
+  font-size: 36px;
+  font-weight: 350;
+  line-height: 1.1;
+  color: #d7fa52;
+}
+.k-club-facts strong small {
+  font-size: 14px;
+  color: #aab59c;
+}
+.k-club-facts .k-club-fact-name {
+  font-size: 20px;
+  line-height: 1.3;
+  margin: 14px 0 10px;
+}
+.k-club-facts .k-club-fact-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: #dfe5d3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.k-club-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 26px;
+  border-bottom: 1px solid #ffffff14;
+}
+.k-club-badges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.k-club-badges > li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1.3fr) minmax(0, 1.2fr) 150px;
+  gap: 22px;
+  align-items: center;
+  padding: 18px 26px;
+  border-bottom: 1px solid #ffffff10;
+}
+.k-club-badges > li:hover {
+  background: #ffffff04;
+}
+.k-club-badges .k-achievement-art {
+  width: 64px;
+  height: 64px;
+}
+.k-club-badges > li.is-locked .k-achievement-art {
+  filter: grayscale(1);
+  opacity: 0.32;
+}
+.k-club-badge-main header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.k-club-badge-main header .k-rarity {
+  margin-top: 0;
+}
+.k-club-badge-main strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+.k-club-badge-main p {
+  font-size: 10px;
+  color: #a5b295;
+  line-height: 1.6;
+  margin: 5px 0 10px;
+}
+.k-club-share small {
+  display: block;
+  margin-top: 6px;
+  font-size: 10px;
+  color: #a4b394;
+}
+.k-club-badge-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 0;
+}
+.k-club-badge-facts dt {
+  font-size: 9px;
+  color: #8e9a80;
+  margin-bottom: 5px;
+}
+.k-club-badge-facts dd {
+  margin: 0;
+  font-size: 12px;
+  min-width: 0;
+}
+.k-club-badge-facts dd b {
+  display: block;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.k-club-badge-facts dd span:not(.k-muted) {
+  font-size: 11px;
+  color: #d7fa52;
+}
+.k-club-holders {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+.k-club-holders > span {
+  margin-left: -7px;
+  border: 2px solid #20251f;
+  border-radius: 50%;
+  display: inline-flex;
+  overflow: hidden;
+}
+.k-club-holders em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 10px;
+  color: #a4b394;
+}
+.k-club-collectors {
+  padding: 24px 26px 10px;
+}
+.k-club-collectors h3 {
+  font-size: 18px;
+  font-weight: 400;
+  margin: 8px 0 14px;
+}
+.k-club-collectors ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.k-club-collectors li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 180px) 1fr 56px 40px;
+  gap: 16px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid #ffffff10;
+  font-size: 12px;
+}
+.k-club-collectors li:last-child {
+  border: 0;
+}
+.k-club-collectors li > span:first-child {
+  font-size: 10px;
+  color: #7f8c70;
+}
+.k-club-collectors strong {
+  font-weight: 400;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.k-club-collectors strong small,
+.k-club-collectors li > small {
+  font-size: 10px;
+  color: #a4b394;
+}
+.k-club-collectors li > small {
+  text-align: right;
+}
+@media (max-width: 900px) {
+  .k-club-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .k-club-facts > div:nth-child(2) {
+    border-right: 0;
+  }
+  .k-club-facts > div:nth-child(-n + 2) {
+    border-bottom: 1px solid #ffffff14;
+  }
+  .k-club-badges > li {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 12px 16px;
+  }
+  .k-club-badges .k-achievement-art {
+    width: 56px;
+    height: 56px;
+  }
+  .k-club-badge-facts,
+  .k-club-holders {
+    grid-column: 2;
+  }
+  .k-club-holders {
+    justify-content: flex-start;
+    padding-left: 7px;
+  }
+}
+@media (max-width: 520px) {
+  .k-club-facts > div {
+    padding: 16px;
+  }
+  .k-club-facts strong {
+    font-size: 28px;
+  }
+  .k-club-toolbar,
+  .k-club-badges > li,
+  .k-club-collectors {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .k-club-collectors li {
+    grid-template-columns: 22px minmax(0, 1fr) 50px 36px;
+  }
+  .k-club-collectors li > .k-rivalry-track {
+    display: none;
+  }
+  .k-achievement-controls {
+    justify-content: flex-start;
+  }
+}

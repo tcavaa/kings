@@ -20,6 +20,7 @@ import {
   defineAchievements,
   perGameAchievements,
   lifetimeAchievements,
+  achievementTimeline,
 } from '../../../shared/achievements.js'
 
 export { countCodes } from '../../../shared/achievements.js'
@@ -82,10 +83,88 @@ export function computePerGameAchievements(players, rounds) {
  *   Only players with ≥1 achievement are included.
  */
 export function computeAllLifetimeAchievements(games = []) {
-  return lifetimeAchievements(games.map(g => ({
-    playedAt: g.playedAt,
-    players: (g.players || []).map(p => ({ key: p.seat, name: p.name })),
-    winners: winnerNames(g),
-    rounds: (g.roundDetails || []).map(toRound),
-  })))
+  return lifetimeAchievements(games.map(toSharedGame))
+}
+
+const toSharedGame = (g) => ({
+  playedAt: g.playedAt,
+  players: (g.players || []).map(p => ({ key: p.seat, name: p.name })),
+  winners: winnerNames(g),
+  rounds: (g.roundDetails || []).map(toRound),
+})
+
+/** Rarity by the share of players holding a badge. */
+export function rarityOf(share) {
+  if (!share) return { id: 'unclaimed', label: 'ჯერ არავის' }
+  if (share <= 0.1) return { id: 'legendary', label: 'ლეგენდარული' }
+  if (share <= 0.25) return { id: 'epic', label: 'ეპიკური' }
+  if (share <= 0.5) return { id: 'rare', label: 'იშვიათი' }
+  return { id: 'common', label: 'ჩვეულებრივი' }
+}
+
+/**
+ * The club's view of the collection, over the ranked players `names`:
+ *  - `badges`: per achievement (display order) { code, holders, share,
+ *    rarity, total, most, bestRate, first, latest }. holders are
+ *    { name, count, rate, first, last }, most first; `rate` is the share of
+ *    their games it came in (PERFECT_PLUS: of their Plus rounds), for
+ *    repeatable badges only, and `bestRate` counts players with `minGames`+.
+ *  - `collectors`: { name, unique, total }, most unique badges first.
+ *  - `rarest`: the earned badge the fewest hold; `latest`: the newest unlock
+ *    { code, name, at }; `total`: every badge won, repeats included.
+ */
+export function clubAchievementStats(games = [], names = [], { minGames = 10 } = {}) {
+  const timeline = achievementTimeline(games.map(toSharedGame))
+  const ranked = names.filter((n) => timeline[n])
+  const time = (t) => new Date(t).getTime() || 0
+  const badges = Object.values(ACHIEVEMENT_DEFS).map(({ id: code, repeatable }) => {
+    const holders = ranked
+      .filter((n) => timeline[n].earned[code])
+      .map((n) => {
+        const t = timeline[n]
+        const e = t.earned[code]
+        const chances = code === 'PERFECT_PLUS' ? t.plusRounds : t.games
+        return {
+          name: n,
+          count: e.count,
+          rate: repeatable && chances ? e.count / chances : null,
+          games: t.games,
+          first: e.first,
+          last: e.last,
+        }
+      })
+      .sort((a, b) => b.count - a.count || time(a.first) - time(b.first))
+    const share = ranked.length ? holders.length / ranked.length : 0
+    const byTime = [...holders].sort((a, b) => time(a.first) - time(b.first))
+    const rated = holders.filter((h) => h.rate != null && h.games >= minGames)
+    return {
+      code,
+      repeatable,
+      holders,
+      share,
+      rarity: rarityOf(share),
+      total: holders.reduce((s, h) => s + h.count, 0),
+      most: repeatable ? holders[0] || null : null,
+      bestRate: rated.sort((a, b) => b.rate - a.rate)[0] || null,
+      first: byTime[0] || null,
+      latest: [...holders].sort((a, b) => time(b.last) - time(a.last))[0] || null,
+    }
+  })
+  const collectors = ranked
+    .map((name) => {
+      const earned = Object.values(timeline[name].earned)
+      return { name, unique: earned.length, total: earned.reduce((s, e) => s + e.count, 0) }
+    })
+    .sort((a, b) => b.unique - a.unique || b.total - a.total || a.name.localeCompare(b.name))
+  const earned = badges.filter((b) => b.holders.length)
+  const rarest = earned.length
+    ? earned.reduce((m, b) => (b.holders.length < m.holders.length ? b : m))
+    : null
+  let latest = null
+  for (const b of badges) {
+    for (const h of b.holders) {
+      if (!latest || time(h.last) > time(latest.at)) latest = { code: b.code, name: h.name, at: h.last }
+    }
+  }
+  return { badges, collectors, rarest, latest, total: badges.reduce((s, b) => s + b.total, 0) }
 }

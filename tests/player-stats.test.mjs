@@ -94,3 +94,28 @@ test("records find the extremes and skip removed players", () => {
   assert.equal(r.longestStreak.value, 3);
   assert.equal(r.longestGame.value, 3600);
 });
+
+test("club achievement stats: holders, rates, firsts and collectors", async () => {
+  const { clubAchievementStats, rarityOf } = await import("../src/online/utils/achievements.js");
+  const games = [];
+  for (let i = 0; i < 16; i++) {
+    // A wins the first 5 in a row, B the other 11; C never wins.
+    const aWins = i < 5;
+    const g = game(aWins ? { A: 50, B: 10, C: 0 } : { A: 0, B: 50, C: 10 });
+    games.push(g);
+  }
+  const stats = clubAchievementStats(games, ["A", "B", "C"], { minGames: 10 });
+  const streak5 = stats.badges.find((b) => b.code === "WIN_STREAK_5");
+  assert.deepEqual(streak5.holders.map((h) => h.name).sort(), ["A", "B"]);
+  assert.equal(streak5.first.name, "A");
+  assert.equal(streak5.first.first, games[4].playedAt);
+  assert.equal(streak5.latest.name, "B");
+  // No rounds recorded, so no per-game badges.
+  assert.equal(stats.badges.find((b) => b.code === "NEVER_BELOW_ZERO").holders.length, 0);
+  // B adds WINS_10 and WIN_STREAK_10 to the two streak badges both hold.
+  assert.deepEqual(stats.collectors.map((c) => [c.name, c.unique]), [["B", 4], ["A", 2], ["C", 0]]);
+  assert.equal(stats.badges.find((b) => b.code === "GAMES_50").rarity.id, "unclaimed");
+  assert.equal(rarityOf(0.08).id, "legendary");
+  assert.equal(stats.rarest.code, "WINS_10");
+  assert.equal(stats.latest.name, "B");
+});
