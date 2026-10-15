@@ -76,7 +76,10 @@ export async function verifyPin(id, pin) {
 // editing one).
 export const checkPin = (id, pin) => api.verifyProfilePin(id, pin)
 
-// ── File → downscaled JPEG data URL ─────────────────────────────────────────
+// ── File → small square photo data URL ─────────────────────────────────────
+// A 256px square as WebP (about 4 KB, a quarter of the same JPEG), or JPEG
+// where the browser can't encode WebP (it hands back PNG instead, which
+// would be bigger, not smaller).
 export async function fileToDataURL(file, maxSize = 256) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -90,7 +93,8 @@ export async function fileToDataURL(file, maxSize = 256) {
         const scale = size / Math.min(img.width, img.height)
         const sw = img.width * scale, sh = img.height * scale
         ctx.drawImage(img, (size - sw) / 2, (size - sh) / 2, sw, sh)
-        resolve(canvas.toDataURL('image/jpeg', 0.85))
+        const webp = canvas.toDataURL('image/webp', 0.8)
+        resolve(webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.85))
       }
       img.onerror = reject
       img.src = reader.result

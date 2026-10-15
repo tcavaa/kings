@@ -11,12 +11,14 @@
     "server": "npm --prefix server start",
     "server:dev": "npm --prefix server run dev",
     "db:merge-score-app": "node --env-file-if-exists=.env.local scripts/merge-score-app.mjs",
+    "db:optimize-media": "node --env-file-if-exists=.env.local scripts/optimize-media.mjs",
     "test:3d": "node tests/three-browser.cjs"
   },
   "engines": {
     "node": ">=20.9.0"
   },
   "dependencies": {
+    "@breezystack/lamejs": "1.2.7",
     "canvas-confetti": "1.9.4",
     "lucide-react": "1.25.0",
     "next": "16.4.0",

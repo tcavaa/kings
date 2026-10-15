@@ -22,19 +22,11 @@ const writePass = (v) => {
   } catch { /* private mode — the code just won't survive a refresh */ }
 }
 
-// Same ceiling the server enforces, checked here so a too-big file fails
-// instantly instead of after a multi-megabyte upload.
+// Same ceiling the server enforces. It applies to the clip as sent, after
+// compressAudio has made it small; a file is refused up front only when it
+// is too big to be worth decoding at all.
 const MAX_BYTES = 2 * 1024 * 1024
-
-/** File → `data:audio/...;base64,...`, the shape the API expects. */
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error('ფაილის წაკითხვა ვერ მოხერხდა'))
-    reader.readAsDataURL(file)
-  })
-}
+const MAX_PICK_BYTES = 25 * 1024 * 1024
 
 /* ─── passcode gate ───────────────────────────────────────────────────── */
 
@@ -243,8 +235,8 @@ function UploadForm({ passcode, onAdded, onError }) {
 
   const pick = (e) => {
     const f = e.target.files?.[0] || null
-    if (f && f.size > MAX_BYTES) {
-      onError(`ფაილი ძალიან დიდია (მაქს. ${Math.round(MAX_BYTES / 1024)} KB)`)
+    if (f && f.size > MAX_PICK_BYTES) {
+      onError(`ფაილი ძალიან დიდია (მაქს. ${Math.round(MAX_PICK_BYTES / 1024 / 1024)} MB)`)
       e.target.value = ''
       return
     }
@@ -258,7 +250,13 @@ function UploadForm({ passcode, onAdded, onError }) {
     if (busy || !file || !name.trim()) return
     setBusy(true)
     try {
-      const audio = await fileToDataUrl(file)
+      // 64 kbps mono MP3: every player downloads every clip at the table.
+      const { compressAudio } = await import('../../lib/compressAudio')
+      const { dataUrl: audio, bytes } = await compressAudio(file)
+      if (bytes > MAX_BYTES) {
+        onError(`ხმა ძალიან გრძელია (მაქს. ${Math.round(MAX_BYTES / 1024)} KB)`)
+        return
+      }
       await adminApi.createSound(passcode, { label: name.trim(), audio })
       setName(''); setFile(null)
       if (fileRef.current) fileRef.current.value = ''
