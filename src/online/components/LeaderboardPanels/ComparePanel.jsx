@@ -85,7 +85,7 @@ export default function ComparePanel({
                 disabled={!on && selected.length >= MAX}
                 onClick={() => toggle(name)}
               >
-                <AvatarImg avatar={avatarOf(name)} size={24} />
+                <AvatarImg avatar={avatarOf(name)} name={name} size={24} />
                 <span>{name}</span>
                 {on && <Check size={14} />}
               </button>
@@ -173,7 +173,7 @@ export default function ComparePanel({
                       <tr key={r.name}>
                         <th>
                           <div className="k-player-cell">
-                            <AvatarImg avatar={avatarOf(r.name)} size={28} />
+                            <AvatarImg avatar={avatarOf(r.name)} name={r.name} size={28} />
                             <span>{r.name}</span>
                             {lead.wins && (
                               <Trophy size={13} className="k-compare-crown" />
@@ -280,7 +280,7 @@ function PairScore({ cmp, a, b, avatarOf }) {
   return (
     <div className="k-compare-pair">
       <div>
-        <AvatarImg avatar={avatarOf(a)} size={56} />
+        <AvatarImg avatar={avatarOf(a)} name={a} size={56} />
         <span>{a}</span>
       </div>
       <strong>
@@ -290,7 +290,7 @@ function PairScore({ cmp, a, b, avatarOf }) {
         <small>მოგება</small>
       </strong>
       <div>
-        <AvatarImg avatar={avatarOf(b)} size={56} />
+        <AvatarImg avatar={avatarOf(b)} name={b} size={56} />
         <span>{b}</span>
       </div>
       <div className="k-compare-ahead">

@@ -30,7 +30,7 @@ export default function PlayersTable({
                   onClick={() => onPlayerSelect(p.name)}
                   aria-label={`${p.name} — პროფილი`}
                 >
-                  <AvatarImg avatar={p.avatar} size={36} />
+                  <AvatarImg avatar={p.avatar} name={p.name} size={36} />
                   <strong>{p.name}</strong>
                 </button>
               </td>

@@ -164,6 +164,7 @@ function ResultsContent({ onOpenLeaderboard, game }) {
             {winners.map((w) => (
               <AvatarImg
                 key={w.seat}
+                name={w.name}
                 avatar={
                   w.avatar || playerList.find((p) => p.seat === w.seat)?.avatar
                 }
@@ -196,7 +197,7 @@ function ResultsContent({ onOpenLeaderboard, game }) {
             {allPlayers.map((p, idx) => (
               <div key={p.seat} className={p.seat === mySeat ? "own" : ""}>
                 <span>{String(idx + 1).padStart(2, "0")}</span>
-                <AvatarImg avatar={p.avatar} size={42} />
+                <AvatarImg avatar={p.avatar} name={p.name} size={42} />
                 <div>
                   <strong>{p.name}</strong>
                   <small>

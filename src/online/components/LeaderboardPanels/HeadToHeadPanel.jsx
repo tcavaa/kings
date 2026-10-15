@@ -79,7 +79,7 @@ export default function HeadToHeadPanel({ pairs, players }) {
                 <tr key={r.other}>
                   <th>
                     <div className="k-player-cell">
-                      <AvatarImg avatar={avatarFor(r.avatarOf)} size={28} />
+                      <AvatarImg avatar={avatarFor(r.avatarOf)} name={r.other} size={28} />
                       <span>{r.other}</span>
                     </div>
                   </th>

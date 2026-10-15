@@ -1,4 +1,5 @@
 import "../styles/game-light.css";
+import { useLastChampions } from "../lib/champions";
 import {
   useCallback,
   useEffect,
@@ -155,6 +156,10 @@ export default function GameLayout() {
   // actually changed, not on every unrelated GameLayout render (drawer
   // toggles, quote changes, chat traffic). setState always produces fresh
   // objects for real updates, so no legitimate emit is ever skipped.
+  // The last season's champion wears a crown on their seat.
+  const championSet = useLastChampions();
+  const champions = useMemo(() => [...championSet].sort(), [championSet]);
+
   const gameState = useMemo(
     () => ({
       hand,
@@ -178,6 +183,7 @@ export default function GameLayout() {
       // Lets the canvas tell "the seat this view is anchored to" apart from
       // "the person looking" — a watcher is anchored to seat 0 but owns none.
       spectator: !!spectating,
+      champions,
     }),
     [
       hand,
@@ -198,6 +204,7 @@ export default function GameLayout() {
       playPending,
       reconnecting,
       spectating,
+      champions,
     ],
   );
 

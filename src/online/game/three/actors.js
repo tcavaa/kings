@@ -29,6 +29,26 @@ function faceMap(file) {
   }
   return faceMaps.get(file);
 }
+// The last season's champion's crown: a gold band with five points, built in
+// the character's own metres (the holder scales it onto the head bone).
+const crownGold = new THREE.MeshStandardMaterial({ color: 0xf3ba45, metalness: 0.65, roughness: 0.32 });
+function crownMesh() {
+  const crown = new THREE.Group();
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.078, 0.04, 20, 1, true), crownGold);
+  band.material.side = THREE.DoubleSide;
+  crown.add(band);
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    const point = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 4), crownGold);
+    point.position.set(Math.sin(a) * 0.08, 0.044, Math.cos(a) * 0.08);
+    crown.add(point);
+  }
+  crown.traverse((o) => {
+    if (o.isMesh) o.castShadow = true;
+  });
+  return crown;
+}
+
 const tmp = new THREE.Vector3(),
   tmp2 = new THREE.Vector3(),
   look = new THREE.Vector3(),
@@ -50,7 +70,42 @@ export class Actor {
     this.lookTarget = new THREE.Vector3(0, 1.1, 0);
     this.headYaw = 0;
     this.headPitch = 0;
+    this.crowned = false;
     this.setLook(look);
+  }
+  // The last season's champion wears a crown on their head.
+  setCrowned(on) {
+    if (this.crowned === !!on) return;
+    this.crowned = !!on;
+    this.placeCrown();
+  }
+  removeCrown() {
+    if (!this.crown) return;
+    this.crown.removeFromParent();
+    // The gold material is shared by every crown; free only the shapes.
+    this.crown.traverse((o) => {
+      if (o.isMesh) o.geometry.dispose();
+    });
+    this.crown = null;
+  }
+  placeCrown() {
+    this.removeCrown();
+    const anchor = this.bones?.head;
+    if (!this.crowned || !anchor || this.disposed) return;
+    // Like a custom head: undo the bone's rest turn and scale so the crown
+    // sits level on top of the hair, then follows every nod.
+    this.model.updateMatrixWorld(true);
+    const boneScale = anchor.getWorldScale(new THREE.Vector3()).y;
+    const holder = new THREE.Group();
+    anchor.getWorldQuaternion(q).invert();
+    holder.quaternion.copy(q).multiply(this.root.getWorldQuaternion(new THREE.Quaternion()));
+    holder.scale.setScalar(WORLD_SCALE / boneScale);
+    const crown = crownMesh();
+    crown.position.y = 0.255;
+    crown.rotation.z = -0.12;
+    holder.add(crown);
+    anchor.add(holder);
+    this.crown = holder;
   }
   // look: { gender: "male" | "female", head: url | null }
   async setLook(look = {}) {
@@ -130,6 +185,7 @@ export class Actor {
         this.cards.add(arm);
       }
       if (this.headUrl) await this.attachHead(this.headUrl, version);
+      if (!this.disposed && version === this.version) this.placeCrown();
     } catch (e) {
       console.error("KING character failed to load", e);
       if (!this.disposed) this.onError?.("პერსონაჟი ვერ ჩაიტვირთა.");
@@ -189,12 +245,13 @@ export class Actor {
         if (o.isMesh) o.material.dispose();
       });
       if (this.customHead) dispose(this.customHead);
+      this.removeCrown();
     }
     if (this.cards) {
       this.root.remove(this.cards);
       dispose(this.cards);
     }
-    this.model = this.cards = this.customHead = this.mixer = null;
+    this.model = this.cards = this.customHead = this.crown = this.mixer = null;
   }
   // One-shot gestures layered over the idle loop.
   gesture(name) {

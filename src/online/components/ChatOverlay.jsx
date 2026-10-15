@@ -173,7 +173,7 @@ export default function ChatOverlay({ open, onClose }) {
                 key={m.id || `${m.seat}:${m.at ?? i}`}
                 className={`k-chat-message ${mine ? "is-mine" : ""}`}
               >
-                <AvatarImg avatar={m.avatar} size={28} />
+                <AvatarImg avatar={m.avatar} name={m.name} size={28} />
                 <div>
                   <span>{m.name}</span>
                   <div className="k-message-body">

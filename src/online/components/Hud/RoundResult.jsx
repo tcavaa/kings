@@ -55,7 +55,7 @@ export default function RoundResult() {
             return (
               <div key={p.seat}>
                 <span>
-                  <AvatarImg avatar={p.avatar} size={32} />
+                  <AvatarImg avatar={p.avatar} name={p.name} size={32} />
                   {p.name}
                 </span>
                 <b className={delta < 0 ? "negative" : "positive"}>

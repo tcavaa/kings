@@ -203,6 +203,9 @@
   flex: 1;
   font-size: 13px;
 }
+.k-profile-picker button .k-avatar-crowned {
+  flex: none;
+}
 .k-profile-picker small {
   display: block;
   color: #92a27d;

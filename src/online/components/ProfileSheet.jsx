@@ -46,7 +46,7 @@ export default function ProfileSheet({ p, onClose }) {
           <>
             {active && (
               <div className="k-member">
-                <AvatarImg avatar={active.avatar} size={64} />
+                <AvatarImg avatar={active.avatar} name={active.name} size={64} />
                 <div>
                   <small>PLAYER PROFILE</small>
                   <h3>{active.name}</h3>

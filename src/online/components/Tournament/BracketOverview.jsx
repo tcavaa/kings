@@ -43,7 +43,7 @@ function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
           <div key={`${p.name}-${i}`} className="flex items-center gap-2">
             <span className="rounded-full overflow-hidden shrink-0"
                   style={{ opacity: p.connected === false ? 0.4 : 1 }}>
-              <AvatarImg avatar={p.avatar} size={20} />
+              <AvatarImg avatar={p.avatar} name={p.name} size={20} />
             </span>
             <span className="text-xs truncate flex-1 min-w-0" style={{ color: '#eeeae1' }}>
               {p.name}

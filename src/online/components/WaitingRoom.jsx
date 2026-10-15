@@ -100,7 +100,7 @@ export default function WaitingRoom() {
               >
                 <div>
                   {p ? (
-                    <AvatarImg avatar={p.avatar} size={74} />
+                    <AvatarImg avatar={p.avatar} name={p.name} size={74} />
                   ) : (
                     <Plus size={26} />
                   )}

@@ -56,7 +56,7 @@ export default function ClubAchievements({ stats, players }) {
                 <small> / {TOTAL}</small>
               </strong>
               <div className="k-club-fact-note">
-                <AvatarImg avatar={avatarOf(top.name)} size={20} />
+                <AvatarImg avatar={avatarOf(top.name)} name={top.name} size={20} />
                 {top.name}
               </div>
             </>
@@ -176,7 +176,7 @@ export default function ClubAchievements({ stats, players }) {
               >
                 {b.holders.slice(0, 5).map((h) => (
                   <span key={h.name} title={`${h.name}${h.count > 1 ? ` ×${h.count}` : ""}`}>
-                    <AvatarImg avatar={avatarOf(h.name)} size={26} />
+                    <AvatarImg avatar={avatarOf(h.name)} name={h.name} size={26} />
                   </span>
                 ))}
                 {b.holders.length > 5 && <em>+{b.holders.length - 5}</em>}
@@ -196,7 +196,7 @@ export default function ClubAchievements({ stats, players }) {
             <li key={c.name}>
               <span>{String(i + 1).padStart(2, "0")}</span>
               <div className="k-player-cell">
-                <AvatarImg avatar={avatarOf(c.name)} size={28} />
+                <AvatarImg avatar={avatarOf(c.name)} name={c.name} size={28} />
                 <span>{c.name}</span>
               </div>
               <div className="k-rivalry-track" aria-hidden="true">

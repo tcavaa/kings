@@ -38,6 +38,35 @@ function coinTexture(scene) {
   });
 }
 
+// The last season's champion's crown, tipped over the photo's top-left corner.
+function crownTexture(scene) {
+  return bake(scene, "avatar-crown", 40, 36, (ctx) => {
+    ctx.rotate(-0.45);
+    const s = 13;
+    ctx.beginPath();
+    ctx.moveTo(-s, s * 0.55);
+    ctx.lineTo(-s * 1.15, -s * 0.55);
+    ctx.lineTo(-s * 0.5, 0);
+    ctx.lineTo(0, -s * 0.8);
+    ctx.lineTo(s * 0.5, 0);
+    ctx.lineTo(s * 1.15, -s * 0.55);
+    ctx.lineTo(s, s * 0.55);
+    ctx.closePath();
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#6b4300";
+    ctx.fillStyle = "#f3ba45";
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#fff3ba";
+    for (const x of [-s * 1.15, 0, s * 1.15]) {
+      ctx.beginPath();
+      ctx.arc(x, x === 0 ? -s * 0.8 : -s * 0.55, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  });
+}
+
 // Leader / "Dealer" pill (Kakhetian wine).
 function pillTexture(scene) {
   return bake(scene, "avatar-pill", 68, 22, (ctx) => {
@@ -67,6 +96,7 @@ export class AvatarsView {
       cardCounts = {},
       leaderSeat,
       round,
+      champions = [],
     } = state;
     // See the note in the opponents' fans: null must be coerced here,
     // otherwise the seat-0 slot resolves to `seat: null`, matches no
@@ -91,6 +121,7 @@ export class AvatarsView {
         isOwn,
         isActive: gamePhase === "playing" && currentTurn === seat,
         isLeader,
+        isChampion: champions.includes(player.name),
         score: cumulativeScores[seat] ?? 0,
         cardCount: (cardCounts || {})[seat] ?? 0,
         round1Hide: round === 1 && gamePhase === "type_selection" && !isLeader && !isOwn,
@@ -150,6 +181,10 @@ export class AvatarsView {
           })
           .setOrigin(0.5),
       );
+    }
+
+    if (v.isChampion) {
+      container.add(bakedImage(scene, -radius + 2, -radius - 2, crownTexture(scene)));
     }
 
     // Card-count badge top-right corner

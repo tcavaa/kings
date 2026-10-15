@@ -1,4 +1,5 @@
-import { AvatarPhoto } from "./AvatarImg";
+import { AvatarPhoto, ChampionCrown } from "./AvatarImg";
+import { useLastChampions } from "../lib/champions";
 import { useEffect, useRef, useState } from "react";
 import { Upload, Trash2, ArrowRight, Pencil, Check } from "lucide-react";
 import { saveProfile, fileToDataURL, deleteProfile } from "../lib/profiles";
@@ -280,6 +281,7 @@ export default function ProfileForm({ editing, currentPin, onDone, onCancel }) {
 }
 
 export function ProfilePicker({ profiles = [], value, onChange, onEdit }) {
+  const champions = useLastChampions();
   if (!profiles.length) return null;
   return (
     <div className="k-profile-picker">
@@ -291,7 +293,14 @@ export function ProfilePicker({ profiles = [], value, onChange, onEdit }) {
             aria-pressed={p.id === value}
             onClick={() => onChange(p)}
           >
-            <AvatarPhoto avatar={p.avatar} />
+            {champions.has(p.name) ? (
+              <span className="k-avatar-crowned">
+                <AvatarPhoto avatar={p.avatar} />
+                <ChampionCrown size={16} />
+              </span>
+            ) : (
+              <AvatarPhoto avatar={p.avatar} />
+            )}
             <span>
               {p.name}
               <small>

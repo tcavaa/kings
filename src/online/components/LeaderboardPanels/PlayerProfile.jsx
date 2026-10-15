@@ -50,7 +50,7 @@ export default function PlayerProfile({
         <ArrowLeft size={18} /> უკან რეიტინგზე
       </button>
       <header className="k-profile-identity">
-        <AvatarImg avatar={player.avatar} size={96} />
+        <AvatarImg avatar={player.avatar} name={player.name} size={96} />
         <div>
           <span className="k-eyebrow">
             PLAYER / {String(rank).padStart(2, "0")}

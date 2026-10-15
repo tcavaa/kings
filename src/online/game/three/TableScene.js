@@ -401,6 +401,7 @@ export class TableScene {
           );
         });
     }
+    for (const a of this.actors) a.setCrowned((state.champions || []).includes(a.player.name));
     this.refresh();
   }
   send(type, value) {
@@ -714,7 +715,15 @@ export class TableScene {
         ctx.textAlign = "left";
         ctx.fillStyle = "#1e1a14";
         const off = p.connected === false ? " ·" : "";
-        fitText(ctx, `${this.name(p).toUpperCase()}${off}`, 26, y + rh / 2, cw * 0.55, rh * 0.42, "700");
+        // The last season's champion: a gold crown before the name.
+        const champion = (s.champions || []).includes(p.name);
+        if (champion) {
+          ctx.fillStyle = "#b8860b";
+          drawCrown(ctx, 26 + rh * 0.24, y + rh / 2 + rh * 0.02, rh * 0.2);
+          ctx.fillStyle = "#1e1a14";
+        }
+        const nameX = champion ? 26 + rh * 0.56 : 26;
+        fitText(ctx, `${this.name(p).toUpperCase()}${off}`, nameX, y + rh / 2, cw * 0.55 - (nameX - 26), rh * 0.42, "700");
         const v = s.cumulativeScores?.[p.seat] ?? 0;
         ctx.textAlign = "right";
         ctx.fillStyle = v < 0 ? "#b12c25" : v > 0 ? "#1f6a3a" : "#1e1a14";

@@ -23,7 +23,7 @@ export default function PodiumView({ game, sortedPlayers }) {
                 isWinnerName(game, p.name) ? 1 : i + 1,
               ).padStart(2, "0")}
             </span>
-            <AvatarImg avatar={p.avatar} size={40} />
+            <AvatarImg avatar={p.avatar} name={p.name} size={40} />
             <div>
               <strong>{p.name}</strong>
               <small>

@@ -78,7 +78,7 @@ export default function PublicRoomPanel({ active, quota, onNeedProfile }) {
                   }
                 >
                   {p ? (
-                    <AvatarImg avatar={p.avatar} size={58} />
+                    <AvatarImg avatar={p.avatar} name={p.name} size={58} />
                   ) : (
                     <Plus size={22} />
                   )}

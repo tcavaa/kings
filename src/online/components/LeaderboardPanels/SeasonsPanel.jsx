@@ -58,7 +58,7 @@ function Standings({ players, champions = [] }) {
               <th>
                 <div className="k-player-cell">
                   <span className="k-muted">{String(i + 1).padStart(2, "0")}</span>
-                  <AvatarImg avatar={p.avatar} size={28} />
+                  <AvatarImg avatar={p.avatar} name={p.name} size={28} />
                   <span>{p.name}</span>
                   {champs.has(p.name) && <Trophy size={14} />}
                 </div>

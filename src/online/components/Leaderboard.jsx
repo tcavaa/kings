@@ -338,7 +338,7 @@ export default function Leaderboard({ home = "/" }) {
                   onClick={() => setProfileName(leader.name)}
                   aria-label={`${leader.name} — პროფილი`}
                 >
-                  <AvatarImg avatar={leader.avatar} size={88} />
+                  <AvatarImg avatar={leader.avatar} name={leader.name} size={88} />
                   <h2>
                     {leader.name} <ArrowUpRight size={20} />
                   </h2>

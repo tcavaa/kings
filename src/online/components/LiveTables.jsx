@@ -33,7 +33,7 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
       <ol className="k-live-players">
         {players.map((p) => (
           <li key={p.seat} className={p.connected ? undefined : "is-away"}>
-            <AvatarImg avatar={p.avatar} size={30} />
+            <AvatarImg avatar={p.avatar} name={p.name} size={30} />
             <span>{p.name}</span>
             <b className={p.score < 0 ? "k-negative" : undefined}>{p.score}</b>
           </li>

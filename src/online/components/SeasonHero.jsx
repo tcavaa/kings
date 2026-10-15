@@ -81,7 +81,7 @@ export default function SeasonHero({ profiles }) {
                         {i === 0 && (
                           <Crown className="k-season-crown" size={18} aria-label="ლიდერი" />
                         )}
-                        <AvatarImg avatar={p.avatar} size={36} />
+                        <AvatarImg avatar={p.avatar} name={p.name} size={36} />
                       </span>
                       <strong>{p.name}</strong>
                     </button>

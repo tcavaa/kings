@@ -13,7 +13,7 @@ export default function PlayerStatsCards({ playerList, stats }) {
       {playerList.map((p) => (
         <article key={p.seat}>
           <header>
-            <AvatarImg avatar={p.avatar} size={32} />
+            <AvatarImg avatar={p.avatar} name={p.name} size={32} />
             <strong>{p.name}</strong>
           </header>
           <dl>

@@ -112,7 +112,7 @@ export default function TournamentPanel({ active, onNeedProfile }) {
             return (
               <div key={i}>
                 {p ? (
-                  <AvatarImg avatar={p.avatar} size={48} />
+                  <AvatarImg avatar={p.avatar} name={p.name} size={48} />
                 ) : (
                   <span>
                     <Plus size={20} />
