@@ -80,11 +80,11 @@ function reloadGames() {
   listeners.forEach(fn => fn())
 }
 
-export async function saveGame({ sheetId, players, rounds, durationSeconds }) {
+export async function saveGame({ sheetId, players, rounds, durationSeconds, surrenderedBy }) {
   await request('/api/games/live', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sheetId, players, rounds, durationSeconds }),
+    body: JSON.stringify({ sheetId, players, rounds, durationSeconds, surrenderedBy }),
   })
   reloadGames()
 }
