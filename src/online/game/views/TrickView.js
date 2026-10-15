@@ -139,16 +139,15 @@ export class TrickView {
 
   /**
    * The winner's reaction, as the cards land: a ring pulses out of their
-   * avatar, red with a shake and flash when the trick hands them a penalty
-   * card (K♥ in King, a queen, a jack or a heart in those rounds). Minus,
-   * Last two and the pluses keep the gold ring.
+   * avatar, red when the trick hands them a penalty card (K♥ in King, a
+   * queen, a jack or a heart in those rounds). Minus, Last two and the
+   * pluses keep the gold ring.
    */
   react(winnerSeat, trick, state, L) {
     const tookPenalty = (trick || []).some((t) => isPenaltyCard(state.chosenGameType, t.card));
     this.scene.time.delayedCall(450, () => {
       if (!this.scene.sys?.isActive()) return;
       this._pulse(winnerSeat, tookPenalty ? 0xd4574d : 0xf0c75a, state, L);
-      if (tookPenalty) this._shake(L);
     });
   }
 
@@ -170,23 +169,6 @@ export class TrickView {
       duration: 700,
       ease: "Cubic.easeOut",
       onComplete: () => ring.destroy(),
-    });
-  }
-
-  _shake(L) {
-    const camera = this.scene.cameras?.main;
-    if (!camera) return;
-    camera.shake(220, 0.014);
-    // Brief red vignette — overlay rectangle that fades out
-    const { W, H } = L;
-    const flash = this.scene.add.rectangle(W / 2, H / 2, W, H, 0xc92020, 1);
-    flash.setDepth(999).setAlpha(0.32);
-    this.scene.tweens.add({
-      targets: flash,
-      alpha: { from: 0.32, to: 0 },
-      duration: 360,
-      ease: "Cubic.easeOut",
-      onComplete: () => flash.destroy(),
     });
   }
 }

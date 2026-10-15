@@ -83,7 +83,7 @@ function roundDetailsOf(rounds, seatOf, seats) {
  *   finals   final score per seat
  *   winners  winning seats (sheet order)
  */
-function buildRow({ id, playedAt, slots, rounds, finals, winnerSeats, durationSeconds, legacy }) {
+function buildRow({ id, playedAt, slots, rounds, finals, winnerSeats, durationSeconds, surrenderedBySeat, legacy }) {
   const seats = slots.map((_, seat) => seat);
   const seatOf = new Map(slots.map((p, seat) => [p.id, seat]));
   const players = slots.map((p, seat) => ({
@@ -97,6 +97,7 @@ function buildRow({ id, playedAt, slots, rounds, finals, winnerSeats, durationSe
     isTie: winners.length > 1,
   };
   if (durationSeconds != null) payload.durationSeconds = durationSeconds;
+  if (surrenderedBySeat != null) payload.surrenderedBySeat = surrenderedBySeat;
   if (legacy && Object.keys(legacy).length) payload.legacy = legacy;
   return {
     id,
@@ -119,7 +120,7 @@ const SHEET_ID_RE = /^[A-Za-z0-9_-]{8,58}$/;
  * player's profile ({ id, name }) or null. Names come from the profiles,
  * totals from the rounds — the same arithmetic the sheet showed.
  */
-function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, resolve) {
+function fromScoreSheet({ sheetId, players, rounds, durationSeconds, surrenderedBy } = {}, resolve) {
   if (!Array.isArray(players) || players.length < 3 || players.length > 4) {
     throw invalid('A game needs 3 or 4 players.');
   }
@@ -136,8 +137,16 @@ function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, reso
   });
   const who = slots.map((s) => s.profileId || `name:${s.name.toLowerCase()}`);
   if (new Set(who).size !== slots.length) throw invalid('Players must be distinct.');
-  // A finished sheet: every player led every game type once.
-  if (!Array.isArray(rounds) || rounds.length !== ids.length * GAME_TYPES.length) {
+  // A finished sheet: every player led every game type once. A player may
+  // surrender after at least one round, which ends the game early: like a
+  // surrender in King Online, the highest score at that point wins.
+  const fullLength = ids.length * GAME_TYPES.length;
+  if (surrenderedBy != null) {
+    if (!ids.includes(surrenderedBy)) throw invalid('Unknown surrendering player.');
+    if (!Array.isArray(rounds) || rounds.length < 1 || rounds.length >= fullLength) {
+      throw invalid('A game can be surrendered after its first round and before its last.');
+    }
+  } else if (!Array.isArray(rounds) || rounds.length !== fullLength) {
     throw invalid('The game is not finished: every player leads every game type once.');
   }
   const idSet = new Set(ids);
@@ -183,6 +192,7 @@ function fromScoreSheet({ sheetId, players, rounds, durationSeconds } = {}, reso
     finals,
     winnerSeats: finals.flatMap((score, seat) => (score === best ? [seat] : [])),
     durationSeconds: duration,
+    surrenderedBySeat: surrenderedBy != null ? ids.indexOf(surrenderedBy) : undefined,
   });
 }
 

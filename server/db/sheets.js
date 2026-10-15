@@ -63,6 +63,7 @@ function sheetState(state) {
     activePlayerIndex: Number.isInteger(state.activePlayerIndex) ? state.activePlayerIndex : 0,
     startedAt: Number.isFinite(state.startedAt) ? state.startedAt : null,
     endedAt: Number.isFinite(state.endedAt) ? state.endedAt : null,
+    surrenderedBy: ids.has(state.surrenderedBy) ? state.surrenderedBy : null,
   };
   const text = JSON.stringify(clean);
   if (text.length > 100 * 1024) throw badRequest('Score sheet is too large.');

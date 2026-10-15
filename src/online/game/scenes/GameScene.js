@@ -166,8 +166,7 @@ export class GameScene extends Phaser.Scene {
   update() {
     const loop = this.game.loop;
     if (!this._idleFrameMs || !loop.hasFpsLimit) return;
-    let busy =
-      this.trick.animating || this.cameras.main.shakeEffect.isRunning;
+    let busy = this.trick.animating;
     // Looping tweens (the trump sparkle) don't count: they'd keep it busy forever.
     for (const tween of this.tweens.tweens) {
       if (busy) break;

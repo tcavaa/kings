@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { Globe, Trophy, Crown, Handshake, Timer } from 'lucide-react'
 import { formatDuration } from '../../../shared/duration.js'
 import { useGameData } from '../lib/gameData'
@@ -9,6 +9,7 @@ import SeasonChampionsTab from './SeasonChampionsTab'
 import ShowMore from './ShowMore'
 import { computePerGameAchievements, ACHIEVEMENT_DEFS } from '../utils/achievements'
 import { winnerNamesOf, isWinnerOf, isTieResult } from '../utils/winners'
+import { goBack, navigate, pathOf, useLocation } from '../../../shared/router'
 
 const NONE = []
 
@@ -29,9 +30,15 @@ export default function WinnersPage({ seasons }) {
   const results = data?.live.results ?? NONE
   const details = data?.live.details ?? NONE
 
-  const [subView, setSubView]           = useState('list')      // 'list' | 'detail'
-  const [historyTab, setHistoryTab]     = useState('local')     // 'local' | 'online' | 'seasons'
-  const [selectedResultId, setSelectedResultId] = useState(null)
+  // /score/history (local games), /score/history/online, /score/history/seasons;
+  // a local game opens at /score/history/game/<id>.
+  const { segments } = useLocation('/score')
+  const [, tab, gameId] = segments
+  const historyTab = tab === 'online' || tab === 'seasons' ? tab : 'local'
+  const subView = tab === 'game' && gameId ? 'detail' : 'list'
+  const selectedResultId = subView === 'detail' ? gameId : null
+  const setHistoryTab = key => navigate(key === 'local' ? '/score/history' : `/score/history/${key}`)
+  const backToList = () => goBack('/score/history')
 
   const detailById = useMemo(() => new Map(details.map(d => [d.game_result_id, d])), [details])
   const { visible, remaining, showMore } = usePaged(results)
@@ -43,6 +50,10 @@ export default function WinnersPage({ seasons }) {
     return map
   }, [visible, detailById])
 
+  if (subView === 'detail' && loading && !data) {
+    return <div className="card"><p style={{ color: 'var(--muted)', margin: 0 }}>Loading…</p></div>
+  }
+
   if (subView === 'detail') {
     const result = results.find(r => r.id === selectedResultId)
     const detail = detailById.get(selectedResultId)
@@ -52,12 +63,12 @@ export default function WinnersPage({ seasons }) {
           <h2>Game Details</h2>
           <p style={{ color: 'var(--muted)' }}>No detailed data for this game.</p>
           <div className="actions">
-            <button className="primary" onClick={() => setSubView('list')}>Back</button>
+            <button className="primary" onClick={backToList}>Back</button>
           </div>
         </div>
       )
     }
-    return <GameDetailPage detail={detail} result={result} onBack={() => setSubView('list')} />
+    return <GameDetailPage detail={detail} result={result} onBack={backToList} />
   }
 
   return (
@@ -109,7 +120,7 @@ export default function WinnersPage({ seasons }) {
                       )}
                     </span>
                     {hasDetail ? (
-                      <button className="link history-details-btn" onClick={() => { setSelectedResultId(r.id); setSubView('detail') }}>
+                      <button className="link history-details-btn" onClick={() => navigate(pathOf('/score/history', 'game', r.id))}>
                         Details →
                       </button>
                     ) : (

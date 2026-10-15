@@ -4,6 +4,7 @@ import { useLiveSheets } from '../lib/gameData'
 import { GAME_TYPES } from '../constants/gameTypes'
 import { PLAYER_COLORS } from '../constants/colors'
 import { totalsByPlayer } from '../utils/rounds'
+import { setQuery } from '../../../shared/router'
 import ScoreTable from './ScoreTable'
 import GameProgress from './GameProgress'
 
@@ -17,7 +18,8 @@ function ago(iso) {
 
 function SheetView({ sheet, onBack }) {
   const target = sheet.players.length * GAME_TYPES.length
-  const finished = sheet.rounds.length >= target
+  const finished = sheet.rounds.length >= target || !!sheet.surrenderedBy
+  const surrendered = sheet.surrenderedBy ? sheet.players.find(p => p.id === sheet.surrenderedBy)?.name ?? 'A player' : null
   return (
     <>
       <div className="card">
@@ -26,7 +28,8 @@ function SheetView({ sheet, onBack }) {
           <button className="link icon-btn" onClick={onBack}><ArrowLeft size={13} /> Back</button>
         </div>
         <p className="more-hint" style={{ margin: 0 }}>
-          {finished ? 'All rounds played — waiting to be saved' : `Round ${sheet.rounds.length + 1} / ${target} · leader ${sheet.players[sheet.activePlayerIndex]?.name ?? '—'}`}
+          {surrendered ? `${surrendered} surrendered — waiting to be saved`
+            : finished ? 'All rounds played — waiting to be saved' : `Round ${sheet.rounds.length + 1} / ${target} · leader ${sheet.players[sheet.activePlayerIndex]?.name ?? '—'}`}
           {' · updated '}{ago(sheet.updatedAt)}
         </p>
       </div>
@@ -52,11 +55,7 @@ export default function LiveSheets({ children }) {
   const open = useMemo(() => sheets.find(s => s.id === openId) || null, [sheets, openId])
 
   // Keep the address in step so a refresh (or a shared link) shows the same game.
-  useEffect(() => {
-    const url = new URL(window.location.href)
-    if (openId) url.searchParams.set('live', openId); else url.searchParams.delete('live')
-    window.history.replaceState(null, '', url)
-  }, [openId])
+  useEffect(() => { setQuery('live', openId) }, [openId])
 
   if (openId && open) return <SheetView sheet={open} onBack={() => setOpenId(null)} />
   if (openId && !loaded) return children

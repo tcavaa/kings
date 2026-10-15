@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic'
 // during render), inside <StrictMode> like its old main.jsx. Until its code
 // arrives the page shows a light shell instead of a blank screen (the
 // stylesheet comes with the code, so the shell styles itself).
-const App = dynamic(() => import('../../../src/score/App'), {
+const App = dynamic(() => import('../../../../src/score/App'), {
   ssr: false,
   loading: () => (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui, sans-serif', color: '#6b7280' }}>

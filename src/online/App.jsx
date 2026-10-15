@@ -1,7 +1,8 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useEffect, useRef, lazy, Suspense } from 'react'
 import { GameProvider, useGame, useToasts } from './context/GameContext'
 import Lobby        from './components/Lobby'
 import WaitingRoom  from './components/WaitingRoom'
+import { navigate, useLocation } from '../../shared/router'
 
 // Heavy screens are code-split so the lobby doesn't pay for them up front:
 // GameLayout drags in Phaser (~1.5 MB), GameOverScreen pulls canvas-confetti
@@ -14,8 +15,8 @@ const Leaderboard    = lazy(() => import('./components/Leaderboard'))
 // it, and mounted outside GameProvider — it has no business opening a socket.
 const AdminApp       = lazy(() => import('./components/Admin/AdminApp'))
 
-// The app has no router: the server's SPA fallback serves index.html for any
-// path, so a single pathname check is all the routing /admin needs.
+// /admin is its own page, loaded fresh (never reached from inside the app),
+// so one pathname check at load is all it needs.
 function isAdminPath() {
   if (typeof window === 'undefined') return false
   return /^\/admin\/?$/.test(window.location.pathname)
@@ -68,8 +69,16 @@ function ToastContainer() {
 }
 
 function AppInner() {
-  const { appPhase, publicSeat, tournament } = useGame()
-  const [view, setView] = useState('main') // 'main' | 'leaderboard'
+  const { appPhase, publicSeat, tournament, roomCode, spectating } = useGame()
+  // Every screen has its own address (see shared/router.js):
+  //   /, /tournament           the lobby and its tabs
+  //   /leaderboard/...         the leaderboard (open from the lobby or a game's end)
+  //   /room/CODE, /watch/CODE  a table we sit at or watch
+  const { segments } = useLocation()
+  const top = segments[0]
+  const inRoom = appPhase === 'waiting' || appPhase === 'game' || appPhase === 'gameover'
+  const showLeaderboard = top === 'leaderboard' && (appPhase === 'lobby' || appPhase === 'gameover')
+  const roomPath = roomCode ? `/${spectating ? 'watch' : 'room'}/${encodeURIComponent(roomCode)}` : null
   // A quick-match seat or a tournament entry can turn into a game at any
   // moment, without a WaitingRoom to prefetch the table from: fetch the
   // (large) game chunk now so the deal doesn't wait on it.
@@ -77,27 +86,41 @@ function AppInner() {
   useEffect(() => {
     if (tableAhead) loadGameLayout().catch(() => { /* retried by lazy() */ })
   }, [tableAhead])
-  // A table can start while the leaderboard is open (a quick-match seat
-  // filling, a tournament draw or final) — show it.
+  // At a table the address is the table's. A table can start while the
+  // leaderboard is open (a quick-match seat filling, a tournament draw or
+  // final) — show it. Going Back from a table lands on it again: the game
+  // goes on until the player leaves it from the table itself. Leaving takes
+  // the table's address away.
+  const wasInRoom = useRef(false)
   useEffect(() => {
-    if (appPhase === 'game' || appPhase === 'waiting') setView('main')
-  }, [appPhase])
+    if (inRoom) {
+      const onRoomPage = top === 'room' || top === 'watch'
+      if (roomPath && !(appPhase === 'gameover' && top === 'leaderboard')
+          && window.location.pathname !== roomPath) {
+        navigate(roomPath, { replace: onRoomPage })
+      }
+    } else if (wasInRoom.current && (top === 'room' || top === 'watch')) {
+      navigate('/', { replace: true })
+    }
+    wasInRoom.current = inRoom
+  }, [inRoom, roomPath, appPhase, top])
+  const openLeaderboard = () => navigate('/leaderboard')
 
   return (
     <div className="min-h-screen text-ink"
          style={{ background: '#091211', minHeight: '100dvh' }}>
       <ToastContainer />
       <Suspense fallback={<ScreenLoader />}>
-        {view === 'leaderboard' ? (
-          <Leaderboard onBack={() => setView('main')} />
+        {showLeaderboard ? (
+          <Leaderboard home={appPhase === 'gameover' && roomPath ? roomPath : '/'} />
         ) : (
           <>
             {appPhase === 'lobby'    && (
-              <Lobby onOpenLeaderboard={() => setView('leaderboard')} />
+              <Lobby onOpenLeaderboard={openLeaderboard} />
             )}
             {appPhase === 'waiting'  && <WaitingRoom />}
             {appPhase === 'game'     && <GameLayout />}
-            {appPhase === 'gameover' && <GameOverScreen onOpenLeaderboard={() => setView('leaderboard')} />}
+            {appPhase === 'gameover' && <GameOverScreen onOpenLeaderboard={openLeaderboard} />}
           </>
         )}
       </Suspense>

@@ -1,4 +1,5 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useMemo } from 'react'
+import { goBack, navigate, pathOf, useLocation } from '../../../shared/router'
 import { Handshake, Trophy } from 'lucide-react'
 import { useGameData } from '../lib/gameData'
 import { usePaged } from '../hooks/usePaged'
@@ -140,7 +141,13 @@ const tdStyle = { padding: '7px 10px', textAlign: 'left' }
 export default function OnlineHistoryTab() {
   const { data, loading, error } = useGameData()
   const games = data?.online.games ?? NONE
-  const [selectedGame, setSelectedGame] = useState(null)
+  // A game opens at /score/history/online/<id>.
+  const { segments } = useLocation('/score')
+  const selectedId = segments[1] === 'online' ? segments[2] : null
+  const selectedGame = selectedId ? games.find(g => String(g.id) === selectedId) || null : null
+  const setSelectedGame = g => (g
+    ? navigate(pathOf('/score/history/online', g.id))
+    : goBack('/score/history/online'))
   const { visible, remaining, showMore } = usePaged(games)
   const rowsById = useMemo(() => {
     const m = new Map()

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowUpRight,
   ArrowRight,
@@ -18,6 +18,7 @@ import LiveTables from "./LiveTables";
 import TournamentPanel from "./Tournament/TournamentPanel";
 import ClubShell, { openScoreApp } from "./ui/ClubShell";
 import Sheet from "./ui/Sheet";
+import { navigate, useLocation } from "../../../shared/router";
 
 // After this long without a connection the server is most likely asleep
 // (Render's free tier cold-starts in up to ~30 s); say so.
@@ -35,16 +36,26 @@ export default function Lobby({ onOpenLeaderboard }) {
     resumableSeat,
     resumeSeat,
     dismissResumeSeat,
+    watchGame,
   } = useGame();
   const { onlinePlayers } = useLobby();
 
-  const [mode, setMode] = useState("championship");
-  const [dialog, setDialog] = useState(null);
+  // The address picks the tab (/ is the league, /tournament the
+  // tournaments). /room/CODE is an invite link: it opens the private-table
+  // sheet with the code filled in. /watch/CODE opens that table to watch.
+  const { segments } = useLocation();
+  const [top, linkCode = ""] = segments;
+  const inviteCode = top === "room" ? linkCode.toUpperCase().slice(0, 6) : "";
+  const mode = top === "tournament" ? "tournament" : "championship";
+  const setMode = (id) => navigate(id === "tournament" ? "/tournament" : "/");
+  const [dialog, setDialog] = useState(() => (inviteCode ? "private" : null));
   const profileState = useProfiles();
   const { active } = profileState;
-  // Pre-fill the room code from the last successful join so a quick refresh
-  // or an accidental tab close doesn't force the player to retype it.
+  // Pre-fill the room code from an invite link, or else from the last
+  // successful join so a quick refresh or an accidental tab close doesn't
+  // force the player to retype it.
   const [joinCode, setJoinCode] = useState(() => {
+    if (inviteCode) return inviteCode;
     try {
       return localStorage.getItem("king.lastRoom") || "";
     } catch {
@@ -136,10 +147,23 @@ export default function Lobby({ onOpenLeaderboard }) {
   const canPlay = connected && active && publicSeat === null
     && !(tournament && tournament.status !== "done");
   const openProfile = () => setDialog("profile");
+  const closePrivate = () => {
+    setDialog(null);
+    if (top === "room") navigate("/", { replace: true });
+  };
+
+  // A /watch/CODE link: start watching once there is a profile to watch as.
+  const watchedRef = useRef(null);
+  const watchCode = top === "watch" ? linkCode.toUpperCase() : "";
+  useEffect(() => {
+    if (!watchCode || !canPlay || watchedRef.current === watchCode) return;
+    watchedRef.current = watchCode;
+    watchGame(watchCode, active.name);
+  }, [watchCode, canPlay, active?.name, watchGame]);
   return (
     <ClubShell
       onHome={() => {
-        setMode("championship");
+        navigate("/");
         window.scrollTo({ top: 0, behavior: "smooth" });
       }}
       onLeaderboard={onOpenLeaderboard}
@@ -329,7 +353,7 @@ export default function Lobby({ onOpenLeaderboard }) {
         <ProfileSheet p={profileState} onClose={() => setDialog(null)} />
       )}
       {dialog === "private" && (
-        <Sheet title="შენი ხალხი. შენი მაგიდა." onClose={() => setDialog(null)}>
+        <Sheet title="შენი ხალხი. შენი მაგიდა." onClose={closePrivate}>
           <div className="k-private-setup">
             <p>მოიწვიე მეგობრები ან შეუერთდი მათ კოდით.</p>
             {!active && (

@@ -3,8 +3,8 @@
 // A custom build from Phaser's source (phaser/src, as its custom-build docs
 // describe) holding only what the table uses: the game loop, scenes, scale
 // manager, both renderers, textures and canvas textures, the image and SVG
-// loaders, input, tweens, timers, cameras, and the Graphics, Text, Image,
-// Container and Rectangle objects. No physics, tilemaps, particles, sound
+// loaders, input, tweens, timers, cameras, and the Graphics, Text, Image
+// and Container objects. No physics, tilemaps, particles, sound
 // (the shuffle is a plain <audio>, lib/shuffleSound.js) or other objects.
 //
 // It relies on Phaser's build flags (`typeof WEBGL_RENDERER` and friends),
@@ -31,7 +31,6 @@ import "phaser/src/tweens/TweenManager.js"; // this.tweens
 import "phaser/src/gameobjects/container/ContainerFactory.js";
 import "phaser/src/gameobjects/graphics/GraphicsFactory.js";
 import "phaser/src/gameobjects/image/ImageFactory.js";
-import "phaser/src/gameobjects/shape/rectangle/RectangleFactory.js";
 import "phaser/src/gameobjects/text/TextFactory.js";
 import "phaser/src/gameobjects/text/TextCreator.js";
 

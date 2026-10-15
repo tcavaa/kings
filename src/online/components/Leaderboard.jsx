@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import {
   ArrowUpRight,
   Search,
@@ -13,6 +13,7 @@ import { winRate } from "../utils/format";
 import ClubShell from "./ui/ClubShell";
 import AvatarImg from "./AvatarImg";
 import PlayersTable from "./LeaderboardPanels/PlayersTable";
+import { goBack, navigate, pathOf, useLocation } from "../../../shared/router";
 const Insights = lazy(() => import("./LeaderboardPanels/Insights"));
 const PastGamesList = lazy(() => import("./LeaderboardPanels/PastGamesList"));
 const GameDetail = lazy(() => import("./LeaderboardPanels/GameDetail"));
@@ -26,16 +27,36 @@ const GAME_TYPES = [
   ["online", "ონლაინ"],
   ["live", "ლაივი"],
 ];
+const SECTIONS = ["rankings", "insights", "compare", "history", "seasons"];
+const BASE = "/leaderboard";
 
-export default function Leaderboard({ onBack }) {
+// Each view has its own address:
+//   /leaderboard[/insights|compare|history|seasons]   a section
+//   /leaderboard/player/<name>                         a player's profile
+//   /leaderboard/game/<id>                             one game
+// with ?type=online|live for the game-type filter. `home` is where the
+// logo goes back to (the lobby, or the table whose game just ended).
+export default function Leaderboard({ home = "/" }) {
   const [allGames, setAllGames] = useState([]);
-  const [gameType, setGameType] = useState("all");
+  const { segments, query: params } = useLocation();
+  const [, view, key] = segments;
+  const gameType = ["online", "live"].includes(params.get("type"))
+    ? params.get("type")
+    : "all";
+  const profileName = view === "player" && key ? key : null;
+  const gameId = view === "game" && key ? key : null;
+  // A profile or a game keeps the section it was opened from lit up.
+  const lastSection = useRef("rankings");
+  if (SECTIONS.includes(view)) lastSection.current = view;
+  else if (!view) lastSection.current = "rankings";
+  const section = lastSection.current;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const [selected, setSelected] = useState(null);
-  const [profileName, setProfileName] = useState(null);
-  const [section, setSection] = useState("rankings");
+  const selected = useMemo(
+    () => (gameId ? allGames.find((g) => String(g.id) === gameId) || null : null),
+    [allGames, gameId],
+  );
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("wins");
   const [page, setPage] = useState(0);
@@ -103,23 +124,29 @@ export default function Leaderboard({ onBack }) {
   const leader = aggregated[0];
   const count = section === "history" ? games.length : ranked.length;
   const pages = Math.ceil(count / PAGE_SIZE);
-  const changeSection = (id) => {
-    setProfileName(null);
-    setSection(id);
-    setPage(0);
-    setSelected(null);
-  };
-  const changeType = (type) => {
-    setProfileName(null);
-    setGameType(type);
-    setPage(0);
-    setSelected(null);
-  };
+  const withType = (path, type = gameType) =>
+    type === "all" ? path : `${path}?type=${type}`;
+  const sectionPath = (id, type) =>
+    withType(pathOf(BASE, id === "rankings" ? null : id), type);
+  const changeSection = (id) => navigate(sectionPath(id));
+  const changeType = (type) =>
+    navigate(sectionPath(section, type), { replace: true });
+  const setSelected = (game) =>
+    game
+      ? navigate(withType(pathOf(BASE, "game", game.id)))
+      : goBack(sectionPath(section));
+  const setProfileName = (name) =>
+    name
+      ? navigate(withType(pathOf(BASE, "player", name)))
+      : goBack(sectionPath(section));
+  const goHome = () => navigate(home);
+  // A new section or filter starts on its first page.
+  useEffect(() => setPage(0), [section, gameType]);
   return (
     <ClubShell
       page="rankings"
       title="ლიდერბორდი"
-      onHome={onBack}
+      onHome={goHome}
       onLeaderboard={() => changeSection("rankings")}
     >
       <header className="k-ranking-heading">
@@ -208,7 +235,7 @@ export default function Leaderboard({ onBack }) {
           <Trophy size={48} strokeWidth={1} />
           <h2>შენი ისტორია ჯერ წინ არის.</h2>
           <p>პირველი დასრულებული თამაში აქ გამოჩნდება.</p>
-          <button className="k-button" onClick={onBack}>
+          <button className="k-button" onClick={goHome}>
             იპოვე შენი თამაში <ArrowUpRight size={18} />
           </button>
         </div>
@@ -223,6 +250,20 @@ export default function Leaderboard({ onBack }) {
           {selected ? (
             <div className="k-detail">
               <GameDetail game={selected} onBack={() => setSelected(null)} />
+            </div>
+          ) : gameId ? (
+            <div className="k-ranking-empty">
+              <h2>თამაში ვერ მოიძებნა.</h2>
+              <button className="k-button" onClick={() => setSelected(null)}>
+                <ArrowLeft size={18} /> უკან
+              </button>
+            </div>
+          ) : profileName && !profilePlayer ? (
+            <div className="k-ranking-empty">
+              <h2>მოთამაშე ვერ მოიძებნა.</h2>
+              <button className="k-button" onClick={() => setProfileName(null)}>
+                <ArrowLeft size={18} /> უკან
+              </button>
             </div>
           ) : profilePlayer ? (
             <PlayerProfile
@@ -340,7 +381,7 @@ export default function Leaderboard({ onBack }) {
           )}
         </Suspense>
       )}
-      {!selected &&
+      {!gameId &&
         !profileName &&
         !loading &&
         !error &&

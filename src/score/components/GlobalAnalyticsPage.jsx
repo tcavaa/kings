@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ReferenceLine, Cell,
@@ -11,13 +11,17 @@ import ComparePlayersPage from './ComparePlayersPage'
 import AwardsGrid from './AwardsGrid'
 import HeatMatrix from './HeatMatrix'
 import { PLAYER_COLORS as COLORS } from '../constants/colors'
+import { goBack, navigate, useLocation } from '../../../shared/router'
 
 const TYPE_CODES = ['K', 'Q', 'J', 'H', 'L2', 'T', 'P1', 'P2', 'P3']
 
 // details/results: the season's games of the type picked in `filter` — King
 // Online's and the ones recorded here are counted the same way, per player.
 export default function GlobalAnalyticsPage({ details, results, filter = null, onBack }) {
-  const [view, setView] = useState('main') // 'main' | 'compare'
+  // /score/stats, and /score/stats/compare for the head-to-head.
+  const { segments } = useLocation('/score')
+  const view = segments[1] === 'compare' ? 'compare' : 'main'
+  const setView = v => (v === 'compare' ? navigate('/score/stats/compare') : goBack('/score/stats'))
   const chart = useChartTheme()
   // Players taken off the player list (no King Online name) keep their old
   // games, under `guest:` ids, but aren't listed or ranked any more.

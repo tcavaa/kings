@@ -301,6 +301,8 @@ function rowToGame(row, parsed) {
     // need to be rebuilt exactly (see src/score/lib/gameShapes.js).
     ...(payload.durationSeconds != null && { durationSeconds: payload.durationSeconds }),
     ...(payload.legacy && { legacy: payload.legacy }),
+    // A ჩაწერა game someone surrendered before the last round.
+    ...(payload.surrenderedBySeat != null && { surrenderedBySeat: payload.surrenderedBySeat }),
   };
 }
 

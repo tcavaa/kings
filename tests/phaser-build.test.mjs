@@ -46,7 +46,7 @@ const used = (re) => [...new Set([...gameSource().matchAll(re)].map((m) => m[1])
 test("every scene.add.* / scene.make.* the table calls is registered", () => {
   const adds = used(/\.add\.([a-zA-Z]+)\(/g);
   const makes = used(/\.make\.([a-zA-Z]+)\(/g);
-  assert.ok(adds.length >= 5);
+  assert.ok(adds.length >= 4);
   for (const m of adds) assert.equal(typeof GameObjectFactory.prototype[m], "function", `add.${m}`);
   for (const m of makes) assert.equal(typeof GameObjectCreator.prototype[m], "function", `make.${m}`);
 });

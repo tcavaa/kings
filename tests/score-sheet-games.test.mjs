@@ -114,6 +114,23 @@ test("only a finished sheet can be saved", () => {
   assert.throws(() => fromScoreSheet({ ...sheet, rounds: sheet.rounds.slice(0, 35) }, resolve), /not finished/);
 });
 
+test("a surrendered sheet saves early, and the highest score at that point wins", () => {
+  const row = fromScoreSheet({ ...sheet, rounds: opening, surrenderedBy: "p_2" }, resolve);
+  assert.equal(row.payload.roundDetails.length, 3);
+  assert.equal(row.payload.surrenderedBySeat, 1);
+  assert.deepEqual(row.payload.players.map((p) => p.score), [48, -40, 12, -20]);
+  assert.deepEqual(row.payload.winners.map((w) => w.name), ["Ana"]);
+  assert.equal(asServed(row).surrenderedBySeat, 1);
+  // A finished game has no surrender in it.
+  assert.equal(fromScoreSheet(sheet, resolve).payload.surrenderedBySeat, undefined);
+});
+
+test("a surrender needs a player of the game and a game in progress", () => {
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: opening, surrenderedBy: "p_9" }, resolve), /surrendering player/);
+  assert.throws(() => fromScoreSheet({ ...sheet, rounds: [], surrenderedBy: "p_1" }, resolve), /surrendered after/);
+  assert.throws(() => fromScoreSheet({ ...sheet, surrenderedBy: "p_1" }, resolve), /surrendered after/);
+});
+
 test("scores must be the ones the recorded cards give", () => {
   const forged = sheet.rounds.map((r, i) => (i === 0 ? { ...r, scores: { ...r.scores, p_1: 1000 } } : r));
   assert.throws(() => fromScoreSheet({ ...sheet, rounds: forged }, resolve), /do not match/);

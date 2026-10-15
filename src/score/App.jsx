@@ -12,6 +12,7 @@ import BottomNav from './components/BottomNav.jsx'
 import SeasonBanner from './components/SeasonBanner.jsx'
 import GameTimer from './components/GameTimer.jsx'
 import ThemeDecorations from './components/ThemeDecorations.jsx'
+import SurrenderButton from './components/SurrenderButton.jsx'
 import { saveGame, publishLiveSheet, removeLiveSheet } from './lib/gameData.js'
 import { sheetReducer, EMPTY_SHEET, targetRoundsOf } from './lib/sheetReducer.js'
 import LiveSheets from './components/LiveSheets.jsx'
@@ -20,8 +21,9 @@ import { applyThemeToBody } from './utils/themes'
 import { formatDuration } from '../../shared/duration.js'
 import { readStorage, writeStorage } from './utils/storage'
 import { totalsByPlayer } from './utils/rounds'
-import { RefreshCw, Trash2, Timer, ArrowLeft } from 'lucide-react'
+import { RefreshCw, Trash2, Timer, ArrowLeft, Flag } from 'lucide-react'
 import { playRoundEnd, playBigPenalty, playGameWin, playRematch } from './utils/sounds.js'
+import { goBack, navigate, useLocation } from '../../shared/router'
 import './styles/main.css'
 
 // The score sheet itself loads first; the other tabs and the charts (with
@@ -38,6 +40,7 @@ const PageLoading = (
 )
 
 const STATE_KEY = 'king-score-state'
+const VIEWS = ['history', 'stats', 'more', 'players']
 
 // Other people's games in progress are a bonus on the home screen: if one
 // can't be drawn, show the player picker on its own rather than a broken page.
@@ -56,12 +59,15 @@ function celebrate(soundEnabled) {
 
 function App() {
   const [state, dispatch] = useReducer(sheetReducer, EMPTY_SHEET)
-  const { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId } = state
+  const { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, surrenderedBy } = state
   const [hydrated, setHydrated] = useState(false)
   // The game type picked for the coming round, from the matrix or the selector.
   const [selectedTypeCode, setSelectedTypeCode] = useState(null)
-  // 'home' (Score) | 'history' | 'stats' | 'more' | 'players'
-  const [view, setView] = useState('home')
+  // 'home' (Score) | 'history' | 'stats' | 'more' | 'players', from the
+  // address: /score, /score/history, /score/stats, /score/more, /score/players.
+  const { segments } = useLocation('/score')
+  const view = VIEWS.includes(segments[0]) ? segments[0] : 'home'
+  const setView = useCallback(v => navigate(v === 'home' ? '/score' : `/score/${v}`), [])
   const [saving, setSaving] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(() => readStorage('king-sound') !== 'off')
   const [darkMode, setDarkMode] = useState(() => readStorage('king-theme') === 'dark')
@@ -105,6 +111,7 @@ function App() {
             startedAt: parsed.startedAt || null,
             endedAt: parsed.endedAt || null,
             sheetId: parsed.sheetId || null,
+            surrenderedBy: parsed.surrenderedBy || null,
           } })
         }
       }
@@ -115,9 +122,9 @@ function App() {
   // Persist to localStorage on change
   useEffect(() => {
     if (!hydrated) return
-    const snapshot = { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId }
+    const snapshot = { players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, surrenderedBy }
     writeStorage(STATE_KEY, JSON.stringify(snapshot))
-  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
+  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, surrenderedBy, hydrated])
 
   // Publish the game in progress so others can follow it live. The pending
   // timer and the last request are kept so that ending the sheet can wait
@@ -128,10 +135,10 @@ function App() {
     const pub = publishRef.current
     pub.timer = setTimeout(() => {
       pub.timer = null
-      pub.request = publishLiveSheet(sheetId, { players, activePlayerIndex, rounds, startedAt, endedAt })
+      pub.request = publishLiveSheet(sheetId, { players, activePlayerIndex, rounds, startedAt, endedAt, surrenderedBy })
     }, 600)
     return () => { clearTimeout(pub.timer); pub.timer = null }
-  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, hydrated])
+  }, [players, activePlayerIndex, rounds, startedAt, endedAt, sheetId, surrenderedBy, hydrated])
 
   const endLiveSheet = useCallback(async (id) => {
     if (!id) return
@@ -156,7 +163,9 @@ function App() {
 
   const targetRoundsCount = useMemo(() => targetRoundsOf(players), [players])
 
-  const gameFinished = !!(players && rounds.length >= targetRoundsCount && targetRoundsCount > 0)
+  // A game is over when every round is played, or when someone surrenders.
+  const gameFinished = !!(players && ((rounds.length >= targetRoundsCount && targetRoundsCount > 0) || surrenderedBy))
+  const surrenderedName = surrenderedBy ? players?.find(p => p.id === surrenderedBy)?.name : null
 
   const finishedParticipants = useMemo(() => {
     if (!gameFinished || !players) return []
@@ -184,6 +193,7 @@ function App() {
         players: players.map((p) => ({ id: p.id, name: p.name })),
         rounds,
         durationSeconds: durationSeconds ?? undefined,
+        surrenderedBy: surrenderedBy ?? undefined,
       })
       saved = true
     } catch (err) {
@@ -198,7 +208,7 @@ function App() {
     } else {
       dispatch({ type: 'RESET' })
     }
-  }, [players, rounds, durationSeconds, sheetId, soundEnabled, endLiveSheet])
+  }, [players, rounds, durationSeconds, sheetId, surrenderedBy, soundEnabled, endLiveSheet])
 
   const handleStart = useCallback((playersList) => {
     setSelectedTypeCode(null)
@@ -240,13 +250,19 @@ function App() {
     dispatch({ type: 'EDIT_LAST', round: nextRound })
   }, [players, rounds])
 
+  const onSurrender = useCallback((playerId) => {
+    setSelectedTypeCode(null)
+    dispatch({ type: 'SURRENDER', playerId })
+    celebrate(soundEnabled)
+  }, [soundEnabled])
+
   const handleReset = useCallback(() => {
     const ok = window.confirm('Are you sure you want to reset the current game? This will clear all progress.')
     if (!ok) return
     endLiveSheet(sheetId)
     dispatch({ type: 'RESET' })
     setView('home')
-  }, [sheetId, endLiveSheet])
+  }, [sheetId, endLiveSheet, setView])
 
   return (
     <div className="app">
@@ -271,7 +287,7 @@ function App() {
       <main className="app-content">
         <Suspense fallback={PageLoading}>
           {view === 'players' && (
-            <PlayersPage onBack={() => setView('more')} currentChampion={currentChampion} />
+            <PlayersPage onBack={() => goBack('/score/more')} currentChampion={currentChampion} />
           )}
 
           {view === 'history' && (
@@ -281,7 +297,7 @@ function App() {
           {view === 'stats' && (
             <StatsPage
               currentSeasonStart={currentSeasonStart}
-              onBack={() => setView('home')}
+              onBack={() => goBack('/score')}
             />
           )}
 
@@ -310,6 +326,7 @@ function App() {
         {view === 'home' && players && !gameFinished && (
           <>
             <div className="game-toolbar">
+              <SurrenderButton players={players} roundsPlayed={rounds.length} onSurrender={onSurrender} />
               <button type="button" className="link danger-link reset-game-btn" onClick={handleReset}>
                 <Trash2 size={13} /> Reset game
               </button>
@@ -351,13 +368,23 @@ function App() {
 
         {view === 'home' && players && gameFinished && (
           <>
-            {/* The final round can still be fixed or undone until the game is saved. */}
+            {/* The final round can still be fixed or undone until the game is
+                saved; a surrendered game is taken back with Resume instead. */}
+            {surrenderedBy && (
+              <div className="surrender-note">
+                <Flag size={14} />
+                <span><strong>{surrenderedName ?? 'A player'}</strong> surrendered after round {rounds.length} of {targetRoundsCount}.</span>
+                <button type="button" className="link reset-game-btn" disabled={saving} onClick={() => dispatch({ type: 'RESUME' })}>
+                  Resume game
+                </button>
+              </div>
+            )}
             <ScoreTable
               players={players}
               rounds={rounds}
               gameFinished
-              onEditLastRound={saving ? undefined : onEditLastRound}
-              onUndoLastRound={saving ? undefined : onUndoLastRound}
+              onEditLastRound={saving || surrenderedBy ? undefined : onEditLastRound}
+              onUndoLastRound={saving || surrenderedBy ? undefined : onUndoLastRound}
               playerColors={PLAYER_COLORS}
               currentChampion={currentChampion}
             />
