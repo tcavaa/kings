@@ -269,7 +269,8 @@ body.king-light-game .k-chat-compose .k-chat-send {
 body.king-light-game .k-recording {
   color: #b44941;
 }
-body.king-light-game .k-message-reactions button {
+body.king-light-game .k-message-reactions button,
+body.king-light-game .k-message-react {
   color: #467451;
   border-color: #c2d6c2;
 }

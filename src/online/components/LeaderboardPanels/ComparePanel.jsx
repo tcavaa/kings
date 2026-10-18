@@ -167,7 +167,14 @@ export default function ComparePanel({
                   </tr>
                 </thead>
                 <tbody>
-                  {cmp.rows.map((r) => {
+                  {/* Most wins first; win % breaks ties. */}
+                  {[...cmp.rows]
+                    .sort(
+                      (x, y) =>
+                        y.wins - x.wins ||
+                        (y.winPct ?? -1) - (x.winPct ?? -1),
+                    )
+                    .map((r) => {
                     const lead = leaderOf(cmp.rows, r);
                     return (
                       <tr key={r.name}>

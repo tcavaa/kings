@@ -176,30 +176,21 @@ export default function ChatOverlay({ open, onClose }) {
                 <AvatarImg avatar={m.avatar} name={m.name} size={28} />
                 <div>
                   <span>{m.name}</span>
-                  <div className="k-message-body">
-                    {m.type === "voice" ? (
-                      <VoiceBubble
-                        url={m.url}
-                        duration={m.duration}
-                        mine={mine}
-                      />
-                    ) : (
-                      m.message
-                    )}
-                  </div>
-                  <div className="k-message-reactions">
-                    {Object.entries(m.reactions || {}).map(([emoji, by]) => (
-                      <button
-                        key={emoji}
-                        onClick={() => m.id && reactToMessage(m.id, emoji)}
-                        title={by.map((r) => r.name).join(", ")}
-                      >
-                        {emoji}
-                        {by.length > 1 ? by.length : ""}
-                      </button>
-                    ))}
+                  <div className="k-message-row">
+                    <div className="k-message-body">
+                      {m.type === "voice" ? (
+                        <VoiceBubble
+                          url={m.url}
+                          duration={m.duration}
+                          mine={mine}
+                        />
+                      ) : (
+                        m.message
+                      )}
+                    </div>
                     {m.id && (
                       <button
+                        className="k-message-react"
                         aria-label="რეაქციის დამატება"
                         onClick={() =>
                           setPickerFor(pickerFor === m.id ? null : m.id)
@@ -209,6 +200,20 @@ export default function ChatOverlay({ open, onClose }) {
                       </button>
                     )}
                   </div>
+                  {Object.keys(m.reactions || {}).length > 0 && (
+                    <div className="k-message-reactions">
+                      {Object.entries(m.reactions).map(([emoji, by]) => (
+                        <button
+                          key={emoji}
+                          onClick={() => m.id && reactToMessage(m.id, emoji)}
+                          title={by.map((r) => r.name).join(", ")}
+                        >
+                          {emoji}
+                          {by.length > 1 ? by.length : ""}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {pickerFor === m.id && (
                     <div className="k-message-reactions">
                       {REACTIONS.map((e) => (

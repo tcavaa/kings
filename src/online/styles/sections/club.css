@@ -414,6 +414,26 @@
   background: #333e2b;
   border-radius: 8px 0 8px 8px;
 }
+.k-message-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.is-mine .k-message-row {
+  flex-direction: row-reverse;
+}
+.k-message-row .k-message-body {
+  min-width: 0;
+}
+.k-message-react {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ffffff15;
+  color: #b2be9f;
+}
 .k-message-reactions {
   display: flex;
   flex-wrap: wrap;
