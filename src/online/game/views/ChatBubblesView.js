@@ -8,7 +8,7 @@ const textStyle = () => ({
   color: "#1a1a1a",
   fontFamily: latinFont(),
   fontStyle: "bold",
-  wordWrap: { width: 240, useAdvancedWrap: true },
+  wordWrap: { width: 190, useAdvancedWrap: true },
   align: "center",
 });
 
@@ -60,26 +60,31 @@ export class ChatBubblesView {
     }
     for (const [seat, { rel, msg, key }] of wanted) {
       if (this.bubbles.has(seat)) continue;
-      this.bubbles.set(seat, { key, obj: this._draw(L.AVATAR_POS[rel], msg.message || "") });
+      this.bubbles.set(seat, { key, obj: this._draw(L.AVATAR_POS[rel], msg.message || "", L.W) });
     }
   }
 
-  _draw(pos, message) {
+  _draw(pos, message, sceneW) {
     const { scene } = this;
     const text = scene.add.text(0, 0, message, textStyle()).setOrigin(0.5);
-    const tw = Math.max(40, Math.min(260, text.width + 24));
+    const tw = Math.max(40, Math.min(214, text.width + 24));
     const th = text.height + 14;
 
-    // Anchor the bubble above the avatar (own at bottom: place above; opps at top: also place above)
-    const bubble = scene.add.container(pos.x, pos.y - 78);
+    // Above the avatar, pushed sideways to stay inside the scene: a side
+    // seat sits near the edge, so a centred bubble would spill off screen.
+    // The tail still points at the avatar. Grows upward when it wraps.
+    const margin = 8;
+    const cx = Math.min(Math.max(pos.x, margin + tw / 2), sceneW - margin - tw / 2);
+    const tailX = Math.min(Math.max(pos.x - cx, -tw / 2 + 14), tw / 2 - 14);
+    const bubble = scene.add.container(cx, pos.y - 62 - th / 2);
     const bg = scene.add.graphics();
     bg.fillStyle(0xffffff, 1);
     bg.fillRoundedRect(-tw / 2, -th / 2, tw, th, 10);
     bg.lineStyle(2, 0xd7fa52, 1);
     bg.strokeRoundedRect(-tw / 2, -th / 2, tw, th, 10);
     // Tail pointing toward avatar
-    bg.fillTriangle(-6, th / 2 - 1, 6, th / 2 - 1, 0, th / 2 + 7);
-    bg.strokeTriangle(-6, th / 2 - 1, 6, th / 2 - 1, 0, th / 2 + 7);
+    bg.fillTriangle(tailX - 6, th / 2 - 1, tailX + 6, th / 2 - 1, tailX, th / 2 + 7);
+    bg.strokeTriangle(tailX - 6, th / 2 - 1, tailX + 6, th / 2 - 1, tailX, th / 2 + 7);
     bubble.add([bg, text]);
     bubble.setDepth(100);
 

@@ -440,6 +440,12 @@
   gap: 4px;
   margin-top: 6px;
 }
+.k-message-row .k-message-reactions {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  margin-top: 0;
+}
 .k-message-reactions button {
   padding: 4px 6px;
   border: 1px solid #ffffff15;
