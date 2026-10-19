@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Crown, Handshake, Skull, Pencil, Undo2 } from 'lucide-react'
+import { Crown, Handshake, Skull, Pencil, Undo2, Check, X } from 'lucide-react'
 import { GAME_TYPES } from '../constants/gameTypes'
 import TrophyIcon from './TrophyIcon'
 import { isChampionName } from '../utils/winners'
@@ -143,17 +143,17 @@ export default function ScoreTable({ players, rounds, onEditLastRound, onUndoLas
                       {!isEditing && (
                         <>
                           {onEditLastRound && (
-                            <button className="link icon-btn" onClick={startEdit} title="ბოლო რაუნდის რედაქტირება"><Pencil size={11} /> შეცვლა</button>
+                            <button className="link icon-btn" onClick={startEdit} title="ბოლო რაუნდის რედაქტირება" aria-label="ბოლო რაუნდის რედაქტირება"><Pencil size={15} /></button>
                           )}
                           {onUndoLastRound && (
-                            <button className="link icon-btn" onClick={onUndoLastRound} title="ბოლო რაუნდის გაუქმება" style={{ color: 'var(--muted)' }}><Undo2 size={11} /> გაუქმება</button>
+                            <button className="link icon-btn" onClick={onUndoLastRound} title="ბოლო რაუნდის გაუქმება" aria-label="ბოლო რაუნდის გაუქმება" style={{ color: 'var(--muted)' }}><Undo2 size={15} /></button>
                           )}
                         </>
                       )}
                       {isEditing && (
                         <>
-                          <button className="link" disabled={Boolean(validationMessage)} onClick={saveEdit}>შენახვა</button>
-                          <button className="link" onClick={cancelEdit}>გაუქმება</button>
+                          <button className="link icon-btn" disabled={Boolean(validationMessage)} onClick={saveEdit} title="შენახვა" aria-label="შენახვა"><Check size={15} /></button>
+                          <button className="link icon-btn" onClick={cancelEdit} title="გაუქმება" aria-label="გაუქმება"><X size={15} /></button>
                         </>
                       )}
                     </span>

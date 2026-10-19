@@ -12,8 +12,7 @@
     "server:dev": "npm --prefix server run dev",
     "db:merge-score-app": "node --env-file-if-exists=.env.local scripts/merge-score-app.mjs",
     "db:optimize-media": "node --env-file-if-exists=.env.local scripts/optimize-media.mjs",
-    "db:unembed-game-photos": "node --env-file-if-exists=.env.local scripts/unembed-game-photos.mjs",
-    "test:3d": "node tests/three-browser.cjs"
+    "db:unembed-game-photos": "node --env-file-if-exists=.env.local scripts/unembed-game-photos.mjs"
   },
   "engines": {
     "node": ">=20.9.0"
@@ -28,11 +27,9 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "recharts": "3.8.1",
-    "socket.io-client": "4.8.3",
-    "three": "^0.186.1"
+    "socket.io-client": "4.8.3"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.0",
     "autoprefixer": "10.5.0",
     "postcss": "8.5.12",
     "tailwindcss": "3.4.19"

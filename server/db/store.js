@@ -5,7 +5,6 @@
 // `require('../db/store')`. Each domain lives in its own module:
 //
 //   profiles.js    profiles, photos, PINs, sessions, and ჩაწერა's player list
-//   characters.js  each profile's 3D look (gender, uploaded head model)
 //   games.js       finished games, lifetime stats, the daily league quota
 //   seasons.js     King Score's seasons
 //   live.js        rooms and tournaments in progress (restart recovery)
@@ -16,7 +15,6 @@
 
 module.exports = {
   ...require('./profiles'),
-  ...require('./characters'),
   ...require('./games'),
   ...require('./seasons'),
   ...require('./live'),

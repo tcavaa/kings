@@ -423,7 +423,10 @@ button, input, select { min-height: 44px; }
 }
 .meta { color: var(--muted); margin: 2px 2px 14px; display: flex; gap: 14px; font-size: 13px; }
 
-.edit-actions { margin-left: 8px; display: inline-flex; gap: 8px; }
+/* The last round's edit/undo (or save/cancel) icons: their own row under the
+   round label, splitting the cell's width so both always fit. */
+.edit-actions { display: flex; gap: 6px; margin-top: 6px; }
+.edit-actions > .link { flex: 1 1 0; min-width: 0; padding: 6px 0; }
 .td input[type="number"] {
   width: 70px; padding: 6px 8px; border-radius: 8px;
   border: 1px solid var(--line-strong); background: var(--input-bg); color: var(--text);

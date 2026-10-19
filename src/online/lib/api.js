@@ -108,12 +108,6 @@ export const api = {
   saveProfile:   (id, body)   => request(`/api/profiles/${encodeURIComponent(id)}`, {
     method: 'PUT', body: JSON.stringify(body),
   }),
-  // 3D looks: { [profileId]: { gender, head: url|null } }
-  getCharacters: (ids)        => request(`/api/characters?ids=${ids.map(encodeURIComponent).join(',')}`),
-  getCharacter:  (id)         => request(`/api/profiles/${encodeURIComponent(id)}/character`),
-  saveCharacter: (id, body)   => request(`/api/profiles/${encodeURIComponent(id)}/character`, {
-    method: 'PUT', body: JSON.stringify(body),
-  }),
   deleteProfile: (id, currentPin) => request(`/api/profiles/${encodeURIComponent(id)}`, {
     method: 'DELETE', body: JSON.stringify({ currentPin }),
   }),

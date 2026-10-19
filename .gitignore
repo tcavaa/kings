@@ -29,7 +29,4 @@ npm-debug.log*
 backups/
 .claude/worktrees/
 
-# Blender texture scratch output
-blender/build/
-__pycache__/
 scripts/.media-backup/

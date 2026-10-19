@@ -268,7 +268,7 @@ async function getProfileByName(name) {
 }
 
 module.exports = {
-  assertPinOwner, listProfiles, getProfile, getProfileByName, upsertProfile, deleteProfile, verifyProfilePin,
+  listProfiles, getProfile, getProfileByName, upsertProfile, deleteProfile, verifyProfilePin,
   getProfileAvatar, createProfileSession, profileForSession,
   listPlayers, createPlayer, deletePlayer, clearPlayerPin, setPlayerPin,
 };
