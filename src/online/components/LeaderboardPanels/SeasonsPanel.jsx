@@ -15,6 +15,8 @@ import { isWinnerName } from "../../lib/leaderboard";
 import { inSeason } from "../../../../server/games/results.js";
 import { currentSeasonOf, gamesSince, leagueGames, standingsOf } from "../../lib/seasons";
 import AvatarImg from "../AvatarImg";
+import FormGuide from "./FormGuide";
+import { recentForm } from "../../lib/playerStats";
 import { signed, winRate, averageScore } from "../../utils/format";
 import {
   CHART_COLOURS as COLOURS,
@@ -35,40 +37,54 @@ const fmt = (d) =>
 const seasonChampions = (season) =>
   season?.champion_names || String(season?.champion_name || "").split(" & ").filter(Boolean);
 
-function Standings({ players, champions = [] }) {
+// The season table, in the rankings' style: form, games, wins and win rate.
+// A name opens the player's profile, a form box the game.
+function Standings({ players, games, champions = [], onPlayerSelect, onSelectGame }) {
   if (!players.length) return <p className="k-data-empty">ამ სეზონში თამაში ჯერ არ არის.</p>;
   const champs = new Set(champions);
   return (
-    <div className="k-table-scroll">
-      <table className="k-data-table">
+    <div className="k-rank-table-wrap k-season-standings">
+      <table className="k-rank-table">
         <thead>
           <tr>
+            <th>#</th>
             <th>მოთამაშე</th>
+            <th>ფორმა</th>
             <th>თამაში</th>
             <th>მოგება</th>
             <th>მოგ. %</th>
-            <th>
-              საშუალო<small>ქულა</small>
-            </th>
+            <th>საშუალო</th>
           </tr>
         </thead>
         <tbody>
           {players.map((p, i) => (
-            <tr key={p.name} className={champs.has(p.name) ? "is-current" : undefined}>
-              <th>
-                <div className="k-player-cell">
-                  <span className="k-muted">{String(i + 1).padStart(2, "0")}</span>
-                  <AvatarImg avatar={p.avatar} name={p.name} size={28} />
-                  <span>{p.name}</span>
-                  {champs.has(p.name) && <Trophy size={14} />}
-                </div>
-              </th>
+            <tr key={p.name} className={champs.has(p.name) ? "is-champion" : undefined}>
+              <td>{String(i + 1).padStart(2, "0")}</td>
+              <td>
+                <button
+                  className="k-player-link"
+                  onClick={() => onPlayerSelect?.(p.name)}
+                  aria-label={`${p.name} — პროფილი`}
+                >
+                  <AvatarImg avatar={p.avatar} name={p.name} size={36} />
+                  <strong>{p.name}</strong>
+                  {champs.has(p.name) && <Trophy size={14} aria-label="ჩემპიონი" />}
+                </button>
+              </td>
+              <td className="k-form-cell">
+                <FormGuide
+                  form={recentForm(games, p.name, 5)}
+                  name={p.name}
+                  onSelectGame={onSelectGame}
+                  size="sm"
+                />
+              </td>
               <td>{p.gamesPlayed}</td>
               <td>
-                <b>{p.wins}</b>
+                <span className="k-wins-badge">{p.wins}</span>
               </td>
               <td>{winRate(p)}%</td>
-              <td>{signed(averageScore(p))}</td>
+              <td className={averageScore(p) < 0 ? "k-negative" : ""}>{signed(averageScore(p))}</td>
             </tr>
           ))}
         </tbody>
@@ -117,7 +133,7 @@ function SeasonRace({ games, players }) {
   );
 }
 
-export default function SeasonsPanel({ games }) {
+export default function SeasonsPanel({ games, onPlayerSelect, onSelectGame }) {
   const [seasons, setSeasons] = useState(null);
   const [error, setError] = useState(false);
   const [pastId, setPastId] = useState("");
@@ -186,7 +202,12 @@ export default function SeasonsPanel({ games }) {
           </div>
         </div>
         <SeasonRace games={currentGames} players={currentPlayers} />
-        <Standings players={currentPlayers} />
+        <Standings
+          players={currentPlayers}
+          games={currentGames}
+          onPlayerSelect={onPlayerSelect}
+          onSelectGame={onSelectGame}
+        />
       </section>
       <section className="k-analysis-panel">
         <header>
@@ -251,7 +272,13 @@ export default function SeasonsPanel({ games }) {
               ))}
             </select>
           </header>
-          <Standings players={shownPast.players} champions={seasonChampions(shownPast.season)} />
+          <Standings
+            players={shownPast.players}
+            games={shownPast.games}
+            champions={seasonChampions(shownPast.season)}
+            onPlayerSelect={onPlayerSelect}
+            onSelectGame={onSelectGame}
+          />
         </section>
       )}
     </div>

@@ -105,6 +105,11 @@ function AppInner() {
     wasInRoom.current = inRoom
   }, [inRoom, roomPath, appPhase, top])
   const openLeaderboard = () => navigate('/leaderboard')
+  // Just left a table: the address is still the table's until the effect
+  // above swaps it for /. The lobby would read /room/CODE as an invite link
+  // (opening the private-table sheet) or /watch/CODE as one to watch again,
+  // so it waits for the new address.
+  const leavingRoom = !inRoom && wasInRoom.current && (top === 'room' || top === 'watch')
 
   return (
     <div className="min-h-screen text-ink"
@@ -115,7 +120,7 @@ function AppInner() {
           <Leaderboard home={appPhase === 'gameover' && roomPath ? roomPath : '/'} />
         ) : (
           <>
-            {appPhase === 'lobby'    && (
+            {appPhase === 'lobby' && !leavingRoom && (
               <Lobby onOpenLeaderboard={openLeaderboard} />
             )}
             {appPhase === 'waiting'  && <WaitingRoom />}

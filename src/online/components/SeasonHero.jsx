@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Crown } from "lucide-react";
+import { ArrowUpRight, Crown } from "lucide-react";
 import { api } from "../lib/api";
 import { withCurrentAvatars } from "../lib/playerAvatars";
 import { recentForm } from "../lib/playerStats";
@@ -13,7 +13,8 @@ const TOP = 3;
 /**
  * The homepage's opening: the current season's name and its top three, by
  * the same table as the leaderboard's Seasons tab. The leader wears the
- * crown. A name opens the player's profile, a form box the game.
+ * crown. A name opens the player's profile, a form box the game, and the
+ * link under the table the whole season.
  */
 export default function SeasonHero({ profiles }) {
   const [seasons, setSeasons] = useState(null);
@@ -102,6 +103,12 @@ export default function SeasonHero({ profiles }) {
               ))}
             </tbody>
           </table>
+          <button
+            className="k-link k-season-more"
+            onClick={() => navigate("/leaderboard/seasons")}
+          >
+            სრული სეზონი <ArrowUpRight size={16} />
+          </button>
         </div>
       )}
     </>

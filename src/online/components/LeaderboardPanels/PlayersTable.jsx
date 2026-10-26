@@ -1,6 +1,7 @@
 import AvatarImg from "../AvatarImg";
 import FormGuide from "./FormGuide";
 import { recentForm } from "../../lib/playerStats";
+import { winRate } from "../../utils/format";
 export default function PlayersTable({
   aggregated,
   games = [],
@@ -17,6 +18,7 @@ export default function PlayersTable({
             <th>ფორმა</th>
             <th>თამაში</th>
             <th>მოგება</th>
+            <th>მოგ. %</th>
             <th>ქულა</th>
           </tr>
         </thead>
@@ -46,6 +48,7 @@ export default function PlayersTable({
               <td>
                 <span className="k-wins-badge">{p.wins}</span>
               </td>
+              <td>{winRate(p)}%</td>
               <td className={p.totalScore < 0 ? "k-negative" : ""}>
                 {p.totalScore > 0 ? "+" : ""}
                 {p.totalScore}

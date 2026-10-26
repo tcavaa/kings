@@ -54,6 +54,9 @@
 .k-season-top .k-rank-table td {
   padding: 13px 10px;
 }
+.k-season-top .k-season-more {
+  margin-top: 16px;
+}
 .k-season-top tr.is-leader td strong {
   font-weight: 650;
 }

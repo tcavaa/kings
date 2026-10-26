@@ -23,7 +23,11 @@ export function currentSeasonOf(seasons) {
 export const gamesSince = (games, start) =>
   start ? leagueGames(games).filter((g) => inSeason(g.playedAt, start)) : []
 
-/** A season's table rows, best first, with each player's photo from their games. */
+/**
+ * A season's table rows, best first, with each player's photo from their
+ * games. Level on wins, the better win rate goes first (fewer games for the
+ * same wins).
+ */
 export function standingsOf(games) {
   const avatars = new Map()
   for (const g of games) {
@@ -32,5 +36,8 @@ export function standingsOf(games) {
   const table = seasonTable(
     games.map((g) => ({ playedAt: g.playedAt, type: g.type, players: g.players, winners: winnerNames(g) })),
   )
-  return table.map((r) => ({ ...r, gamesPlayed: r.games, avatar: avatars.get(r.name) || null }))
+  const rate = (r) => (r.games ? r.wins / r.games : 0)
+  return table
+    .sort((a, b) => b.wins - a.wins || rate(b) - rate(a) || a.name.localeCompare(b.name))
+    .map((r) => ({ ...r, gamesPlayed: r.games, avatar: avatars.get(r.name) || null }))
 }

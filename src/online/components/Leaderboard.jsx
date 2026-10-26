@@ -98,7 +98,9 @@ export default function Leaderboard({ home = "/" }) {
         .sort((a, b) =>
           sort === "score"
             ? b.totalScore - a.totalScore
-            : b.wins - a.wins || b.totalScore - a.totalScore,
+            : sort === "rate"
+              ? b.wins / b.gamesPlayed - a.wins / a.gamesPlayed || b.wins - a.wins
+              : b.wins - a.wins || b.totalScore - a.totalScore,
         )
         .map((p, i) => ({ ...p, rank: i + 1 })),
     [aggregated, sort],
@@ -376,6 +378,7 @@ export default function Leaderboard({ home = "/" }) {
                     }}
                   >
                     <option value="wins">მოგებებით</option>
+                    <option value="rate">მოგების %-ით</option>
                     <option value="score">ქულებით</option>
                   </select>
                 </div>
@@ -408,7 +411,11 @@ export default function Leaderboard({ home = "/" }) {
               </p>
             )
           ) : section === "seasons" ? (
-            <SeasonsPanel games={games} />
+            <SeasonsPanel
+              games={games}
+              onPlayerSelect={setProfileName}
+              onSelectGame={setSelected}
+            />
           ) : section === "insights" ? (
             aggregated.length > 1 ? (
               <Insights

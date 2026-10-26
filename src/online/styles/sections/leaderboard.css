@@ -62,6 +62,45 @@
 .k-season-race {
   padding: 20px 12px 14px;
 }
+/* The season tables: the rankings' table, on the panels' dark ground. */
+.k-season-standings {
+  padding: 0 16px 8px;
+}
+.k-season-standings .k-rank-table th {
+  color: #a4b394;
+  border-bottom-color: #ffffff2e;
+}
+.k-season-standings .k-rank-table td {
+  border-bottom-color: #ffffff14;
+}
+.k-season-standings .k-rank-table td:first-child {
+  color: #8d9a7e;
+}
+.k-season-standings .k-rank-table tr:hover td {
+  background: #2a3127;
+}
+.k-season-standings .k-wins-badge {
+  background: #3a4630;
+  color: #d7fa52;
+}
+.k-season-standings .k-form-dot.is-latest::after {
+  background: #a4b394;
+}
+.k-season-standings .k-form-dot:hover,
+.k-season-standings .k-form-dot:focus-visible {
+  outline-color: #ffffff66;
+}
+.k-season-standings .k-negative {
+  color: #e98a72;
+}
+.k-season-standings tr.is-champion td strong {
+  font-weight: 650;
+  color: #d7fa52;
+}
+.k-season-standings tr.is-champion svg {
+  color: #e8c547;
+  flex: none;
+}
 @media (max-width: 720px) {
   .k-season-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
