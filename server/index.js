@@ -41,6 +41,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: { origin: CORS_ORIGINS, methods: ['GET', 'POST'] },
+  // Notice a dead connection within ~20 s instead of the default ~45 s. A
+  // phone that loses its network mid-game otherwise keeps a socket both ends
+  // think is open, and the table freezes for the whole time.
+  pingInterval: 10000,
+  pingTimeout: 10000,
 });
 
 const gameManager = new GameManager();

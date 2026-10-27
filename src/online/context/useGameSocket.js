@@ -25,11 +25,13 @@ export function useGameSocket(ctx) {
  */
 export function connectGameSocket(ctx, url = SOCKET_URL) {
   const { refs } = ctx
-  // Use socket.io's default transport flow: connect via long-polling first
-  // (which works on any HTTP server), then *optimistically* upgrade to
-  // WebSocket in the background. If the host doesn't allow WS upgrades, we
-  // silently stay on polling instead of hanging on the WS handshake. The
-  // game server is its own host (see SOCKET_URL).
+  // WebSocket first, long-polling only if the WebSocket fails. Polling first
+  // (socket.io's default) stalled on iPhones: after the network changes or
+  // the page is reloaded, iOS can send the polling request down a dead
+  // pooled HTTP connection, and the lobby sat on "connecting…" with the join
+  // button disabled until the connect timeout or a few more refreshes. A
+  // WebSocket always opens a new connection, and needs one round trip less.
+  // The game server is its own host (see SOCKET_URL).
   //
   // Reconnection is socket.io's default — we just turn the knobs to be
   // a bit more aggressive on the first few attempts because mobile wifi
@@ -39,6 +41,8 @@ export function connectGameSocket(ctx, url = SOCKET_URL) {
     // refresh gets them back and nobody else can.
     auth: { clientKey: getClientKey() },
     withCredentials: false,
+    transports: ['websocket', 'polling'],
+    tryAllTransports: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 600,
@@ -105,6 +109,8 @@ export function connectGameSocket(ctx, url = SOCKET_URL) {
 
   socket.on('disconnect', () => {
     ctx.setConnected(false)
+    // Already known to be down: the rejoin's snapshot replaces the resync.
+    ctx.resyncAnswered()
     // Only flag the reconnect banner if we were actually mid-game / mid-
     // lobby — a brief blip during the very first connection attempt
     // shouldn't pop the banner.
@@ -150,6 +156,8 @@ export function connectGameSocket(ctx, url = SOCKET_URL) {
   return () => {
     ctx.clearTrickTimers()
     ctx.clearGameOverTimer()
+    ctx.resyncAnswered()
+    clearTimeout(refs.playTimer.current)
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', onResumeVisibility)
     }

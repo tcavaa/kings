@@ -155,7 +155,11 @@ export function registerTableEvents(socket, ctx) {
     }
   })
 
+  // The answer to a resync whose table we already hold.
+  socket.on('state-current', () => ctx.resyncAnswered())
+
   socket.on('game-state', (state) => {
+    ctx.resyncAnswered()
     // A snapshot of a FINISHED game must never drag the user back onto
     // the table. Late snapshots arrive after game over (visibility-resume
     // resync, a socket blip reconnect, the error-path resync) — route

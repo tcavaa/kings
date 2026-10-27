@@ -247,7 +247,7 @@ export function registerRoomEvents(socket, ctx) {
     if (refs.playPending.current) {
       refs.playPending.current = false
       ctx.dispatch({ type: 'play-released' })
-      socket.emit('request-state')
+      ctx.requestState({ full: true })
     }
     // Still in the lobby without a seat: a join was refused, so forget the
     // room code joinRoom stashed, or a later blip would rejoin it.

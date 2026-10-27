@@ -1,5 +1,8 @@
 import { readSeatMarker, clearSeatMarker } from '../lib/publicSeatStore'
 
+// How long a card play may wait for the server's answer before we resync.
+const PLAY_ACK_MS = 4000
+
 /**
  * Everything the UI can ask of the game server. Built once from the
  * provider's toolbox, so every action keeps one identity for the app's
@@ -79,6 +82,16 @@ export function createActions(ctx) {
       refs.playPending.current = true
       dispatch({ type: 'play-sent', card })
       emit('play-card', { card })
+      // The card is already out of the hand and the hand is locked until the
+      // server answers. If the play was lost on its way (a connection that
+      // died quietly), nothing would ever unlock it: the player sees their
+      // turn, one card more than the others and no way to play. Ask for the
+      // table instead, which also notices a dead connection.
+      clearTimeout(refs.playTimer.current)
+      refs.playTimer.current = setTimeout(() => {
+        refs.playTimer.current = null
+        if (refs.playPending.current) ctx.requestState({ full: true })
+      }, PLAY_ACK_MS)
     },
 
     nextRound: tableAction(() => emit('next-round')),

@@ -1,6 +1,9 @@
 import { getProfileToken } from '../lib/profiles'
 import { createActions } from './gameActions'
 
+// How long a resync may go unanswered before the connection counts as dead.
+const RESYNC_REPLY_MS = 6000
+
 /**
  * The values the socket listeners read. They're registered once, so they go
  * through these mutable refs rather than through React state.
@@ -28,6 +31,10 @@ export function createGameRefs() {
     // background resync at that version gets a short "up to date" reply
     // instead of the whole table.
     stateVersion: ref(null),
+    // Pending checks that the server answered: a resync (see requestState)
+    // and our last card play (see playCard).
+    resyncTimer: ref(null),
+    playTimer: ref(null),
     trickTimers: ref([]),
     // The switch to the results screen, a moment after game-over. Cancelled
     // by anything that moves us to another table first (the tournament final).
@@ -97,12 +104,31 @@ export function createGameCtx({ refs, dispatch, chat, unlockAudio, playClip, set
     }),
 
     // Watchdog / tab-resume resync. Sends our table version so an unchanged
-    // table costs a one-line reply. (A rejected play resyncs without it: our
-    // optimistic hand differs from the server's even at the same version.)
-    requestState: () => {
+    // table costs a one-line reply. `full` drops the version: after a play
+    // that went unanswered or was refused, our optimistic hand differs from
+    // the server's even at the same version.
+    //
+    // The server always answers (game-state or state-current). No answer
+    // means the connection died without socket.io noticing: iOS keeps a
+    // dropped socket "connected" until the heartbeat gives up, and in the
+    // meantime the table looks frozen. Closing the transport makes socket.io
+    // reconnect, and the rejoin brings back our seat and a fresh snapshot.
+    requestState: ({ full = false } = {}) => {
+      const socket = refs.socket.current
+      if (!socket) return
       const v = refs.stateVersion.current
-      refs.socket.current?.emit('request-state',
-        v && v.room === refs.roomCode.current ? { version: v.version } : {})
+      socket.emit('request-state',
+        !full && v && v.room === refs.roomCode.current ? { version: v.version } : {})
+      if (refs.resyncTimer.current) return
+      refs.resyncTimer.current = setTimeout(() => {
+        refs.resyncTimer.current = null
+        if (refs.socket.current !== socket || !socket.connected || refs.reconnecting.current) return
+        socket.io.engine?.close()
+      }, RESYNC_REPLY_MS)
+    },
+    resyncAnswered: () => {
+      clearTimeout(refs.resyncTimer.current)
+      refs.resyncTimer.current = null
     },
 
     seatName: (seat, list = refs.players.current) =>
