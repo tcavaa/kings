@@ -22,6 +22,9 @@ const nextConfig = {
   // open a second game socket); the score app opts in itself, exactly like
   // its old main.jsx did. Production behaviour is unaffected either way.
   reactStrictMode: false,
+  // No AGENTS.md: `next dev` otherwise writes one whenever an AI coding agent
+  // runs it.
+  agentRules: false,
   // The API routes share the game server's CommonJS store (server/db), which
   // talks to Supabase through the postgres driver — keep it unbundled.
   serverExternalPackages: ['postgres'],
