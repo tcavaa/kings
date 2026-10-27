@@ -377,7 +377,9 @@ function ResultsContent({ onOpenLeaderboard, game }) {
           )}
         </section>
       </div>
-      {bracketOpen && <BracketOverview onClose={() => setBracketOpen(false)} />}
+      {bracketOpen && (
+        <BracketOverview code={tournamentSeat?.code} onClose={() => setBracketOpen(false)} />
+      )}
     </ClubShell>
   );
 }

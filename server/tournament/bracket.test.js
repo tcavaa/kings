@@ -86,7 +86,7 @@ test('the specified double-tie case: 25/25 vs 5/5', () => {
     table(0, [{ name: 'A', score: 25, penalty: -30 }, { name: 'B', score: 25, penalty: -40 }, { name: 'C', score: -10 }]),
     table(1, [{ name: 'D', score: 5, penalty: -60 }, { name: 'E', score: 5, penalty: -20 }, { name: 'F', score: -30 }]),
   ]);
-  eq('both 25s advance, then the cleaner 5', names(r), ['A', 'B', 'E']);
+  eq('each table sends one (E on fewer penalties), then the second 25', names(r), ['A', 'E', 'B']);
   check('E beat D on fewer penalties',
     r.standings.find((s) => s.name === 'E').rank < r.standings.find((s) => s.name === 'D').rank);
   check('no wildcard — four winners filled the seats',
@@ -111,15 +111,43 @@ test('9 players, no ties: the three winners', () => {
   check('no wildcard in a 9-player bracket', r.finalists.every((f) => f.isWinner));
 });
 
-test('9 players with a tied table: four winners for three seats', () => {
+test('9 players with a tied table: every table still sends its winner', () => {
   const r = pickFinalists([
     table(0, [{ name: 'A', score: 30 }, { name: 'B', score: 5 }, { name: 'C', score: -5 }]),
     table(1, [{ name: 'D', score: 20, penalty: -50 }, { name: 'E', score: 20, penalty: -15 }, { name: 'F', score: 0 }]),
     table(2, [{ name: 'G', score: 12 }, { name: 'H', score: 11 }, { name: 'I', score: 1 }]),
   ]);
-  eq('top three winners by score then penalty', names(r), ['A', 'E', 'D']);
-  check('G won a table but ranked out',
-    r.standings.find((s) => s.name === 'G').advanced === false);
+  eq('the drawn table goes to its less-penalised winner', names(r), ['A', 'E', 'G']);
+  check('D lost the tiebreak at their own table',
+    r.standings.find((s) => s.name === 'D').advanced === false);
+});
+
+test('9 players: a drawn table never knocks out a lower-scoring winner', () => {
+  // Table 0 draws on 40 — both out-score table 2's winner on 2.
+  const r = pickFinalists([
+    table(0, [{ name: 'A', score: 40, penalty: -60 }, { name: 'B', score: 40, penalty: -20 }, { name: 'C', score: -5 }]),
+    table(1, [{ name: 'D', score: 20 }, { name: 'E', score: 5 }, { name: 'F', score: 0 }]),
+    table(2, [{ name: 'G', score: 2 }, { name: 'H', score: 1 }, { name: 'I', score: 0 }]),
+  ]);
+  eq('B, D and G', names(r), ['B', 'D', 'G']);
+});
+
+test('9 players: a three-way tied table sends one', () => {
+  const r = pickFinalists([
+    table(0, [{ name: 'A', score: 10, penalty: -30 }, { name: 'B', score: 10, penalty: -10 }, { name: 'C', score: 10, penalty: -20 }]),
+    table(1, [{ name: 'D', score: 20 }, { name: 'E', score: 5 }, { name: 'F', score: 0 }]),
+    table(2, [{ name: 'G', score: 2 }, { name: 'H', score: 1 }, { name: 'I', score: 0 }]),
+  ]);
+  eq('D, B (cleanest of the trio) and G', names(r), ['D', 'B', 'G']);
+});
+
+test('6 players: one drawn table sends both, the other its winner', () => {
+  const r = pickFinalists([
+    table(0, [{ name: 'A', score: 15 }, { name: 'B', score: 15 }, { name: 'C', score: -30 }]),
+    table(1, [{ name: 'D', score: 40 }, { name: 'E', score: 35 }, { name: 'F', score: -75 }]),
+  ]);
+  eq('A, B and D — E misses out despite out-scoring both', names(r).sort(), ['A', 'B', 'D']);
+  check('no wildcard', r.finalists.every((f) => f.isWinner));
 });
 
 test('a three-way tied table', () => {

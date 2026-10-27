@@ -159,6 +159,10 @@ export function GameProvider({ children }) {
   // hide controls the server would refuse anyway.
   const canSpeak = !spectating || !!spectating.tournamentId
 
+  // Entered in a tournament that may still seat us: until it is over, or
+  // until the final is drawn without us. Holds off every other table.
+  const inTournament = !!tournament && tournament.status !== 'done' && !tournament.eliminated
+
   // The banner names everyone who is still away.
   const disconnectedPlayer = disconnectedPlayers.length ? disconnectedPlayers.join(' და ') : null
 
@@ -172,7 +176,7 @@ export function GameProvider({ children }) {
     quitProposal,
     publicSeat, publicSeatMode, resumableSeat,
     gameStartedAt,
-    tournament, tournamentSeat, spectating,
+    tournament, tournamentSeat, spectating, inTournament,
     roomMode,
     rematch,
     ...actions,
@@ -186,7 +190,7 @@ export function GameProvider({ children }) {
     quitProposal,
     publicSeat, publicSeatMode, resumableSeat,
     gameStartedAt,
-    tournament, tournamentSeat, spectating,
+    tournament, tournamentSeat, spectating, inTournament,
     roomMode,
     rematch,
     actions,

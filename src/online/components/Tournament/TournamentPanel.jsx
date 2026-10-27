@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, Plus, LogOut, Trophy } from "lucide-react";
+import { ArrowRight, Plus, LogOut, Trophy, Swords } from "lucide-react";
 import { useGame, useLobby } from "../../context/GameContext";
 import AvatarImg from "../AvatarImg";
+import BracketOverview from "./BracketOverview";
 
 const SIZES = [6, 9];
 
@@ -25,9 +26,21 @@ export default function TournamentPanel({ active, onNeedProfile }) {
     refreshTournaments,
   } = useGame();
   const { tournamentList } = useLobby();
+  // The list also carries running and finished tournaments (the homepage
+  // shows those); only a lobby can be joined.
+  const openList = tournamentList.filter((t) => t.status === "lobby");
 
   const [size, setSize] = useState(6);
   const [code, setCode] = useState("");
+  const [bracketOpen, setBracketOpen] = useState(false);
+  const bracket = bracketOpen && tournament && (
+    <BracketOverview code={tournament.code} onClose={() => setBracketOpen(false)} />
+  );
+  const bracketButton = (
+    <button className="k-button k-button-outline" onClick={() => setBracketOpen(true)}>
+      ტურნირის ცხრილი <Swords size={18} />
+    </button>
+  );
 
   // Fetch the open-tournament list on mount and after a reconnect. Later
   // changes (ours included) arrive in the server's own broadcast.
@@ -51,7 +64,9 @@ export default function TournamentPanel({ active, onNeedProfile }) {
           <button className="k-button" onClick={dismissTournament}>
             ახალი ტურნირი <ArrowRight size={18} />
           </button>
+          {bracketButton}
         </section>
+        {bracket}
       </div>
     );
 
@@ -66,11 +81,15 @@ export default function TournamentPanel({ active, onNeedProfile }) {
             მიმდინარეობს.
           </h3>
           <p>
-            {tournament.status === "final"
-              ? "ფინალი მიმდინარეობს. როცა დასრულდება, გამარჯვებული აქ გამოჩნდება."
-              : "ნახევარფინალები მიმდინარეობს. ფინალისტები ყველა მაგიდის დასრულების შემდეგ გაირკვევა."}
+            {tournament.eliminated
+              ? "ფინალში ვერ გახვედი. შეგიძლია უყურო ფინალს ან ითამაშო ლიგაში."
+              : tournament.status === "final"
+                ? "ფინალი მიმდინარეობს. როცა დასრულდება, გამარჯვებული აქ გამოჩნდება."
+                : "ნახევარფინალები მიმდინარეობს. ფინალისტები ყველა მაგიდის დასრულების შემდეგ გაირკვევა. მანამდე შეგიძლია სხვა მაგიდებს უყურო."}
           </p>
+          {bracketButton}
         </section>
+        {bracket}
       </div>
     );
 
@@ -170,8 +189,8 @@ export default function TournamentPanel({ active, onNeedProfile }) {
       </section>
       <section className="k-open-tournaments">
         <span className="k-eyebrow">OPEN TOURNAMENTS</span>
-        {tournamentList.length ? (
-          tournamentList.map((t) => (
+        {openList.length ? (
+          openList.map((t) => (
             <button
               key={t.id}
               disabled={!canAct}

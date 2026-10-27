@@ -6,6 +6,8 @@ import {
   Check,
   MessageCircle,
   ChartNoAxesColumnIncreasing,
+  Eye,
+  Swords,
 } from "lucide-react";
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
@@ -25,6 +27,7 @@ function TopBar({
   onToggleScores,
   onToggleChat,
   onToggleRounds,
+  onToggleBracket,
   waiting,
 }) {
   const {
@@ -34,6 +37,8 @@ function TopBar({
     roomCode,
     gamePhase,
     connected,
+    spectating,
+    stopSpectating,
   } = useGame();
   const [copied, setCopied] = useState(false);
   const timer = useRef(null);
@@ -59,17 +64,26 @@ function TopBar({
         </button>
         <span>kıng</span>
         {/* The room code is what friends type to join, so it's the most
-            visible thing up here; tapping it copies it. */}
-        <button
-          className="k-room-code"
-          aria-label={`ოთახის კოდი ${roomCode} — კოპირება`}
-          title="კოდის კოპირება"
-          onClick={copy}
-        >
-          <small>მაგიდა</small>
-          <b>{roomCode}</b>
-          {copied ? <Check size={15} /> : <Copy size={15} />}
-        </button>
+            visible thing up here; tapping it copies it. A watcher can't
+            join, so they get the way out in its place. */}
+        {spectating ? (
+          <div className="k-watch-chip" role="status">
+            <Eye size={14} aria-hidden="true" />
+            <span>უყურებ</span>
+            <button onClick={stopSpectating}>გასვლა</button>
+          </div>
+        ) : (
+          <button
+            className="k-room-code"
+            aria-label={`ოთახის კოდი ${roomCode} — კოპირება`}
+            title="კოდის კოპირება"
+            onClick={copy}
+          >
+            <small>მაგიდა</small>
+            <b>{roomCode}</b>
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
+        )}
       </div>
       <div className="k-round-group">
         {waiting && (
@@ -130,6 +144,16 @@ function TopBar({
           <i className={connected ? "on" : ""} />
         </span>
         <GameTimer />
+        {onToggleBracket && (
+          <button
+            className="k-game-icon k-bracket-trigger"
+            aria-label="ტურნირის მიმოხილვა"
+            title="ტურნირის მიმოხილვა"
+            onClick={onToggleBracket}
+          >
+            <Swords size={17} />
+          </button>
+        )}
         <button
           className="k-rounds-trigger"
           onClick={onToggleRounds}

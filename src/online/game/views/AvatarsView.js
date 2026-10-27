@@ -117,6 +117,7 @@ export class AvatarsView {
       const isLeader = seat === leaderSeat;
       const view = {
         portrait: L.portrait,
+        layout: L.id,
         name: player.name,
         isOwn,
         isActive: gamePhase === "playing" && currentTurn === seat,

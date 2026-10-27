@@ -66,28 +66,40 @@ function compareCandidates(a, b) {
 /**
  * Choose the three finalists from every finished semifinal table.
  *
- * Two tiers, each internally ranked:
- *   1. table winners
- *   2. everyone else
+ * Three tiers, each internally ranked:
+ *   1. every table's winner — one seat per table, always
+ *   2. the other co-winners of a drawn table
+ *   3. everyone else
  *
- * Winners are always seated before non-winners regardless of score, so a
- * strong player who lost their table can never bump a weaker table's winner —
- * the leftover seat (the "wildcard", only reachable in a 6-player bracket) is
- * what the best non-winner competes for.
+ * Tier 1 is what makes "each table winner goes to the final" hold: a drawn
+ * table settles its own winner by penalty points (less negative goes through)
+ * and can never push another table's winner out, however low that winner
+ * scored. In a 9-player bracket the three tables fill the final there and
+ * then.
  *
- * Ties fall out of the same ranking rather than needing a special case. With
- * two tables tied 25/25 and 5/5 there are four winners for three seats: both
- * 25s rank first, and the 5s are split by penalty points — matching the rule
- * the tournament was specified with.
+ * In a 6-player bracket the third seat goes to a drawn table's other winner
+ * when there is one ("a draw sends both"), otherwise to the best player who
+ * didn't win their table — the wildcard. Winners always rank before
+ * non-winners, so a strong runner-up can never bump a table's winner. With
+ * both tables drawn (25/25 and 5/5) there are four winners for three seats:
+ * each table sends one, and the last seat is decided by score then penalty
+ * points — so the second 25 goes through.
  *
  * @returns {{ finalists: object[], standings: object[] }}
  */
 function pickFinalists(tables = []) {
-  const candidates = tables.flatMap(tableCandidates);
-  const winners = candidates.filter((c) => c.isWinner).sort(compareCandidates);
-  const rest    = candidates.filter((c) => !c.isWinner).sort(compareCandidates);
+  const byTable = tables.map((t) => tableCandidates(t).sort(compareCandidates));
+  // Sorted by score then penalty, so the first winner listed is the one who
+  // wins the table's own tiebreak.
+  const heads = byTable.map((list) => list.find((c) => c.isWinner) || list[0]).filter(Boolean);
+  const coWinners = byTable.flatMap((list) => list.filter((c) => c.isWinner && !heads.includes(c)));
+  const rest = byTable.flatMap((list) => list.filter((c) => !c.isWinner && !heads.includes(c)));
 
-  const ordered = [...winners, ...rest];
+  const ordered = [
+    ...heads.sort(compareCandidates),
+    ...coWinners.sort(compareCandidates),
+    ...rest.sort(compareCandidates),
+  ];
   const finalists = ordered.slice(0, FINAL_SEATS);
   const finalistNames = new Set(finalists.map((f) => f.name));
 

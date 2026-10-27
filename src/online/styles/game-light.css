@@ -650,3 +650,45 @@ body.king-light-game .k-game-header .k-turn-status small {
     display: none !important;
   }
 }
+
+/* Watching: the header's room-code slot holds the watch badge and its exit. */
+.k-watch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 6px 6px 11px;
+  border-radius: 5px;
+  background: #31536b;
+  color: #eeeae1;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.k-watch-chip > button {
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: #eeeae1;
+  color: #31536b;
+  font-size: 11px;
+  font-weight: 700;
+}
+.k-watch-chip > button:hover {
+  background: #d7fa52;
+  color: #171919;
+}
+body.king-light-game .k-game-tools .k-bracket-trigger {
+  color: #8a6a26;
+  background: #f6eedb;
+  border-color: #e0cfa6;
+}
+/* Narrow phones: the eye says it; the exit keeps its word. Keeps the
+   badge and the tools on one header row. */
+@media (max-width: 430px) {
+  .k-watch-chip {
+    padding-left: 9px;
+    gap: 6px;
+  }
+  .k-watch-chip > span {
+    display: none;
+  }
+}

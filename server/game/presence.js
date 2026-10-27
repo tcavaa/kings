@@ -134,7 +134,12 @@ const presenceMethods = {
         roomCode: room.code,
         mode: room.mode || 'public',
         tournament: room.tournamentId
-          ? { stage: room.tournamentStage || null, table: room.tournamentTable ?? null }
+          ? {
+            id: room.tournamentId,
+            code: String(room.tournamentId).replace(/^t_/, ''),
+            stage: room.tournamentStage || null,
+            table: room.tournamentTable ?? null,
+          }
           : null,
         round: gs.round,
         phase: gs.phase,

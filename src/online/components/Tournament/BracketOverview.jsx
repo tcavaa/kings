@@ -13,9 +13,10 @@ const PHASE_LABEL = {
   game_over:       'დასრულდა',
 }
 
-function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
+function TableCard({ table, isFinal, myRoomCode, watching, onSpectate }) {
   const finished = table.status === 'finished' || table.phase === 'game_over'
   const mine = table.roomCode === myRoomCode
+  const watched = table.roomCode === watching
   // Highest score first so the leader of each table reads at a glance.
   const players = [...(table.players || [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
 
@@ -60,7 +61,7 @@ function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
       </div>
 
       {/* You can watch any table that isn't the one you're sitting at. */}
-      {!mine && !finished && (
+      {!mine && !watched && !finished && (
         <button onClick={() => onSpectate(table.roomCode)}
                 className="mt-2.5 w-full px-3 py-1.5 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 active:scale-95 transition-transform"
                 style={{ background: 'rgba(49,83,107,0.12)', border: '1px solid rgba(49,83,107,0.4)', color: '#31536b' }}>
@@ -73,21 +74,36 @@ function TableCard({ table, isFinal, myRoomCode, onSpectate }) {
 
 /**
  * Live bracket: where every table is, what the scores are, and a way into
- * watching one. Open from the HUD during a tournament.
+ * watching one. Open from the HUD during a tournament, from the game-over
+ * screen, or from the homepage for any tournament (`code`) — following one
+ * is open to everybody.
  */
-export default function BracketOverview({ onClose }) {
-  const { refreshOverview, roomCode, spectateTable } = useGame()
-  const { tournamentOverview: ov } = useLobby()
+export default function BracketOverview({ code, onClose }) {
+  const { refreshOverview, roomCode, spectating, tournament, spectateTable, watchGame } = useGame()
+  const { tournamentOverview } = useLobby()
+  // One overview is kept at a time, and our own tournament pushes its
+  // updates unasked: show only the one this panel is for.
+  const ov = !code || tournamentOverview?.code === code ? tournamentOverview : null
 
   // The server pushes an update whenever a table finishes, but scores move
   // constantly mid-round — poll while the panel is actually open.
   useEffect(() => {
-    refreshOverview()
-    const id = setInterval(refreshOverview, 3000)
+    const refresh = () => refreshOverview(code)
+    refresh()
+    const id = setInterval(refresh, 3000)
     return () => clearInterval(id)
-  }, [refreshOverview])
+  }, [refreshOverview, code])
 
-  const watch = (rc) => { spectateTable(rc); onClose() }
+  // An entrant watches as one (voice and sounds stay theirs); anyone else
+  // watches the way the homepage does.
+  const entrant = !!ov && tournament?.id === ov.id
+  const watch = (rc) => {
+    if (entrant) spectateTable(rc)
+    else watchGame(rc)
+    onClose()
+  }
+  // The table we are watching right now has nothing to switch to.
+  const here = spectating ? null : roomCode
 
   // A dialog's keyboard basics: focus moves in, Escape closes, and focus
   // goes back to the button that opened it.
@@ -134,8 +150,20 @@ export default function BracketOverview({ onClose }) {
             </div>
           ) : (
             <>
+              {ov.status === 'done' && ov.winners?.length > 0 && (
+                <div className="rounded-xl p-3 text-center"
+                     style={{ background: 'rgba(213,185,130,0.12)', border: '1px solid rgba(213,185,130,0.45)' }}>
+                  <div className="text-[10px] font-typewriter uppercase" style={{ color: 'rgba(225,233,225,0.55)' }}>
+                    ტურნირის გამარჯვებული
+                  </div>
+                  <div className="text-base font-western inline-flex items-center gap-1.5" style={{ color: '#d5b982' }}>
+                    <Trophy size={16} /> {ov.winners.map((w) => w.name).join(' და ')}
+                  </div>
+                </div>
+              )}
+
               {(ov.tables || []).map((t) => (
-                <TableCard key={t.roomCode} table={t} myRoomCode={roomCode} onSpectate={watch} />
+                <TableCard key={t.roomCode} table={t} myRoomCode={here} watching={spectating?.roomCode} onSpectate={watch} />
               ))}
 
               {ov.final && (
@@ -143,7 +171,7 @@ export default function BracketOverview({ onClose }) {
                   <div className="western-divider font-western text-[10px] uppercase my-1">
                     <span className="px-2">ფინალი</span>
                   </div>
-                  <TableCard table={ov.final} isFinal myRoomCode={roomCode} onSpectate={watch} />
+                  <TableCard table={ov.final} isFinal myRoomCode={here} watching={spectating?.roomCode} onSpectate={watch} />
                 </>
               )}
 

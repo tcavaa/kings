@@ -69,7 +69,7 @@ function ToastContainer() {
 }
 
 function AppInner() {
-  const { appPhase, publicSeat, tournament, roomCode, spectating } = useGame()
+  const { appPhase, publicSeat, inTournament, roomCode, spectating } = useGame()
   // Every screen has its own address (see shared/router.js):
   //   /, /tournament           the lobby and its tabs
   //   /leaderboard/...         the leaderboard (open from the lobby or a game's end)
@@ -82,7 +82,7 @@ function AppInner() {
   // A quick-match seat or a tournament entry can turn into a game at any
   // moment, without a WaitingRoom to prefetch the table from: fetch the
   // (large) game chunk now so the deal doesn't wait on it.
-  const tableAhead = publicSeat !== null || (!!tournament && tournament.status !== 'done')
+  const tableAhead = publicSeat !== null || inTournament
   useEffect(() => {
     if (tableAhead) loadGameLayout().catch(() => { /* retried by lazy() */ })
   }, [tableAhead])

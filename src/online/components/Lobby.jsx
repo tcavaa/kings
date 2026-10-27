@@ -31,7 +31,7 @@ export default function Lobby({ onOpenLeaderboard }) {
     joinRoom,
     connected,
     publicSeat,
-    tournament,
+    inTournament,
     announcePresence,
     refreshLobby,
     resumableSeat,
@@ -147,8 +147,7 @@ export default function Lobby({ onOpenLeaderboard }) {
   ];
   // One table at a time: not while seated at the homepage table or entered
   // in a tournament.
-  const canPlay = connected && active && publicSeat === null
-    && !(tournament && tournament.status !== "done");
+  const canPlay = connected && active && publicSeat === null && !inTournament;
   const openProfile = () => setDialog("profile");
   const closePrivate = () => {
     setDialog(null);

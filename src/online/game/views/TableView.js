@@ -13,7 +13,7 @@ export class TableView {
   /** Show the table for layout L (drops the other layout's texture). */
   draw(L) {
     const { scene } = this;
-    const key = L.portrait ? "table-tall" : "table-wide";
+    const key = `table-${L.id}`;
     this.image?.destroy();
     if (this.key && this.key !== key && scene.textures.exists(this.key)) {
       scene.textures.remove(this.key);

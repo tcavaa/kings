@@ -73,7 +73,13 @@ export function createGameCtx({ refs, dispatch, chat, unlockAudio, playClip, set
     setSpectating: (v) => { refs.spectating.current = v; set.spectating(v) },
     setReconnecting: (v) => { refs.reconnecting.current = v; set.reconnecting(v) },
     enterTournament: (t) => {
-      set.tournament(t)
+      // Once the final is drawn, an entrant not in it is out: still
+      // following the bracket, but free to play elsewhere.
+      const me = String(refs.myName.current || '').toLowerCase()
+      const finalists = t?.finalists || []
+      const eliminated = !!t && finalists.length > 0
+        && !finalists.some((n) => String(n).toLowerCase() === me)
+      set.tournament(t && { ...t, eliminated })
       refs.tournamentCode.current = t?.code || ''
     },
 

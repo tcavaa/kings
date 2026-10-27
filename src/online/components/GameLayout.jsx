@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { Swords, Eye } from "lucide-react";
 import { useGame, useChat } from "../context/GameContext";
 import { EventBus } from "../game/EventBus";
 import PhaserGame from "../game/PhaserGame";
@@ -62,7 +61,6 @@ export default function GameLayout() {
     roomCode,
     tournamentSeat,
     spectating,
-    stopSpectating,
     quitProposal,
     reconnecting,
   } = useGame();
@@ -95,6 +93,7 @@ export default function GameLayout() {
   const [chatOpen, setChatOpen] = useState(false);
   const [confirmQuit, setConfirmQuit] = useState(null); // null | 'round' | 'game'
   const [bracketOpen, setBracketOpen] = useState(false);
+  const openBracket = useCallback(() => setBracketOpen(true), []);
 
   const openDrawer = useCallback(
     (id) => setDrawer((prev) => (prev === id ? null : id)),
@@ -282,59 +281,19 @@ export default function GameLayout() {
         onToggleMenu={toggleMenu}
         onToggleScores={openScores}
         onToggleChat={toggleChat}
+        // The bracket: at a bracket table, or watching one — from the
+        // homepage too, since anyone may follow a tournament.
+        onToggleBracket={
+          tournamentSeat || spectating?.tournamentCode ? openBracket : undefined
+        }
       />
 
-      {/* Tournament chrome. Deliberately a LEFT-aligned column rather than
-          centred: the middle of that band now belongs to the clock, and the
-          spectator badge used to sit exactly on top of it. */}
-      {(tournamentSeat || spectating) && (
-        <div
-          className="absolute z-30 flex flex-col items-start gap-1.5 pointer-events-none"
-          style={{
-            top: "calc(env(safe-area-inset-top, 0px) + 58px)",
-            left: 12,
-          }}
-        >
-          {/* The bracket button belongs to tournament play only. A watcher who
-              came in off the homepage has no bracket to open. */}
-          {(tournamentSeat || spectating?.tournamentId) && (
-            <button
-              onClick={() => setBracketOpen(true)}
-              title="ტურნირის მიმოხილვა"
-              className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold active:scale-95 transition-transform"
-              style={{
-                background: "linear-gradient(180deg, #172725 0%, #13221f 100%)",
-                border: "1px solid rgba(213,185,130,0.6)",
-                color: "#eeeae1",
-                boxShadow: "0 2px 0 rgba(0,0,0,0.25)",
-              }}
-            >
-              <Swords size={14} /> ტურნირი
-            </button>
-          )}
-
-          {spectating && (
-            <div
-              className="pointer-events-auto inline-flex items-center gap-2 px-3 py-2 rounded-full text-xs font-bold"
-              style={{
-                background: "rgba(49,83,107,0.92)",
-                color: "#eeeae1",
-                border: "1px solid rgba(244,232,207,0.35)",
-              }}
-            >
-              <Eye size={13} /> უყურებ
-              <button
-                onClick={stopSpectating}
-                className="underline ml-1 font-normal"
-              >
-                გასვლა
-              </button>
-            </div>
-          )}
-        </div>
+      {bracketOpen && (
+        <BracketOverview
+          code={tournamentSeat?.code || spectating?.tournamentCode}
+          onClose={() => setBracketOpen(false)}
+        />
       )}
-
-      {bracketOpen && <BracketOverview onClose={() => setBracketOpen(false)} />}
       {<ScoreBoardPanel onOpen={openScores} />}
       {<ActionPanel onLastTrick={openLast} />}
 

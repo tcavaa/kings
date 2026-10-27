@@ -13,6 +13,9 @@
 const { playersView, identify } = require('./shared');
 
 const LOBBY = 'lobby';
+
+// Tournament ids are `t_<code>` (see TournamentManager.create).
+const tournamentCodeOf = (id) => String(id).replace(/^t_/, '');
 const LOBBY_BATCH_MS = 250;
 
 function createLobby(io, gameManager, tournamentManager) {
@@ -53,7 +56,7 @@ function createLobby(io, gameManager, tournamentManager) {
 }
 
 function register(io, socket, ctx, conn) {
-  const { gameManager, lobby } = ctx;
+  const { gameManager, tournamentManager, lobby } = ctx;
   const { socketId, allow, emitError, fail } = conn;
 
   lobby.enter(socket);
@@ -76,25 +79,35 @@ function register(io, socket, ctx, conn) {
       const me = await identify(socket, payload);
       lobby.enter(socket);
       if (gameManager.announcePresence(socketId, me.name)) lobby.refresh();
+      // Entered in a tournament this socket doesn't speak for (a reloaded
+      // page has forgotten it): point the client back at it. Its
+      // `tournament-join` re-binds the entry and, mid-bracket, re-seats it.
+      const t = tournamentManager?.findByIdentity(me);
+      if (t && !t.players.some((p) => p.id === socketId && p.connected)) {
+        socket.emit('tournament-resume', { code: t.code });
+      }
     } catch (err) { /* no-op */ }
   });
 
   // The lobby screen opened: back in the lobby channel, with fresh lists.
   socket.on('lobby-info', () => {
     try {
-      lobby.enter(socket, 'online', 'live', 'public');
+      lobby.enter(socket, 'online', 'live', 'public', 'tournaments');
     } catch (err) { /* no-op */ }
   });
 
   // Watch any live King table from the homepage. Same masked state and the
   // same socket-room join as tournament spectating — the difference is only
   // who is allowed in and what they may send once there (see canSpeak).
+  //
+  // A tournament entrant may watch too, as long as no table of theirs is
+  // running (assertNoTable): watching holds no seat, and when the bracket
+  // seats them — the draw, or the final — taking the seat ends the watch.
   socket.on('watch-game', async (payload = {}) => {
     try {
       if (!allow('watch')) return;
       const rc = String(payload.roomCode || '').toUpperCase();
       const me = await identify(socket, payload);
-      conn.assertNoTournament();
       conn.assertNoTable();
       const room = gameManager.getRoom(rc);
       if (!room) return emitError('That table is no longer available.');
@@ -123,6 +136,8 @@ function register(io, socket, ctx, conn) {
       socket.emit('spectate-started', {
         roomCode: rc,
         tournamentId: null,
+        // Lets the HUD open this table's bracket.
+        tournamentCode: room.tournamentId ? tournamentCodeOf(room.tournamentId) : null,
         startedAt: room.startedAt || null,
         players: playersView(room.players),
         stage: room.tournamentStage || null,

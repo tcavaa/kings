@@ -177,3 +177,11 @@
   letter-spacing: -0.5px;
   color: #657052;
 }
+.k-live-tournament-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 20px;
+  font-size: 14px;
+  font-weight: 600;
+}

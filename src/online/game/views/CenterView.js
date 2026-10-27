@@ -19,7 +19,7 @@ export class CenterView {
       VISIBLE_PHASES.includes(gamePhase) && mySeat !== leaderSeat && centerCards?.length
         ? centerCards
         : [];
-    const key = `${L.portrait}|${shown.map((c) => c.rank + c.suit).join(",")}`;
+    const key = `${L.id}|${shown.map((c) => c.rank + c.suit).join(",")}`;
     if (key === this.key) return;
     this._clear();
     this.key = key;

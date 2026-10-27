@@ -168,6 +168,12 @@ export function registerRoomEvents(socket, ctx) {
   })
   socket.on('tournament-state', (t) => { ctx.enterTournament(t) })
   socket.on('tournament-left',  ()  => { ctx.enterTournament(null) })
+  // The server still holds an entry of ours (the page was reloaded): take it
+  // back, which also re-seats us at a running bracket table.
+  socket.on('tournament-resume', ({ code } = {}) => {
+    if (!code || refs.tournamentCode.current === code) return
+    socket.emit('tournament-join', { code, ...ctx.identity() })
+  })
 
   socket.on('tournament-final', () => {
     ctx.addToast('ფინალი იწყება!', 'success')

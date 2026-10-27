@@ -190,14 +190,16 @@ class TournamentManager {
     return null;
   }
 
-  /** Every tournament still worth showing in the lobby. */
-  openTournaments() {
-    return [...this.tournaments.values()].filter((t) => t.status === 'lobby');
-  }
-
-  /** The lobby's list of tournaments to join. */
+  /**
+   * The homepage's tournament list: lobbies to join, brackets in progress,
+   * and finished ones for as long as their results are kept (DONE_TTL_MS).
+   * Anyone may follow any of them; only the lobbies can be joined.
+   */
   openLobbyViews() {
-    return this.openTournaments().map((t) => this.lobbyView(t));
+    const order = { lobby: 0, semifinal: 1, final: 1, done: 2 };
+    return [...this.tournaments.values()]
+      .sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3))
+      .map((t) => this.lobbyView(t));
   }
 
   // ── lobby ─────────────────────────────────────────────────────────────────
@@ -480,7 +482,10 @@ class TournamentManager {
 
   /** Keep a finished tournament for its results screen, then drop it. */
   _forgetLater(t) {
-    const timer = setTimeout(() => this.tournaments.delete(t.id), DONE_TTL_MS);
+    const timer = setTimeout(() => {
+      this.tournaments.delete(t.id);
+      if (this.broadcast) this.broadcast.lobbyChanged({ tournament: null });
+    }, DONE_TTL_MS);
     if (typeof timer.unref === 'function') timer.unref();
   }
 
@@ -498,6 +503,12 @@ class TournamentManager {
       players: t.players.map((p) => ({
         name: p.name, avatar: p.avatar || null, connected: !!p.connected,
       })),
+      // Who is playing the final, once it is drawn — an entrant not on this
+      // list is out, and free to play elsewhere while it runs.
+      finalists: t.status === 'final' || t.status === 'done'
+        ? (t.standings || []).filter((s) => s.advanced).map((s) => s.name)
+        : [],
+      winners: (t.winners || []).map((w) => ({ name: w.name, score: w.score })),
     };
   }
 

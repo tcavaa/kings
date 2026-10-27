@@ -31,7 +31,7 @@ export class TrickView {
 
     // Cards already on the table stay put (and keep any swoop in flight);
     // only cards after the part that still matches are redrawn.
-    const layoutKey = `${L.portrait}|${mySeat}`;
+    const layoutKey = `${L.id}|${mySeat}`;
     let keep = 0;
     if (layoutKey === this.layoutKey) {
       while (keep < this.drawn.length && keep < ids.length && this.drawn[keep] === ids[keep]) keep++;

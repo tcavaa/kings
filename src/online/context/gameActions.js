@@ -165,7 +165,8 @@ export function createActions(ctx) {
       ctx.setTournamentOverview(null)
     },
     refreshTournaments() { emit('tournament-list') },
-    refreshOverview() { emit('tournament-overview') },
+    // Any tournament's bracket by its code; without one, our own.
+    refreshOverview(code) { emit('tournament-overview', code ? { code } : {}) },
     spectateTable(roomCode) {
       ctx.unlockAudio()
       emit('tournament-spectate', { roomCode, ...ctx.identity() })

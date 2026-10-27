@@ -1,6 +1,14 @@
-import { Eye } from "lucide-react";
+import { useState } from "react";
+import { Eye, Swords, Trophy } from "lucide-react";
 import { useGame, useLobby } from "../context/GameContext";
 import AvatarImg from "./AvatarImg";
+import BracketOverview from "./Tournament/BracketOverview";
+
+const TOURNAMENT_STAGE = {
+  semifinal: "ნახევარფინალი",
+  final: "ფინალი",
+  done: "დასრულდა",
+};
 
 const TOTAL_ROUNDS = 27;
 
@@ -9,6 +17,41 @@ function tableLabel(game) {
     return game.tournament.stage === "final" ? "ფინალი" : "ნახევარფინალი";
   }
   return game.mode === "championship" ? "ლიგა" : "კლასიკური";
+}
+
+/** A tournament past its draw: where it stands, and its bracket for anyone. */
+function TournamentCard({ t, onOpen }) {
+  const winners = (t.winners || []).map((w) => w.name).join(" და ");
+  return (
+    <article className="k-live-table" aria-label={`ტურნირი ${t.code}`}>
+      <header>
+        <span>
+          <Swords size={12} className="inline" /> ტურნირი · {t.code}
+        </span>
+        <span>{TOURNAMENT_STAGE[t.status] || ""}</span>
+      </header>
+      {t.status === "done" ? (
+        <p className="k-live-tournament-result">
+          <Trophy size={16} /> {winners || "—"}
+        </p>
+      ) : (
+        <ol className="k-live-players">
+          {(t.finalists?.length
+            ? t.players.filter((p) => t.finalists.includes(p.name))
+            : t.players
+          ).map((p) => (
+            <li key={p.name} className={p.connected ? undefined : "is-away"}>
+              <AvatarImg avatar={p.avatar} name={p.name} size={24} />
+              <span>{p.name}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      <button className="k-button k-button-outline" onClick={() => onOpen(t.code)}>
+        ტურნირის ცხრილი <Swords size={17} />
+      </button>
+    </article>
+  );
 }
 
 function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNeedProfile }) {
@@ -82,12 +125,22 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
  * empty "live" section on the page.
  */
 export default function LiveTables({ active, onNeedProfile }) {
-  const { connected, publicSeat, tournament, watchGame } = useGame();
-  const { liveGames } = useLobby();
-  const busy = publicSeat !== null || (!!tournament && tournament.status !== "done");
-  if (!liveGames.length) return null;
+  const { connected, publicSeat, tournament, watchGame, spectateTable } = useGame();
+  const { liveGames, tournamentList } = useLobby();
+  const [bracket, setBracket] = useState(null);
+  // Only a homepage seat stops watching: it could start a game under you.
+  // A tournament entrant may watch — the bracket seats them when it needs to.
+  const busy = publicSeat !== null;
+  const tournaments = tournamentList.filter((t) => t.status !== "lobby");
+  if (!liveGames.length && !tournaments.length) return null;
 
-  const watch = (roomCode) => watchGame(roomCode, active.name);
+  // Our own tournament's tables are watched as an entrant (voice and the
+  // sound board stay ours); everything else the way anyone would.
+  const watch = (roomCode) => {
+    const game = liveGames.find((g) => g.roomCode === roomCode);
+    if (tournament && game?.tournament?.id === tournament.id) spectateTable(roomCode);
+    else watchGame(roomCode, active.name);
+  };
   return (
     <section className="k-live-tables" aria-labelledby="live-tables-title">
       <div className="k-section-title">
@@ -99,6 +152,9 @@ export default function LiveTables({ active, onNeedProfile }) {
         </div>
       </div>
       <div className="k-live-grid">
+        {tournaments.map((t) => (
+          <TournamentCard key={t.id} t={t} onOpen={setBracket} />
+        ))}
         {liveGames.map((g) => (
           <LiveTableCard
             key={g.roomCode}
@@ -111,6 +167,7 @@ export default function LiveTables({ active, onNeedProfile }) {
           />
         ))}
       </div>
+      {bracket && <BracketOverview code={bracket} onClose={() => setBracket(null)} />}
     </section>
   );
 }

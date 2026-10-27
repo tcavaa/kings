@@ -120,6 +120,19 @@ test("layouts: the tall table for upright boxes, scene size without the top band
   assert.equal(relSeat(1, null), 1);
 });
 
+test("layouts: a watcher's tall table has no hand rows", () => {
+  const tall = layoutFor(true);
+  const watch = layoutFor(true, true);
+  assert.notEqual(watch.id, tall.id);
+  assert.equal(layoutFor(false, true).id, layoutFor(false).id);
+  // The bottom player sits right under the felt, and the scene is shorter.
+  assert.ok(watch.AVATAR_POS[0].y - watch.felt.bottom < 120);
+  assert.ok(watch.H < tall.H - 150);
+  // Everything sits lower, clear of the top bar.
+  assert.ok(watch.AVATAR_POS[1].y > tall.AVATAR_POS[1].y);
+  assert.equal(watch.felt.top - tall.felt.top, watch.TRICK_POS[0].y - tall.TRICK_POS[0].y);
+});
+
 test("hand: one fanned row on the wide table, two rows on the tall one", () => {
   const wide = layoutFor(false);
   const tall = layoutFor(true);

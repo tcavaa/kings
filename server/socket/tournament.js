@@ -70,7 +70,7 @@ function createBroadcaster(ctx) {
     },
 
     finalStarted(t, roomCode, finalists) {
-      io.to(t.id).emit('tournament-state', tournamentManager.lobbyView(t));
+      tournamentSync(ctx, t);
       io.to(t.id).emit('tournament-final', {
         roomCode,
         finalists: finalists.map((f) => ({
@@ -83,7 +83,7 @@ function createBroadcaster(ctx) {
     },
 
     tournamentComplete(t) {
-      io.to(t.id).emit('tournament-state', tournamentManager.lobbyView(t));
+      tournamentSync(ctx, t);
       io.to(t.id).emit('tournament-complete', {
         code: t.code,
         winners: t.winners,
@@ -170,12 +170,17 @@ function register(io, socket, ctx, conn) {
   });
 
   // Live cross-table view — which round every table is on and the scores.
-  socket.on('tournament-overview', () => {
+  // Open to anyone: a `code` names the tournament (the homepage list), and
+  // without one it is the socket's own — the one it is entered in, seated at,
+  // or watching a table of.
+  socket.on('tournament-overview', (payload = {}) => {
     try {
       if (!tournamentManager) return;
-      const mapping = gameManager.getMappingBySocketId(socketId);
-      const t = tournamentManager.findBySocket(socketId)
-        || (mapping ? tournamentManager.findByRoom(mapping.roomCode) : null);
+      const at = gameManager.getMappingBySocketId(socketId)?.roomCode
+        || gameManager.getSpectator(socketId)?.roomCode;
+      const t = (payload?.code && tournamentManager.findByCode(payload.code))
+        || tournamentManager.findBySocket(socketId)
+        || (at ? tournamentManager.findByRoom(at) : null);
       if (!t) return;
       socket.emit('tournament-overview', tournamentManager.overview(t));
     } catch (err) { /* no-op */ }
@@ -232,6 +237,7 @@ function register(io, socket, ctx, conn) {
       socket.emit('spectate-started', {
         roomCode: rc,
         tournamentId: t.id,
+        tournamentCode: t.code,
         startedAt: room.startedAt || null,
         players: playersView(room.players),
         stage: room.tournamentStage || null,

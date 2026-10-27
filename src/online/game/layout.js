@@ -9,11 +9,17 @@
 // limited to a sliver of the width. The scene switches when the screen turns.
 //   VIEW_TOP  the camera skips this empty band above the felt (the top bar
 //             overlays it), so the table fills more of the screen.
-export function layoutFor(portrait) {
+//   id        names the layout; the views key their caches on it.
+//
+// A watcher holds no hand, so on the tall table (`watching`) the two rows of
+// cards under the felt would be an empty gap: the watch layout drops them,
+// seats the bottom player right under the felt, and spends part of the room
+// saved on moving everything clear of the top bar.
+export function layoutFor(portrait, watching = false) {
   if (!portrait) {
     const W = 1100, H = 700, TABLE_CX = W / 2, TABLE_CY = H / 2 - 20;
     return {
-      portrait: false, W, H, VIEW_TOP: 55, TABLE_CX, TABLE_CY,
+      id: "wide", portrait: false, W, H, VIEW_TOP: 55, TABLE_CX, TABLE_CY,
       felt: { left: 55, right: W - 55, top: H * 0.23, bottom: H * 0.845, cut: 92 },
       // relative seat: 0 = self (bottom, under the cards — its name and score
       // sit to the right of the photo, so it can sit low), 1 = left, 2 = right
@@ -35,9 +41,10 @@ export function layoutFor(portrait) {
       ],
     };
   }
+  if (watching) return watchLayout(layoutFor(true));
   const W = 720, H = 1240, TABLE_CX = W / 2, TABLE_CY = 545;
   return {
-    portrait: true, W, H, VIEW_TOP: 0, TABLE_CX, TABLE_CY,
+    id: "tall", portrait: true, W, H, VIEW_TOP: 0, TABLE_CX, TABLE_CY,
     felt: { left: 26, right: W - 26, top: 280, bottom: 810, cut: 70 },
     // Opponents sit above the table (clear of the top bar and the
     // "waiting for…" pill); own avatar at the very bottom under the hand.
@@ -56,6 +63,24 @@ export function layoutFor(portrait) {
       { x: TABLE_CX - 72, y: TABLE_CY - 5, angle: -10 },
       { x: TABLE_CX + 72, y: TABLE_CY - 5, angle: 10 },
     ],
+  };
+}
+
+/** The tall table for a watcher: no hand rows, more room under the top bar. */
+function watchLayout(L) {
+  const dy = 60;
+  const down = (p) => p && { ...p, y: p.y + dy };
+  const felt = { ...L.felt, top: L.felt.top + dy, bottom: L.felt.bottom + dy };
+  const own = { x: L.TABLE_CX, y: felt.bottom + 95 };
+  return {
+    ...L,
+    id: "tall-watch",
+    H: own.y + 75,
+    TABLE_CY: L.TABLE_CY + dy,
+    felt,
+    AVATAR_POS: [own, down(L.AVATAR_POS[1]), down(L.AVATAR_POS[2])],
+    OPP_FAN_POS: L.OPP_FAN_POS.map(down),
+    TRICK_POS: L.TRICK_POS.map(down),
   };
 }
 

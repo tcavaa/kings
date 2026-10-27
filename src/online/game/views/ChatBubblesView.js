@@ -50,7 +50,7 @@ export class ChatBubblesView {
       // Watchers' messages (no seat) and empty seats have no avatar to sit on.
       if (!players.find((p) => p.seat === seat)) continue;
       const rel = relSeat(seat, mySeat);
-      wanted.set(seat, { rel, msg, key: `${L.portrait}|${rel}|${msg.message || ""}|${msg.at ?? ""}` });
+      wanted.set(seat, { rel, msg, key: `${L.id}|${rel}|${msg.message || ""}|${msg.at ?? ""}` });
     }
 
     for (const [seat, bubble] of this.bubbles) {

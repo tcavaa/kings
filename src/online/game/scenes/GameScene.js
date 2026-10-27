@@ -24,6 +24,8 @@ export class GameScene extends Phaser.Scene {
     // A restarted scene (HMR) starts empty, so the next snapshot must draw.
     this._lastRendered = null;
     const size = this.scale.gameSize;
+    // Watching is learnt from the first snapshot (state.spectator).
+    this._watching = false;
     this.L = layoutFor(size.height > size.width);
     this.cameras.main.setScroll(0, this.L.VIEW_TOP);
 
@@ -47,6 +49,19 @@ export class GameScene extends Phaser.Scene {
     const idleFps = this.game.config.fps?.limit;
     this._idleFrameMs = idleFps > 0 ? 1000 / idleFps : 0;
 
+    // Switch to another layout. Resizing the game fires resize again, and
+    // that repaints. Returns whether anything changed.
+    this._useLayout = (portrait, watching) => {
+      const next = layoutFor(portrait, watching);
+      if (next.id === this.L.id) return false;
+      this.L = next;
+      const { width, height } = sceneSize(this.L);
+      this.cameras.main.setScroll(0, this.L.VIEW_TOP);
+      this.table.draw(this.L);
+      this.scale.setGameSize(width, height);
+      return true;
+    };
+
     // When the screen turns, switch layouts; either way the hand's card size
     // depends on how big the canvas is on screen, so repaint (the views
     // redraw only what that changed).
@@ -55,11 +70,7 @@ export class GameScene extends Phaser.Scene {
       const parent = this.scale.parentSize;
       const portrait = isPortraitBox(parent.width, parent.height);
       if (parent.width > 0 && portrait !== this.L.portrait) {
-        this.L = layoutFor(portrait);
-        const { width, height } = sceneSize(this.L);
-        this.cameras.main.setScroll(0, this.L.VIEW_TOP);
-        this.table.draw(this.L);
-        this.scale.setGameSize(width, height); // fires resize again → repaint below
+        this._useLayout(portrait, this._watching);
         return;
       }
       this._repaint();
@@ -193,6 +204,13 @@ export class GameScene extends Phaser.Scene {
 
   _renderAll(state) {
     if (!state || this.trick.animating) return;
+    // Started or stopped watching (a finalist called away from a table they
+    // were watching): the tall table swaps its hand rows in or out. The
+    // resize that follows draws this state.
+    if (!!state.spectator !== this._watching) {
+      this._watching = !!state.spectator;
+      if (this._useLayout(this.L.portrait, this._watching)) return;
+    }
     this._lastRendered = state;
     for (const view of this.views) view.render(state, this.L);
   }

@@ -21,7 +21,7 @@ export class OpponentsView {
       const seat = (mySeat + rel) % 3;
       const count = round1Hidden ? 0 : Math.min(cardCounts[seat] ?? 0, 10);
       const side = this.sides[rel];
-      const key = `${L.portrait}|${count}`;
+      const key = `${L.id}|${count}`;
       if (side.key === key) continue;
       side.key = key;
       side.cards.forEach((c) => c.destroy());
