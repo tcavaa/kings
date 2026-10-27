@@ -116,6 +116,256 @@
   }
 }
 
+/* Leaderboard trios: one card per three players who shared a table, on the
+   rankings' paper with the same lines, badges and form. */
+.k-trios {
+  margin-bottom: 40px;
+  color: #171919;
+}
+.k-trios-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #17191933;
+}
+.k-trios-head .k-eyebrow {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: #7e8872;
+}
+.k-trios-head h2 {
+  margin-top: 10px;
+  font-size: 18px;
+  font-weight: 450;
+}
+.k-trio-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+.k-trio-tools select {
+  max-width: 180px;
+  padding: 10px 18px 10px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #79856c;
+  border-radius: 0;
+  color: inherit;
+  font-size: 11px;
+}
+.k-trio-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: 11px;
+  color: #7e8872;
+}
+.k-trio-toggle > i {
+  position: relative;
+  width: 30px;
+  height: 16px;
+  border-radius: 999px;
+  background: #dce5c7;
+  transition: background 0.15s;
+}
+.k-trio-toggle > i::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #899278;
+  transition: transform 0.15s, background 0.15s;
+}
+.k-trio-toggle[aria-checked="true"] {
+  color: #171919;
+}
+.k-trio-toggle[aria-checked="true"] > i {
+  background: #171919;
+}
+.k-trio-toggle[aria-checked="true"] > i::after {
+  transform: translateX(14px);
+  background: #d7fa52;
+}
+.k-trio-toggle:focus-visible {
+  outline: 2px solid #171919;
+  outline-offset: 2px;
+}
+.k-trio-scope {
+  margin: 0;
+  padding: 14px 0;
+  font-size: 11px;
+  color: #7e8872;
+  border-bottom: 1px solid #17191918;
+}
+.k-trios .k-data-empty {
+  color: #7e8872;
+}
+.k-trio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 1px;
+  background: #17191918;
+  border-bottom: 1px solid #17191918;
+}
+.k-trio {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: #f0f0e9;
+}
+.k-trio > header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 22px 22px 10px;
+}
+.k-trio > header strong {
+  font-size: 30px;
+  font-weight: 400;
+  line-height: 1;
+}
+.k-trio > header span {
+  font-size: 11px;
+  color: #7e8872;
+}
+.k-trio ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 22px 12px;
+}
+.k-trio li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 40px;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #17191918;
+  font-variant-numeric: tabular-nums;
+}
+.k-trio li:last-child {
+  border-bottom: 0;
+}
+.k-trio li > .k-wins-badge,
+.k-trio li > small {
+  grid-row: span 2;
+}
+.k-trio li .k-player-link {
+  gap: 10px;
+  min-width: 0;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.k-trio li .k-player-link > strong {
+  font-weight: 450;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.k-trio li.is-leader .k-player-link > strong {
+  font-weight: 650;
+}
+.k-trio li small {
+  text-align: right;
+  font-size: 11px;
+  color: #7e8872;
+}
+.k-trio-form {
+  grid-column: 1;
+  padding-left: 42px;
+}
+.k-trio li.is-other {
+  padding: 10px 0;
+  font-size: 11px;
+  color: #7e8872;
+}
+.k-trio li.is-other > .k-wins-badge,
+.k-trio li.is-other > small {
+  grid-row: auto;
+}
+.k-trio li.is-other .k-wins-badge {
+  background: transparent;
+  color: #7e8872;
+}
+.k-trio-last {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: auto;
+  padding: 14px 22px;
+  border-top: 1px solid #17191918;
+  text-align: left;
+  color: inherit;
+}
+.k-trio-last span {
+  font-size: 10px;
+  color: #7e8872;
+}
+.k-trio-last span small {
+  margin-left: 8px;
+  font-size: 8px;
+  letter-spacing: 1px;
+}
+.k-trio-last strong {
+  grid-column: 1;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.k-trio-last strong em {
+  font-style: normal;
+  font-weight: 400;
+  color: #7e8872;
+}
+.k-trio-last svg {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  color: #7e8872;
+}
+.k-trio-last:hover {
+  background: #dfe5d3;
+}
+.k-trio-last:hover svg {
+  color: #171919;
+}
+.k-trios > .k-text-action {
+  margin-top: 18px;
+}
+@media (max-width: 720px) {
+  .k-trios-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .k-trio-tools {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 14px;
+  }
+  .k-trio-toggle {
+    grid-column: 1 / -1;
+  }
+  .k-trio-tools select {
+    width: 100%;
+    max-width: none;
+  }
+  .k-trio > header,
+  .k-trio ol,
+  .k-trio-last {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
 /* Leaderboard game-type filter: ყველა / ონლაინ / ლაივი */
 .k-type-filter {
   display: inline-grid;

@@ -20,6 +20,7 @@ const GameDetail = lazy(() => import("./LeaderboardPanels/GameDetail"));
 const PlayerProfile = lazy(() => import("./LeaderboardPanels/PlayerProfile"));
 const SeasonsPanel = lazy(() => import("./LeaderboardPanels/SeasonsPanel"));
 const ComparePanel = lazy(() => import("./LeaderboardPanels/ComparePanel"));
+const TriosPanel = lazy(() => import("./LeaderboardPanels/TriosPanel"));
 const PAGE_SIZE = 12;
 // Games played in King Online, games recorded at a table in ჩაწერა, or both.
 const GAME_TYPES = [
@@ -27,11 +28,11 @@ const GAME_TYPES = [
   ["online", "ონლაინ"],
   ["live", "ლაივი"],
 ];
-const SECTIONS = ["rankings", "insights", "compare", "history", "seasons"];
+const SECTIONS = ["rankings", "trios", "insights", "compare", "history", "seasons"];
 const BASE = "/leaderboard";
 
 // Each view has its own address:
-//   /leaderboard[/insights|compare|history|seasons]   a section
+//   /leaderboard[/trios|insights|compare|history|seasons]   a section
 //   /leaderboard/player/<name>                         a player's profile
 //   /leaderboard/game/<id>                             one game
 // with ?type=online|live for the game-type filter. `home` is where the
@@ -77,6 +78,7 @@ export default function Leaderboard({ home = "/" }) {
   const [sort, setSort] = useState("wins");
   const [page, setPage] = useState(0);
   const [compare, setCompare] = useState({ picked: null, scope: "shared" });
+  const [trios, setTrios] = useState({ seasonOnly: false, player: "", sort: "games" });
   const games = useMemo(
     () =>
       gameType === "all"
@@ -251,6 +253,7 @@ export default function Leaderboard({ home = "/" }) {
       <nav className="k-page-tabs" aria-label="რეიტინგის სექციები">
         {[
           ["rankings", "რეიტინგი"],
+          ["trios", "სამეულები"],
           ["insights", "ანალიტიკა"],
           ["compare", "შედარება"],
           ["history", "თამაშების ისტორია"],
@@ -396,6 +399,15 @@ export default function Leaderboard({ home = "/" }) {
                 )}
               </section>
             </div>
+          ) : section === "trios" ? (
+            <TriosPanel
+              games={games}
+              players={aggregated}
+              state={trios}
+              onState={setTrios}
+              onPlayerSelect={setProfileName}
+              onSelectGame={setSelected}
+            />
           ) : section === "compare" ? (
             aggregated.length > 1 ? (
               <ComparePanel
@@ -444,6 +456,7 @@ export default function Leaderboard({ home = "/" }) {
         !profileName &&
         !loading &&
         !error &&
+        section !== "trios" &&
         section !== "insights" &&
         section !== "compare" &&
         section !== "seasons" &&

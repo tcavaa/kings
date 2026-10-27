@@ -204,3 +204,40 @@ export function allTimeRecords(games) {
   }
   return rec
 }
+
+/**
+ * Every three (current) players who sat at the same table: { names, games,
+ * wins, otherWins }. `names` are sorted, `games` newest first, `wins` maps each
+ * of the three to their wins in those games (tie-aware, like the pairs), and
+ * `otherWins` counts the games a fourth player won. A four-player game counts
+ * for each of the four trios in it.
+ */
+export function buildTrioStats(games = []) {
+  const map = new Map()
+  const newest = [...games].sort((a, b) => new Date(b.playedAt) - new Date(a.playedAt))
+  for (const g of newest) {
+    const names = [...new Set((g.players || []).filter((p) => !isRemovedPlayer(p)).map((p) => p.name))].sort()
+    if (names.length < 3) continue
+    const winners = winnerNames(g)
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        for (let k = j + 1; k < names.length; k++) {
+          const trio = [names[i], names[j], names[k]]
+          const key = trio.join('\u0000')
+          const row = map.get(key) || {
+            names: trio,
+            games: [],
+            wins: Object.fromEntries(trio.map((n) => [n, 0])),
+            otherWins: 0,
+          }
+          row.games.push(g)
+          const ours = trio.filter((n) => winners.includes(n))
+          for (const n of ours) row.wins[n] += 1
+          if (!ours.length) row.otherWins += 1
+          map.set(key, row)
+        }
+      }
+    }
+  }
+  return Array.from(map.values())
+}

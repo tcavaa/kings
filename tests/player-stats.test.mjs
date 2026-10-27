@@ -6,6 +6,7 @@ import {
   streaksOf,
   comparePlayers,
   allTimeRecords,
+  buildTrioStats,
 } from "../src/online/lib/playerStats.js";
 
 let day = 0;
@@ -124,4 +125,27 @@ test("club achievement stats: holders, rates, firsts and collectors", async () =
   assert.equal(rarityOf(0.08).id, "legendary");
   assert.equal(stats.rarest.code, "STREAK_BREAKER");
   assert.equal(stats.latest.name, "B");
+});
+
+test("trios count each three who shared a table, their wins and the newest game first", () => {
+  const first = game({ A: 9, B: 1, C: 1 });
+  const tie = game({ A: 5, B: 5, C: 1 });
+  const fourth = game({ A: 1, B: 2, C: 3, D: 9 });
+  const pair = game({ A: 9, B: 1 });
+  const trios = buildTrioStats([first, tie, fourth, pair]);
+  // ABC from all three games; ABD, ACD and BCD from the four-player one.
+  assert.equal(trios.length, 4);
+  const abc = trios.find((t) => t.names.join("") === "ABC");
+  assert.deepEqual(abc.games.map((g) => g.id), [fourth.id, tie.id, first.id]);
+  assert.deepEqual(abc.wins, { A: 2, B: 1, C: 0 });
+  assert.equal(abc.otherWins, 1);
+  const abd = trios.find((t) => t.names.join("") === "ABD");
+  assert.deepEqual(abd.wins, { A: 0, B: 0, D: 1 });
+  assert.equal(abd.otherWins, 0);
+});
+
+test("trios leave out players taken off the list", () => {
+  const g = game({ A: 9, B: 1, C: 1 });
+  g.players[2].profileId = null;
+  assert.equal(buildTrioStats([g]).length, 0);
 });
