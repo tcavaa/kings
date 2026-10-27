@@ -3,7 +3,6 @@ import { Globe, Handshake } from 'lucide-react'
 import TrophyIcon from './TrophyIcon'
 import { isChampionName, seasonChampions } from '../utils/winners'
 import { seasonStandings } from '../utils/seasonStandings'
-import { getTheme } from '../utils/themes'
 import { formatDate } from '../utils/dates'
 
 const fmt = formatDate
@@ -44,9 +43,9 @@ function SeasonStats({ season, data, loading }) {
             const avg       = p.games > 0 ? (p.totalScore / p.games).toFixed(1) : '—'
             const isChamp   = isChampionName(seasonChampions(season), p.name)
             return (
-              <tr key={p.name} style={{ borderBottom: '1px solid rgba(255,200,60,0.15)', background: isChamp ? 'rgba(0,0,0,0.15)' : undefined }}>
-                <td style={{ ...td, fontWeight: isChamp ? 700 : 400, color: isChamp ? '#ffe566' : 'rgba(255,235,160,0.9)' }}>
-                  {isChamp && <TrophyIcon size={13} color="#ffe566" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
+              <tr key={p.name} style={{ borderBottom: '1px solid var(--line)', background: isChamp ? 'rgba(0,0,0,0.15)' : undefined }}>
+                <td style={{ ...td, fontWeight: isChamp ? 700 : 400, color: isChamp ? 'var(--text)' : 'var(--text)' }}>
+                  {isChamp && <TrophyIcon size={13} color="var(--text)" style={{ marginRight: 4, verticalAlign: 'middle' }} />}
                   {p.name}
                 </td>
                 <td style={{ ...td, textAlign: 'center' }}>{p.liveWins}</td>
@@ -54,7 +53,7 @@ function SeasonStats({ season, data, loading }) {
                 <td style={{ ...td, textAlign: 'center', fontWeight: 700 }}>{p.wins}</td>
                 <td style={{ ...td, textAlign: 'center' }}>{p.games}</td>
                 <td style={{ ...td, textAlign: 'center' }}>{winPct}</td>
-                <td style={{ ...td, textAlign: 'center', color: +avg > 0 ? '#86efac' : +avg < 0 ? '#fca5a5' : 'rgba(255,235,160,0.9)' }}>{avg}</td>
+                <td style={{ ...td, textAlign: 'center', color: +avg > 0 ? 'var(--accent-good)' : +avg < 0 ? 'var(--accent-bad)' : 'var(--text)' }}>{avg}</td>
               </tr>
             )
           })}
@@ -64,8 +63,8 @@ function SeasonStats({ season, data, loading }) {
   )
 }
 
-const th = { padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'rgba(255,240,170,0.85)', fontSize: 11 }
-const td = { padding: '6px 8px', color: 'rgba(255,235,160,0.9)' }
+const th = { padding: '6px 8px', textAlign: 'left', fontWeight: 700, color: 'var(--text)', fontSize: 11 }
+const td = { padding: '6px 8px', color: 'var(--text)' }
 
 export default function SeasonChampionsTab({ seasons, data, loading }) {
   const [expanded, setExpanded] = useState(null)
@@ -78,10 +77,10 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
           background: 'rgba(0,0,0,0.35)',
           borderRadius: '50%',
           padding: 14,
-          border: '2px solid rgba(255,210,60,0.35)',
+          border: '2px solid var(--line)',
           lineHeight: 0,
         }}>
-          <TrophyIcon size={64} color="#ffe566" />
+          <TrophyIcon size={64} color="var(--text)" />
         </div>
         <div className="engraved-title">სეზონის ჩემპიონები</div>
         {seasons[0] && (
@@ -106,15 +105,10 @@ export default function SeasonChampionsTab({ seasons, data, loading }) {
                   onClick={() => setExpanded(isOpen ? null : s.id)}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <TrophyIcon size={22} color="#b5860a" />
+                    <TrophyIcon size={22} color="var(--text)" />
                     <div>
                       <div className="engraved-season-name">
-                        {s.name
-                          ? (() => {
-                              const ThemeIcon = getTheme(s.theme).Icon
-                              return <><ThemeIcon size={12} style={{ verticalAlign: '-1px', marginRight: 4 }} />{s.name}</>
-                            })()
-                          : `სეზონი ${seasonNum}`}
+                        {s.name || `სეზონი ${seasonNum}`}
                       </div>
                       <div className="engraved-period">{fmt(s.started_at)} — {fmt(s.ended_at)}</div>
                     </div>

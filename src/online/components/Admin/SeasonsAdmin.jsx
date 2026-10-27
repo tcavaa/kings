@@ -4,34 +4,16 @@ import Sheet from '../ui/Sheet'
 import { adminApi } from '../../lib/api'
 import { adminCall, ErrorNote, PanelTitle, inputStyle, muted } from './adminUi'
 
-// Same ids as King Score's themes (src/score/utils/themes.js).
-const THEMES = [
-  { id: 'casual',    label: 'ჩვეულებრივი' },
-  { id: 'summer',    label: 'ზაფხული' },
-  { id: 'mountain',  label: 'მთა' },
-  { id: 'christmas', label: 'შობა' },
-]
-
 const day = (iso) => (iso ? new Date(iso).toLocaleDateString('ka-GE') : '—')
 
 function SeasonForm({ initial, submitLabel, busy, onSubmit }) {
   const [name, setName] = useState(initial?.name || '')
-  const [theme, setTheme] = useState(initial?.theme || 'casual')
-  useEffect(() => { setName(initial?.name || ''); setTheme(initial?.theme || 'casual') }, [initial])
+  useEffect(() => { setName(initial?.name || '') }, [initial])
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSubmit({ name: name.trim(), theme }) }}>
+    <form onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSubmit({ name: name.trim() }) }}>
       <input value={name} maxLength={40} onChange={(e) => setName(e.target.value)}
              placeholder="სეზონის სახელი" aria-label="სეზონის სახელი" required
              className="w-full px-3 py-2 text-sm mb-3" style={inputStyle} />
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {THEMES.map((t) => (
-          <button key={t.id} type="button" aria-pressed={theme === t.id} onClick={() => setTheme(t.id)}
-                  className="px-3 py-2 text-xs font-bold"
-                  style={{ ...inputStyle, borderColor: theme === t.id ? '#d7fa52' : '#46513e', opacity: theme === t.id ? 1 : 0.6 }}>
-            {t.label}
-          </button>
-        ))}
-      </div>
       <button type="submit" disabled={busy || !name.trim()}
               className="k-button w-full px-4 py-2.5 text-sm font-bold disabled:opacity-40">
         {busy ? '…' : submitLabel}
@@ -40,7 +22,7 @@ function SeasonForm({ initial, submitLabel, busy, onSubmit }) {
   )
 }
 
-/** /admin → seasons: rename or re-theme the current season, end it, see past ones. */
+/** /admin → seasons: rename the current season, end it, see past ones. */
 export default function SeasonsAdmin({ passcode, onLocked }) {
   const [rows, setRows] = useState(null)
   const [preview, setPreview] = useState(null)
@@ -103,7 +85,6 @@ export default function SeasonsAdmin({ passcode, onLocked }) {
             <div><dt>მიმდინარე სეზონი</dt><dd>{current?.name || 'უსახელო'}</dd></div>
             <div><dt>ჩემპიონი</dt><dd><Trophy size={18} /> {preview?.champion}</dd></div>
             <div><dt>ახალი სეზონი</dt><dd>{pendingSeason.name}</dd></div>
-            <div><dt>თემა</dt><dd>{THEMES.find(t => t.id === pendingSeason.theme)?.label}</dd></div>
           </dl>
           <ErrorNote text={error} />
           <div className="k-admin-confirm-actions">

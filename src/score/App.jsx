@@ -11,13 +11,11 @@ import GameProgress from './components/GameProgress.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import SeasonBanner from './components/SeasonBanner.jsx'
 import GameTimer from './components/GameTimer.jsx'
-import ThemeDecorations from './components/ThemeDecorations.jsx'
 import SurrenderButton from './components/SurrenderButton.jsx'
 import { saveGame, publishLiveSheet, removeLiveSheet } from './lib/gameData.js'
 import { sheetReducer, EMPTY_SHEET, targetRoundsOf } from './lib/sheetReducer.js'
 import LiveSheets from './components/LiveSheets.jsx'
 import { useSeasons } from './hooks/useSeasons'
-import { applyThemeToBody } from './utils/themes'
 import { formatDuration } from '../../shared/duration.js'
 import { readStorage, writeStorage } from './utils/storage'
 import { totalsByPlayer } from './utils/rounds'
@@ -70,10 +68,10 @@ function App() {
   const setView = useCallback(v => navigate(v === 'home' ? '/score' : `/score/${v}`), [])
   const [saving, setSaving] = useState(false)
   const [soundEnabled, setSoundEnabled] = useState(() => readStorage('king-sound') !== 'off')
-  const [darkMode, setDarkMode] = useState(() => readStorage('king-theme') === 'dark')
+  const [darkMode, setDarkMode] = useState(() => readStorage('king-theme') !== 'light')
   const {
     seasons, currentChampion, currentSeasonStart,
-    currentSeasonName, currentSeasonTheme,
+    currentSeasonName,
   } = useSeasons()
 
   // Apply dark mode class to body
@@ -81,14 +79,9 @@ function App() {
     document.body.classList.toggle('dark', darkMode)
     // The phone's status/address bar follows the theme too.
     document.querySelector('meta[name="theme-color"]')
-      ?.setAttribute('content', darkMode ? '#0d1117' : '#f4f4f6')
+      ?.setAttribute('content', darkMode ? '#171919' : '#f0f0e9')
     writeStorage('king-theme', darkMode ? 'dark' : 'light')
   }, [darkMode])
-
-  // Apply the current season's theme (Summer / Mountain / Christmas / Casual)
-  useEffect(() => {
-    applyThemeToBody(currentSeasonTheme)
-  }, [currentSeasonTheme])
 
   // Persist sound preference
   useEffect(() => {
@@ -266,19 +259,17 @@ function App() {
 
   return (
     <div className="app">
-      <ThemeDecorations themeId={currentSeasonTheme} />
       <header className="app-header">
         {/* King Online is the site's home page (its own root layout) */}
         <a className="home-link" href="/" title="King Online"><ArrowLeft size={16} /> King Online</a>
         <button className="brand" onClick={() => setView('home')} title="მთავარი">
-          <img className="logo" src="/12427687.png" alt="" />
-          <h1>KING</h1>
+          <img className="logo" src="/king-mark.svg" alt="" />
+          <h1>KING<span className="brand-section">SCORE</span></h1>
         </button>
       </header>
 
       <SeasonBanner
         seasonName={currentSeasonName}
-        themeId={currentSeasonTheme}
         champion={currentChampion}
       />
 
@@ -309,7 +300,6 @@ function App() {
               darkMode={darkMode}
               onToggleDark={() => setDarkMode(v => !v)}
               seasonName={currentSeasonName}
-              seasonTheme={currentSeasonTheme}
               onResetGame={handleReset}
             />
           )}

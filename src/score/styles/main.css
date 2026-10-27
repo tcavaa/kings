@@ -1,157 +1,32 @@
-/* ════════════════════════════════════════════════════════════════════════
-   King Score — "Card Style" app design
-   Themes: every season picks one of casual / summer / mountain / christmas.
-   The theme swaps the custom properties below via a body.theme-* class;
-   dark mode (body.dark) layers on top of any theme.
-   ════════════════════════════════════════════════════════════════════════ */
-
+/* KING Score — the same paper, ink and citron system as King Online. */
 :root {
-  /* ── Casual (default) ── */
-  --bg: #f4f4f6;
-  --bg-accent: radial-gradient(1200px 500px at 50% -10%, rgba(85, 81, 216, 0.07), transparent 70%);
-  --panel: #ffffff;
-  --text: #171c2b;
-  --muted: #6b7280;
-  --primary: #5551d8;
-  --primary-600: #4643c4;
-  --primary-soft: rgba(85, 81, 216, 0.1);
-  --dark-btn: #101a33;
-  --dark-btn-600: #0a1226;
-  --line: #e4e5ec;
-  --line-strong: #cfd2dd;
-  --accent-good: #059669;
-  --accent-bad: #dc2626;
-  --accent-gold: #d4a017;
-  --cell-bg: #f8f8fb;
-  --input-bg: #ffffff;
-  --tooltip-bg: #ffffff;
-  --grid-stroke: #e4e5ec;
-  --thead-bg: #eef0f6;
-  --thead-text: #3d4257;
-  --banner-grad: linear-gradient(120deg, #5551d8 0%, #7c6ff0 55%, #9f8cf5 100%);
-  --banner-text: #ffffff;
-  --nav-bg: rgba(255, 255, 255, 0.94);
-  --nav-active: #5551d8;
-  --shadow-card: 0 1px 2px rgba(23, 28, 43, 0.05), 0 6px 20px -8px rgba(23, 28, 43, 0.09);
-  --radius: 16px;
+  --bg: #f0f0e9; --bg-accent: none; --panel: #fafaf5; --text: #202421;
+  --muted: #62695e; --primary: #52651d; --primary-600: #405115;
+  --primary-soft: #52651d12; --on-primary: #fff; --dark-btn: #52651d; --dark-btn-600: #405115;
+  --line: #d9dcd1; --line-strong: #b9c0b0; --accent-good: #426d44;
+  --accent-bad: #ac4940; --accent-gold: #7b682f; --cell-bg: #eeefe7;
+  --input-bg: #fafaf5; --tooltip-bg: #fafaf5; --grid-stroke: #d9dcd1;
+  --thead-bg: #e6e9de; --thead-text: #434b3c; --nav-bg: #f0f0e9f5;
+  --nav-active: #52651d; --shadow-card: none; --radius: 4px;
   color-scheme: light;
 }
-
-/* ── Summer: sun, sea, sand ── */
-body.theme-summer {
-  --bg: #fdf7ea;
-  --bg-accent: radial-gradient(1100px 480px at 50% -10%, rgba(56, 189, 248, 0.14), transparent 70%),
-               radial-gradient(700px 300px at 90% 0%, rgba(251, 191, 36, 0.18), transparent 70%);
-  --primary: #0e94b7;
-  --primary-600: #0b7c9a;
-  --primary-soft: rgba(14, 148, 183, 0.12);
-  --dark-btn: #0b4f66;
-  --dark-btn-600: #083e50;
-  --line: #f0e4cd;
-  --line-strong: #e3d2b2;
-  --accent-gold: #f59e0b;
-  --cell-bg: #fdf9f0;
-  --thead-bg: #faeed4;
-  --thead-text: #7c5c1b;
-  --grid-stroke: #f0e4cd;
-  --banner-grad: linear-gradient(120deg, #0ea5e9 0%, #22d3ee 45%, #fbbf24 100%);
-  --nav-active: #0e94b7;
-}
-
-/* ── Mountain: pine, stone, calm ── */
-body.theme-mountain {
-  --bg: #f1f4ef;
-  --bg-accent: radial-gradient(1100px 480px at 50% -10%, rgba(47, 107, 79, 0.12), transparent 70%);
-  --primary: #2f6b4f;
-  --primary-600: #26573f;
-  --primary-soft: rgba(47, 107, 79, 0.12);
-  --dark-btn: #1f3d2e;
-  --dark-btn-600: #172e22;
-  --line: #dfe7dc;
-  --line-strong: #c8d5c3;
-  --accent-gold: #b08b2e;
-  --cell-bg: #f7faf5;
-  --thead-bg: #e4ecdf;
-  --thead-text: #35543f;
-  --grid-stroke: #dfe7dc;
-  --banner-grad: linear-gradient(120deg, #2f6b4f 0%, #588a5f 55%, #8fae7a 100%);
-  --nav-active: #2f6b4f;
-}
-
-/* ── Christmas: snow, lights, festive ── */
-body.theme-christmas {
-  --bg: #f5f8fd;
-  --bg-accent: radial-gradient(1100px 480px at 50% -10%, rgba(185, 28, 28, 0.09), transparent 70%),
-               radial-gradient(700px 320px at 8% 0%, rgba(22, 101, 52, 0.1), transparent 70%);
-  --primary: #b91c1c;
-  --primary-600: #991b1b;
-  --primary-soft: rgba(185, 28, 28, 0.1);
-  --dark-btn: #14532d;
-  --dark-btn-600: #0f3f22;
-  --line: #e2e8f4;
-  --line-strong: #c9d4ea;
-  --accent-gold: #d4a017;
-  --cell-bg: #f8fafe;
-  --thead-bg: #eaf0fa;
-  --thead-text: #334366;
-  --grid-stroke: #e2e8f4;
-  --banner-grad: linear-gradient(120deg, #b91c1c 0%, #dc2626 40%, #166534 100%);
-  --nav-active: #b91c1c;
-}
-
-/* ── Dark mode (layers over any theme) ── */
-/* color-scheme on the root too: the page scrollbar belongs to <html>. */
 :root:has(> body.dark) { color-scheme: dark; }
 body.dark {
-  color-scheme: dark;
-  --bg: #0d1117;
-  --bg-accent: radial-gradient(1200px 500px at 50% -10%, rgba(88, 100, 220, 0.12), transparent 70%);
-  --panel: #161b22;
-  --text: #e6edf3;
-  --muted: #8b949e;
-  --line: #262d38;
-  --line-strong: #39414e;
-  --accent-good: #3fb950;
-  --accent-bad: #f85149;
-  --cell-bg: #1c2128;
-  --input-bg: #0d1117;
-  --tooltip-bg: #21262d;
-  --grid-stroke: #262d38;
-  --thead-bg: #21262d;
-  --thead-text: #aeb7c2;
-  --nav-bg: rgba(17, 22, 29, 0.95);
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 22px -10px rgba(0, 0, 0, 0.5);
-  --dark-btn: #323a48;
-  --dark-btn-600: #3d4657;
+  --bg: #171919; --panel: #242826; --text: #f2f2ed; --muted: #afb7a9;
+  --primary: #d7fa52; --primary-600: #e6ff91; --primary-soft: #d7fa5210;
+  --on-primary: #171919; --dark-btn: #d7fa52; --dark-btn-600: #e6ff91;
+  --line: #394039; --line-strong: #596252; --accent-good: #b9d498;
+  --accent-bad: #e5a097; --accent-gold: #d0c18d; --cell-bg: #1e221f;
+  --input-bg: #191d1a; --tooltip-bg: #242826; --grid-stroke: #394039;
+  --thead-bg: #30372e; --thead-text: #c4cdba; --nav-bg: #171919f5;
+  --nav-active: #d7fa52; color-scheme: dark;
 }
-body.dark.theme-summer {
-  --bg-accent: radial-gradient(1200px 500px at 50% -10%, rgba(14, 148, 183, 0.16), transparent 70%);
-  --primary: #22b8dd; --primary-600: #1ba3c6; --primary-soft: rgba(34, 184, 221, 0.14);
-  --banner-grad: linear-gradient(120deg, #075a74 0%, #0e94b7 55%, #b8860b 100%);
-  --nav-active: #22b8dd;
-}
-body.dark.theme-mountain {
-  --bg-accent: radial-gradient(1200px 500px at 50% -10%, rgba(74, 222, 128, 0.08), transparent 70%);
-  --primary: #4f9d75; --primary-600: #418a64; --primary-soft: rgba(79, 157, 117, 0.14);
-  --banner-grad: linear-gradient(120deg, #14351f 0%, #2f6b4f 60%, #587f4f 100%);
-  --nav-active: #6fbf95;
-}
-body.dark.theme-christmas {
-  --bg-accent: radial-gradient(1200px 500px at 50% -10%, rgba(220, 38, 38, 0.1), transparent 70%);
-  --primary: #e05252; --primary-600: #c93e3e; --primary-soft: rgba(224, 82, 82, 0.14);
-  --banner-grad: linear-gradient(120deg, #7f1d1d 0%, #b91c1c 45%, #14532d 100%);
-  --nav-active: #ef6a6a;
-}
-body.dark input[type="text"], body.dark input[type="number"], body.dark select {
-  background: var(--input-bg); color: var(--text); border-color: var(--line-strong);
-}
-
 /* ════════════ Base ════════════ */
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-inter), var(--font-noto-georgian), sans-serif;
   background: var(--bg);
   background-image: var(--bg-accent);
   background-attachment: fixed;
@@ -168,7 +43,7 @@ body {
   padding: calc(12px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px))
     calc(88px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left, 0px));
   position: relative;
-  z-index: 1; /* content above the fixed .theme-scene backdrop */
+  z-index: 1;
 }
 .app-content { display: flex; flex-direction: column; }
 
@@ -195,94 +70,6 @@ body {
   font-size: 26px; margin: 0; letter-spacing: 0.14em; font-weight: 800;
   color: var(--text);
 }
-
-/* ════════════ Season hero ════════════ */
-.season-hero {
-  position: relative; overflow: hidden;
-  margin: 4px 0 14px;
-  padding: 26px 18px 24px;
-  border-radius: 20px;
-  background: var(--banner-grad);
-  color: var(--banner-text);
-  text-align: center;
-  box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255,255,255,0.25);
-}
-/* light sweep + corner shading so the gradient feels less flat */
-.season-hero::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background:
-    radial-gradient(460px 200px at 50% -50%, rgba(255,255,255,0.3), transparent 70%),
-    radial-gradient(340px 220px at 105% 125%, rgba(0,0,0,0.22), transparent 70%);
-}
-.season-hero-content { position: relative; z-index: 2; }
-.season-hero-title {
-  margin: 0; font-size: 30px; font-weight: 900; line-height: 1.12;
-  letter-spacing: 0.01em; color: #fff;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.28), 0 6px 22px rgba(0,0,0,0.3);
-  overflow-wrap: anywhere;
-}
-.season-hero-champion {
-  position: relative; z-index: 2;
-  display: inline-flex; align-items: center; gap: 7px;
-  margin-top: 12px; padding: 6px 16px; border-radius: 999px;
-  background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.32);
-  font-size: 13px; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
-  backdrop-filter: blur(2px);
-}
-.season-hero-champion svg { color: #ffd75e; flex-shrink: 0; }
-
-/* ── hero decorations (per theme) ── */
-.hero-decor { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.hero-icon { position: absolute; color: rgba(255,255,255,0.3); }
-
-/* mountain: peak + tree line + bird + mist */
-.season-hero-mountain .hero-mountain-peak { right: -16px; bottom: -20px; color: rgba(255,255,255,0.16); }
-.season-hero-mountain .hero-tree-1 { left: 4px;  bottom: -7px; color: rgba(16,42,28,0.4); }
-.season-hero-mountain .hero-tree-2 { left: 42px; bottom: -4px; color: rgba(16,42,28,0.3); }
-.season-hero-mountain .hero-tree-3 { right: 56px; bottom: -9px; color: rgba(16,42,28,0.34); }
-.season-hero-mountain .hero-tree-4 { right: 26px; bottom: -4px; color: rgba(16,42,28,0.26); }
-.season-hero-mountain .hero-hero-bird { left: 16%; top: 12px; color: rgba(255,255,255,0.55); }
-.season-hero-mountain .hero-mist {
-  position: absolute; left: -10%; right: -10%; bottom: 16px; height: 13px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4) 40%, rgba(255,255,255,0.2) 70%, transparent);
-  filter: blur(4px);
-}
-
-/* christmas: string lights + gifts + tree + flakes */
-.season-hero-christmas .hero-lights {
-  position: absolute; top: 5px; left: 0; right: 0; height: 10px;
-  background-image:
-    radial-gradient(circle 3px at 10px 5px, #ffd75e 55%, transparent 60%),
-    radial-gradient(circle 3px at 32px 8px, #ff8b8b 55%, transparent 60%),
-    radial-gradient(circle 3px at 54px 4px, #8be39b 55%, transparent 60%),
-    radial-gradient(circle 3px at 76px 8px, #8fd0ff 55%, transparent 60%);
-  background-size: 88px 10px; background-repeat: repeat-x;
-  filter: drop-shadow(0 0 4px rgba(255, 235, 160, 0.6));
-}
-.season-hero-christmas .hero-gift-1 { left: 12px; bottom: -5px; color: rgba(255,255,255,0.45); }
-.season-hero-christmas .hero-gift-2 { left: 48px; bottom: -2px; color: rgba(255,255,255,0.32); }
-.season-hero-christmas .hero-gift-3 { right: 14px; bottom: -7px; color: rgba(255,255,255,0.42); }
-.season-hero-christmas .hero-xmas-tree { right: 48px; bottom: -12px; color: rgba(255,255,255,0.22); }
-.season-hero-christmas .hero-flake-1 { left: 13%; top: 22px; color: rgba(255,255,255,0.55); }
-.season-hero-christmas .hero-flake-2 { right: 18%; top: 16px; color: rgba(255,255,255,0.45); }
-.season-hero-christmas .hero-flake-3 { left: 28%; bottom: 16px; color: rgba(255,255,255,0.35); }
-
-/* summer: sun + umbrella + shell + wave line */
-.season-hero-summer .hero-sun { right: -18px; top: -20px; color: rgba(255, 243, 170, 0.65); }
-.season-hero-summer .hero-umbrella { left: 8px; bottom: -9px; transform: rotate(-14deg); color: rgba(255,255,255,0.45); }
-.season-hero-summer .hero-shell { left: 62px; bottom: 0; color: rgba(255,255,255,0.38); }
-.season-hero-summer .hero-wave-line {
-  position: absolute; left: -4%; right: -4%; bottom: 6px; height: 10px; opacity: 0.4;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='10' viewBox='0 0 90 10'%3E%3Cpath d='M0 10 V5 Q11 0 22 5 T45 5 T68 5 T90 5 V10 Z' fill='%23ffffff'/%3E%3C/svg%3E");
-  background-repeat: repeat-x; background-size: 90px 10px;
-}
-
-/* casual: faint suits in the corners */
-.season-hero-casual .hero-suit { color: rgba(255,255,255,0.2); }
-.season-hero-casual .hero-suit-1 { left: -8px; top: -10px; transform: rotate(-16deg); }
-.season-hero-casual .hero-suit-2 { right: 15%; top: 8px; transform: rotate(12deg); }
-.season-hero-casual .hero-suit-3 { right: -8px; bottom: -10px; transform: rotate(18deg); }
-.season-hero-casual .hero-suit-4 { left: 17%; bottom: 4px; transform: rotate(-10deg); }
 
 /* ════════════ Icon buttons & in-game toolbar ════════════ */
 .icon-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
@@ -332,7 +119,7 @@ input:focus-visible, select:focus-visible, button:focus-visible {
 .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 12px; }
 .actions.center { justify-content: center; flex-wrap: wrap; }
 .primary {
-  background: var(--primary); color: #fff;
+  background: var(--primary); color: var(--on-primary);
   border: 1px solid var(--primary);
   padding: 10px 16px; border-radius: 12px; cursor: pointer;
   font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
@@ -492,7 +279,7 @@ button, input, select { min-height: 44px; }
 .history-card {
   background: var(--cell-bg);
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 12px 14px;
 }
 .history-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
@@ -534,7 +321,7 @@ button, input, select { min-height: 44px; }
   cursor: pointer; transition: all 0.12s ease;
 }
 .compare-chip:hover:not(:disabled) { border-color: var(--primary); }
-.compare-chip.selected { background: var(--primary); border-color: var(--primary); color: #fff; }
+.compare-chip.selected { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .compare-chip:disabled { opacity: 0.4; cursor: not-allowed; }
 .compare-tr { grid-template-columns: 1.6fr 1fr 1fr 1fr; min-width: 320px; }
 .compare-tr.leader-row .td { background: color-mix(in srgb, var(--accent-gold) 12%, var(--cell-bg)); }
@@ -550,7 +337,7 @@ button, input, select { min-height: 44px; }
 
 .awards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; margin-top: 8px; }
 .award-card {
-  background: var(--cell-bg); border: 1px solid var(--line); border-radius: 14px;
+  background: var(--cell-bg); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 14px 10px; text-align: center;
 }
 .award-icon { font-size: 26px; margin-bottom: 6px; }
@@ -568,8 +355,8 @@ button, input, select { min-height: 44px; }
 .lb-val { font-weight: 600; }
 
 .player-breakdown-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-top: 8px; }
-.player-breakdown-card { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
-.pb-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; color: #fff; }
+.player-breakdown-card { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.pb-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; color: var(--on-primary); }
 .pb-name { font-size: 15px; font-weight: 700; }
 .pb-record { font-size: 12px; opacity: 0.85; }
 .pb-body { padding: 10px 12px; background: var(--cell-bg); display: flex; flex-direction: column; gap: 5px; }
@@ -598,7 +385,7 @@ button, input, select { min-height: 44px; }
   letter-spacing: 0.04em;
 }
 .season-card {
-  border-radius: 14px; overflow: hidden;
+  border-radius: var(--radius); overflow: hidden;
   background: linear-gradient(135deg, #5a3e08 0%, #8b6408 40%, #b5860a 60%, #8b6408 80%, #5a3e08 100%);
   border: 1px solid #7a5508;
   box-shadow: inset 0 1px 0 rgba(255,210,60,0.2), 0 2px 6px rgba(0,0,0,0.3);
@@ -685,7 +472,7 @@ button, input, select { min-height: 44px; }
 .heat-0 { background: var(--cell-bg); }
 .heat-1 { background: rgba(220, 38, 38, 0.18); }
 .heat-2 { background: rgba(220, 38, 38, 0.35); }
-.heat-3 { background: rgba(220, 38, 38, 0.60); color: #fff; font-weight: 700; }
+.heat-3 { background: rgba(220, 38, 38, 0.60); color: var(--on-primary); font-weight: 700; }
 
 
 /* ════════════ Achievements ════════════ */
@@ -794,250 +581,11 @@ button, input, select { min-height: 44px; }
   font-size: 11px; font-weight: 600;
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   Theme scenery — fixed, non-interactive layers that give each season its
-   atmosphere. `.theme-scene` sits BEHIND content (z 0); the snow layer
-   floats ABOVE it (z 940, under modals at 1000).
-   ════════════════════════════════════════════════════════════════════════ */
-.theme-scene {
-  /* Negative z-index keeps the scenery in the background paint layer of
-     .app's stacking context — behind every card, header and text, above
-     only the body background. */
-  position: fixed; inset: 0; z-index: -1;
-  pointer-events: none; overflow: hidden;
-}
-body.dark .theme-scene { filter: brightness(0.5) saturate(0.85); }
-
-/* ── Summer: sky, sun that sets into the sea as you scroll ── */
-.scene-summer .summer-sky {
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, #aedff8 0%, #cfeefb 40%, #fdf0cf 78%, #fbe3b2 100%);
-}
-.scene-summer .summer-sun {
-  /* Starts high in the top-right sky (clear of the centered cards) and
-     rides --scroll-p all the way down into the sea — a scroll-driven
-     sunset. The sea strip paints after it, so the disc sinks behind it. */
-  position: absolute; right: 6%; top: 6vh;
-  width: 88px; height: 88px; border-radius: 50%;
-  background: radial-gradient(circle at 38% 34%, #fff3c4 0%, #ffd75e 45%, #ffb547 100%);
-  box-shadow: 0 0 58px 24px rgba(255, 196, 92, 0.55), 0 0 140px 60px rgba(255, 214, 130, 0.28);
-  transform: translateY(calc(var(--scroll-p, 0) * 74vh));
-  will-change: transform;
-}
-.scene-summer .summer-sea {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 15vh; min-height: 90px;
-  background: linear-gradient(180deg, #56b7da 0%, #3795c1 35%, #1f6f9e 100%);
-  box-shadow: 0 -2px 18px rgba(64, 156, 195, 0.35);
-}
-.scene-summer .summer-wave {
-  position: absolute; left: -120px; right: 0; height: 14px; top: -10px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='14' viewBox='0 0 120 14'%3E%3Cpath d='M0 14 V7 Q15 0 30 7 T60 7 T90 7 T120 7 V14 Z' fill='%2356b7da'/%3E%3C/svg%3E");
-  background-repeat: repeat-x; background-size: 120px 14px;
-  --wave-tile: 120px;
-  animation: waveDrift 9s linear infinite;
-}
-.scene-summer .summer-wave-2 {
-  top: -4px; opacity: 0.55; height: 12px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='12' viewBox='0 0 90 12'%3E%3Cpath d='M0 12 V6 Q11 0 22 6 T45 6 T68 6 T90 6 V12 Z' fill='%2387d0ea'/%3E%3C/svg%3E");
-  background-size: 90px 12px;
-  /* One 90px tile per loop, at the old 20px/s; the old 120px loop jumped. */
-  left: -90px; --wave-tile: 90px;
-  animation: waveDrift 4.5s linear infinite reverse;
-}
-.scene-summer .summer-sea-shine {
-  position: absolute; left: 8%; right: 30%; top: 26%; height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(255,240,190,0.7) 30%, rgba(255,240,190,0.25) 70%, transparent);
-  border-radius: 999px; opacity: 0.8;
-}
-/* Waves slide on the compositor: each strip starts one tile left of the sea
-   and moves exactly one tile per loop, so the repeat is seamless. */
-@keyframes waveDrift {
-  from { transform: translateX(0); }
-  to   { transform: translateX(var(--wave-tile)); }
-}
-
-/* ── Mountain: layered ridges, drifting fog, soaring birds ── */
-.scene-mountain .mountain-sky {
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, #d5e8dd 0%, #e9f1ea 55%, #f1f4ef 100%);
-}
-.scene-mountain .mountain-ridge {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  background-repeat: repeat-x; will-change: transform;
-}
-.scene-mountain .mountain-ridge-far {
-  height: 34vh;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='140' viewBox='0 0 420 140' preserveAspectRatio='none'%3E%3Cpath d='M0 140 L0 92 L48 34 L86 78 L128 44 L178 104 L216 58 L266 96 L308 40 L352 88 L390 62 L420 90 L420 140 Z' fill='%23aec6b5'/%3E%3C/svg%3E");
-  background-size: 420px 100%;
-  opacity: 0.8;
-  transform: translateY(calc(var(--scroll-p, 0) * 3vh));
-}
-.scene-mountain .mountain-ridge-mid {
-  height: 24vh;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='120' viewBox='0 0 360 120' preserveAspectRatio='none'%3E%3Cpath d='M0 120 L0 70 L44 22 L82 64 L122 30 L168 84 L206 44 L254 78 L296 26 L338 70 L360 52 L360 120 Z' fill='%23779b85'/%3E%3C/svg%3E");
-  background-size: 360px 100%;
-  opacity: 0.9;
-  transform: translateY(calc(var(--scroll-p, 0) * 6vh));
-}
-.scene-mountain .mountain-ridge-near {
-  height: 15vh;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='90' viewBox='0 0 300 90' preserveAspectRatio='none'%3E%3Cpath d='M0 90 L0 52 L20 40 L34 52 L52 28 L70 48 L88 34 L108 56 L128 30 L150 54 L170 38 L192 60 L212 36 L236 58 L256 44 L278 62 L300 48 L300 90 Z' fill='%2344654f'/%3E%3C/svg%3E");
-  background-size: 300px 100%;
-  transform: translateY(calc(var(--scroll-p, 0) * 10vh));
-}
-.scene-mountain .mountain-fog {
-  position: absolute; left: -30%; width: 160%; height: 34px;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65) 25%, rgba(255,255,255,0.5) 55%, transparent 85%);
-  border-radius: 999px; filter: blur(6px);
-}
-.scene-mountain .mountain-fog-1 { bottom: 21vh; animation: fogDrift 46s linear infinite; }
-.scene-mountain .mountain-fog-2 { bottom: 11vh; height: 44px; animation: fogDrift 64s linear infinite reverse; }
-@keyframes fogDrift {
-  from { transform: translateX(-8%); }
-  50%  { transform: translateX(8%); }
-  to   { transform: translateX(-8%); }
-}
-.scene-mountain .mountain-bird {
-  position: absolute; left: 0; width: 24px; height: 9px;
-  animation: birdFly 38s linear infinite;
-}
-.scene-mountain .mountain-bird::before,
-.scene-mountain .mountain-bird::after {
-  content: ''; position: absolute; top: 0; width: 12px; height: 9px;
-  border-top: 2.5px solid rgba(52, 74, 61, 0.6);
-  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
-}
-.scene-mountain .mountain-bird::before { left: 0; transform: rotate(-4deg); }
-.scene-mountain .mountain-bird::after  { left: 11px; transform: rotate(4deg); }
-.scene-mountain .mountain-bird-1 { top: 16vh; animation-delay: -6s; }
-.scene-mountain .mountain-bird-2 { top: 10vh; transform: scale(0.7); animation-delay: -24s; animation-duration: 52s; }
-/* The translate property (not transform) keeps bird-2's scale(0.7) intact
-   and stays off the layout path; x moves linearly from -6vw to 104vw. */
-@keyframes birdFly {
-  from { translate: -6vw 0; }
-  25%  { translate: 21.5vw -12px; }
-  50%  { translate: 49vw 6px; }
-  75%  { translate: 76.5vw -8px; }
-  to   { translate: 104vw 0; }
-}
-
-/* ── Mountain: moss growing on random blocks ──
-   nth-child formulas give a stable pseudo-random scatter: some cards, some
-   game-type buttons and some availability cells grow a mossy top edge. */
-body:is(.theme-mountain, .theme-summer, .theme-christmas) :is(.card, .type-btn, .matrix .cell) { position: relative; }
-
-body.theme-mountain .card:nth-child(3n+1)::after,
-body.theme-mountain .card:nth-child(4n+3)::after,
-body.theme-mountain .type-btn[data-decor]::after,
-body.theme-mountain .matrix .cell[data-decor]::after {
-  content: ''; position: absolute; top: -3px; height: 13px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='70' height='14' viewBox='0 0 70 14'%3E%3Cpath d='M0 0 H70 V4 Q66 11 61 5 Q57 13 51 6 Q47 12 41 5 Q36 11 31 4 Q27 10 21 5 Q17 12 11 4 Q7 9 3 4 Q1 6 0 4 Z' fill='%234a7245'/%3E%3Cpath d='M0 0 H70 V3 Q64 7 58 4 Q52 9 45 4 Q39 8 33 3 Q26 8 19 3 Q13 7 7 3 Q3 5 0 3 Z' fill='%235d8a54'/%3E%3C/svg%3E");
-  background-repeat: repeat-x; background-size: 70px 13px;
-  filter: drop-shadow(0 2px 1px rgba(38, 66, 46, 0.25));
-  pointer-events: none; z-index: 2; border-radius: 8px 8px 0 0;
-}
-/* variety: left-hanging patches on some, right-hanging on others */
-body.theme-mountain .card:nth-child(3n+1)::after { left: 14px; width: 46%; }
-body.theme-mountain .card:nth-child(4n+3)::after { right: 16px; left: auto; width: 34%; }
-body.theme-mountain .type-btn[data-decor="a"]::after { left: 8px; width: 55%; height: 9px; background-size: 48px 9px; }
-body.theme-mountain .type-btn[data-decor="b"]::after { right: 8px; left: auto; width: 42%; height: 9px; background-size: 48px 9px; }
-body.theme-mountain .matrix .cell[data-decor]::after {
-  left: 6px; right: 6px; width: auto; height: 8px; background-size: 42px 8px; top: -2px;
-}
-body.dark.theme-mountain .card::after,
-body.dark.theme-mountain .type-btn::after,
-body.dark.theme-mountain .matrix .cell::after { filter: drop-shadow(0 2px 2px rgba(0,0,0,0.5)) brightness(0.9); }
-
-/* ── Summer: fish & water lilies drifting on random blocks ── */
-/* a little fish swimming across the bottom-right of some cards */
-body.theme-summer .card:nth-child(3n+1)::after,
-body.theme-summer .type-btn[data-decor="a"]::after,
-body.theme-summer .matrix .cell[data-decor="a"]::after {
-  content: ''; position: absolute; pointer-events: none; z-index: 2; opacity: 0.55;
-  background-repeat: no-repeat; background-size: contain;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='18' viewBox='0 0 34 18'%3E%3Cpath d='M2 9 Q10 1 19 5 Q24 7 26 9 Q24 11 19 13 Q10 17 2 9 Z' fill='%232f8fbe'/%3E%3Cpath d='M26 9 L33 4 L31 9 L33 14 Z' fill='%232f8fbe'/%3E%3Ccircle cx='7' cy='8' r='1.5' fill='%23ffffff'/%3E%3C/svg%3E");
-}
-body.theme-summer .card:nth-child(3n+1)::after { right: 14px; bottom: 10px; width: 30px; height: 16px; transform: scaleX(-1) rotate(-6deg); }
-body.theme-summer .type-btn[data-decor="a"]::after { right: 8px; top: 50%; margin-top: -7px; width: 24px; height: 13px; }
-body.theme-summer .matrix .cell[data-decor="a"]::after { right: 4px; bottom: 3px; width: 18px; height: 10px; }
-
-/* a water lily resting on the top corner of other cards */
-body.theme-summer .card:nth-child(4n+3)::after,
-body.theme-summer .type-btn[data-decor="b"]::after,
-body.theme-summer .matrix .cell[data-decor="b"]::after {
-  content: ''; position: absolute; pointer-events: none; z-index: 2; opacity: 0.75;
-  background-repeat: no-repeat; background-size: contain;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='22' viewBox='0 0 30 22'%3E%3Cellipse cx='15' cy='16' rx='11' ry='5' fill='%234c9a6d'/%3E%3Cpath d='M15 16 L27 12.5 L27 19.5 Z' fill='%23bfe6cf'/%3E%3Cpath d='M15 1 Q11.6 8 15 12 Q18.4 8 15 1 Z' fill='%23f18bb0'/%3E%3Cpath d='M8 4 Q10.5 10 15 12 Q11 6 8 4 Z' fill='%23ec6f9d'/%3E%3Cpath d='M22 4 Q19.5 10 15 12 Q19 6 22 4 Z' fill='%23ec6f9d'/%3E%3Ccircle cx='15' cy='11' r='1.6' fill='%23ffe27a'/%3E%3C/svg%3E");
-}
-body.theme-summer .card:nth-child(4n+3)::after { left: 16px; top: 6px; width: 26px; height: 19px; }
-body.theme-summer .type-btn[data-decor="b"]::after { right: 10px; top: 50%; margin-top: -8px; width: 20px; height: 15px; }
-body.theme-summer .matrix .cell[data-decor="b"]::after { right: 3px; top: 2px; width: 16px; height: 12px; }
-
-/* ── Christmas: falling snow + snow caps on the blocks ── */
-.snow-layer {
-  position: fixed; inset: 0; z-index: 940;
-  pointer-events: none; overflow: hidden;
-}
-.snowflake {
-  position: absolute; top: -3vh; border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 0 6px rgba(148, 168, 210, 0.75);
-  animation-name: snowFall;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: transform;
-}
-@keyframes snowFall {
-  from { transform: translate3d(0, -4vh, 0); }
-  to   { transform: translate3d(var(--drift, 0px), 108vh, 0); }
-}
-
-/* Lumpy snow drifts sitting on top of the cards & bottom nav. The drift is
-   faintly blue-tinted with a soft shadow so it reads against white cards. */
-body.theme-christmas {
-  --snow-cap: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='12' viewBox='0 0 140 12'%3E%3Cpath d='M0 12 V7 Q8 2 18 6 Q26 1 38 5 Q48 0 60 5 Q70 1 82 6 Q92 0 104 5 Q114 2 126 7 Q133 4 140 7 V12 Z' fill='%23f4f8ff'/%3E%3C/svg%3E");
-}
-body.theme-christmas .card::before,
-body.theme-christmas .bottom-nav::before {
-  content: ''; position: absolute; top: -5px; left: 10px; right: 10px; height: 12px;
-  background-image: var(--snow-cap);
-  background-repeat: repeat-x; background-size: 140px 12px; background-position: bottom;
-  filter: drop-shadow(0 2px 2px rgba(112, 132, 178, 0.4));
-  pointer-events: none; z-index: 2;
-}
-body.theme-christmas .bottom-nav::before { left: 0; right: 0; top: -7px; }
-body.dark.theme-christmas .card::before,
-body.dark.theme-christmas .bottom-nav::before { opacity: 0.9; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
-
-/* random snow tufts on the in-game blocks (game-type buttons + matrix
-   cells), mirroring the mountain moss scatter */
-body.theme-christmas .type-btn[data-decor]::after,
-body.theme-christmas .matrix .cell[data-decor]::after {
-  content: ''; position: absolute; top: -3px; height: 9px;
-  background-image: var(--snow-cap);
-  background-repeat: repeat-x; background-size: 52px 9px; background-position: bottom;
-  filter: drop-shadow(0 2px 2px rgba(112, 132, 178, 0.4));
-  pointer-events: none; z-index: 2; border-radius: 8px 8px 0 0;
-}
-body.theme-christmas .type-btn[data-decor="a"]::after { left: 8px; width: 55%; }
-body.theme-christmas .type-btn[data-decor="b"]::after { right: 8px; left: auto; width: 42%; }
-body.theme-christmas .matrix .cell[data-decor]::after {
-  left: 6px; right: 6px; top: -2px; height: 7px; background-size: 40px 7px;
-}
-body.dark.theme-christmas .type-btn::after,
-body.dark.theme-christmas .matrix .cell::after { opacity: 0.9; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
-
-/* Respect users who prefer less motion — scenery goes still. */
-@media (prefers-reduced-motion: reduce) {
-  .snowflake, .summer-wave, .mountain-fog, .mountain-bird { animation: none !important; }
-  .snow-layer { display: none; }
-}
-
 /* ════════════ Mobile ════════════ */
 @media (max-width: 640px) {
   .matrix-header .player-col { font-size: 12px; padding: 6px 4px; }
   .app { padding: calc(8px + env(safe-area-inset-top, 0px)) max(10px, env(safe-area-inset-right, 0px)) calc(84px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left, 0px)); }
-  .card { padding: 13px; border-radius: 14px; }
+  .card { padding: 13px; border-radius: var(--radius); }
   .season-hero-title { font-size: 24px; }
   .game-type-selector .inputs-grid { grid-template-columns: 1fr; }
   .input-row { flex-wrap: wrap; gap: 8px; }
@@ -1047,3 +595,75 @@ body.dark.theme-christmas .matrix .cell::after { opacity: 0.9; filter: drop-shad
   .history-header { flex-wrap: wrap; }
   .sticky-footer { bottom: calc(60px + env(safe-area-inset-bottom)); }
 }
+
+/* Quiet hierarchy, generous touch targets and compact phone layouts. */
+html, body, #root { min-height: 100dvh; height: auto; }
+body { line-height: 1.5; }
+button, input, select, textarea { font-family: inherit; }
+button, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.app { max-width: 1040px; }
+.app-header { justify-content: space-between; align-items: center; padding: 14px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.home-link { position: static; transform: none; min-height: 44px; order: 2; }
+.brand { padding: 0; gap: 8px; }
+.brand .logo { width: 32px; height: 36px; background: transparent; border: 0; padding: 0; border-radius: 0; }
+.brand h1 { font-size: 23px; letter-spacing: -.06em; display: flex; align-items: center; gap: 12px; }
+.brand-section { font-size: 10px; letter-spacing: .16em; font-weight: 500; color: var(--muted); padding-left: 12px; border-left: 1px solid var(--line-strong); }
+.season-hero { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 0 0 22px; }
+.season-eyebrow { color: var(--muted); font-size: 11px; margin: 0 0 6px; }
+.season-hero-title { font-size: 28px; line-height: 1.3; font-weight: 600; margin: 0; overflow-wrap: anywhere; }
+.season-hero-champion { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+.season-hero-champion strong { display: block; color: var(--text); font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+h2 { font-weight: 600; line-height: 1.5; }
+.card { padding: 20px; margin-bottom: 16px; }
+.primary, .primary.success, .sticky-footer .primary { box-shadow: none; color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
+.primary, .link, .type-btn, .input-row, .radio-row, .td, .th, .bottom-nav-item, select, .input-row input { border-radius: 3px; }
+.primary { letter-spacing: 0; font-weight: 600; }
+.player-input .inline { margin: 0 0 18px; width: 100%; justify-content: space-between; font-size: 13px; }
+.player-input .inline select { width: 76px; }
+.player-input .input-row { flex-direction: column; align-items: stretch; padding: 12px; gap: 8px; }
+.player-input .input-row span { font-size: 12px; color: var(--muted); }
+.player-input .input-row select { width: 100%; }
+input[type="text"], input[type="number"], select, .input-row select { font-size: 16px; }
+.game-timer { border: 0; padding: 0; margin: 0 0 16px; font-size: 16px; background: transparent; color: var(--muted); }
+.game-timer svg { color: var(--muted); }
+.bottom-nav { box-shadow: none; }
+.bottom-nav-item { min-height: 48px; }
+.bottom-nav-item.active { background: transparent; box-shadow: inset 0 2px var(--primary); }
+.bottom-nav-label { font-size: 11px; font-weight: 500; }
+.sticky-footer { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); margin: 12px 0 -12px; padding: 12px 0; }
+.more-hint { line-height: 1.7; }
+.more-toggle-row > div { min-width: 0; }
+.toggle-switch { flex-shrink: 0; }
+@media (max-width: 640px) {
+  .app { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+  .app-header { padding-top: 8px; margin-bottom: 18px; }
+  .card { padding: 16px; }
+  .season-hero { align-items: flex-start; flex-direction: column; gap: 12px; padding-bottom: 20px; }
+  .season-hero-title { font-size: 25px; }
+  .season-hero-champion > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+  .inputs-grid { grid-template-columns: 1fr; }
+  .player-input .actions .primary { width: 100%; }
+  .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .type-btn { font-size: 12px; padding: 10px 8px; }
+  .td, .th { padding: 8px 4px; font-size: 12px; }
+  .row, .inline { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.season-card, .season-card-header { background: var(--panel); border-color: var(--line); box-shadow: none; }
+.engraved-name, .engraved-period, .engraved-champion, .engraved-label { font-family: inherit; color: var(--text); text-shadow: none; letter-spacing: 0; }
+.engraved-period, .engraved-label { color: var(--muted); }
+.season-card-body { border-color: var(--line); }
+.danger-zone { animation: none; }
+.compare-chip.selected { color: var(--on-primary); }
+.pb-header { color: #171919; }
+
+.season-trophy-header { background: var(--panel); border: 1px solid var(--line); box-shadow: none; border-radius: var(--radius); }
+.engraved-title, .engraved-subtitle, .engraved-season-name { color: var(--text); font-family: inherit; letter-spacing: 0; text-shadow: none; }
+
+/* Keep the submit action in its form; the fixed navigation must not cover inputs. */
+.sticky-footer { position: static; }
+.matrix .cell { border-radius: 3px; }

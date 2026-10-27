@@ -79,7 +79,7 @@ export default function WinnersPage({ seasons }) {
       </div>
 
       {/* Tab switcher */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
         {[
           { key: 'local',   label: 'ლაივი',      Icon: null },
           { key: 'online',  label: 'ონლაინ',     Icon: Globe },

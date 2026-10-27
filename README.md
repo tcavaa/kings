@@ -157,7 +157,7 @@ used to write from the browser) and adds `profile_sessions` and
   per profile and 10 passcode guesses per IP per 15 minutes.
 - Profile photos are served from `/api/profiles/:id/avatar?v=…` (cached for
   good), and only those links travel in sockets, snapshots and saved games.
-- Seasons (name, theme, ending one) and the player list are managed in
+- Seasons (name, ending one) and the player list are managed in
   `/admin`; King Score only reads them.
 
 King Online's data came from the cPanel MySQL dump through a one-off import

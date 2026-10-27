@@ -11,17 +11,15 @@ const { gameEntries, barePayload } = require('./games');
 const { winnerNames, inSeason, seasonTable, championOf, championsOf } = require('../games/results');
 const { badRequest } = require('../lib/httpError');
 
-const SEASON_THEMES = ['casual', 'summer', 'mountain', 'christmas'];
-
 async function listSeasons() {
   const rows = await db()`
-    SELECT id, name, theme, started_at, ended_at, champion_name, champion_names
+    SELECT id, name, started_at, ended_at, champion_name, champion_names
       FROM seasons ORDER BY started_at DESC`;
   return rows.map((r) => ({ ...r, started_at: iso(r.started_at), ended_at: iso(r.ended_at) }));
 }
 
 async function currentSeason(sql = db()) {
-  const rows = await sql`SELECT id, name, theme, started_at, ended_at FROM seasons`;
+  const rows = await sql`SELECT id, name, started_at, ended_at FROM seasons`;
   const open = rows.find((r) => !r.ended_at) || null;
   const lastEnded = rows.filter((r) => r.ended_at).sort((a, b) => b.ended_at - a.ended_at)[0];
   const start = open?.started_at || lastEnded?.ended_at || new Date(0);
@@ -59,16 +57,15 @@ async function previewSeasonEnd() {
   return { season: open, startedAt: start.toISOString(), champion, table };
 }
 
-function seasonFields({ name, theme }) {
+function seasonName(name) {
   const cleanName = String(name ?? '').trim();
   if (!cleanName || cleanName.length > 40) throw badRequest('Season name must be 1-40 characters.');
-  if (!SEASON_THEMES.includes(theme)) throw badRequest('Unknown season theme.');
-  return { name: cleanName, theme };
+  return cleanName;
 }
 
 /** /admin: close the current season with its champion and open the next one. */
-async function endSeason({ name, theme }) {
-  const next = seasonFields({ name, theme });
+async function endSeason({ name }) {
+  const nextName = seasonName(name);
   return db().begin(async (tx) => {
     // One season end at a time; a second click waits and then finds no games.
     await tx`LOCK TABLE seasons IN SHARE ROW EXCLUSIVE MODE`;
@@ -88,19 +85,19 @@ async function endSeason({ name, theme }) {
         INSERT INTO seasons (champion_name, champion_names, started_at, ended_at)
         VALUES (${champion}, ${champions}, ${startedAt}, now())`;
     }
-    await tx`INSERT INTO seasons (name, theme, started_at) VALUES (${next.name}, ${next.theme}, now())`;
+    await tx`INSERT INTO seasons (name, started_at) VALUES (${nextName}, now())`;
     return { champion };
   });
 }
 
-/** /admin: rename or re-theme the current season. */
-async function updateCurrentSeason({ name, theme }) {
-  const fields = seasonFields({ name, theme });
+/** /admin: rename the current season. */
+async function updateCurrentSeason({ name }) {
+  const cleanName = seasonName(name);
   const { open, start } = await currentSeason();
   if (open) {
-    await db()`UPDATE seasons SET name = ${fields.name}, theme = ${fields.theme} WHERE id = ${open.id}`;
+    await db()`UPDATE seasons SET name = ${cleanName} WHERE id = ${open.id}`;
   } else {
-    await db()`INSERT INTO seasons (name, theme, started_at) VALUES (${fields.name}, ${fields.theme}, ${start})`;
+    await db()`INSERT INTO seasons (name, started_at) VALUES (${cleanName}, ${start})`;
   }
 }
 

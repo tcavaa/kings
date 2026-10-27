@@ -9,25 +9,25 @@ export async function GET() {
 }
 
 // /admin: { action: 'preview' } shows who would be crowned now;
-// { action: 'end', name, theme } closes the season and opens the next one.
+// { action: 'end', name } closes the season and opens the next one.
 export async function POST(request) {
   try {
     const denied = await requireAdmin(request)
     if (denied) return denied
-    const { action, name, theme } = (await readJson(request)) || {}
+    const { action, name } = (await readJson(request)) || {}
     if (action === 'preview') return json(await store.previewSeasonEnd())
-    if (action === 'end') return json(await store.endSeason({ name, theme }))
+    if (action === 'end') return json(await store.endSeason({ name }))
     return json({ error: 'Unknown action' }, 400)
   } catch (err) { return sendErr(err) }
 }
 
-// /admin: rename or re-theme the current season.
+// /admin: rename the current season.
 export async function PATCH(request) {
   try {
     const denied = await requireAdmin(request)
     if (denied) return denied
-    const { name, theme } = (await readJson(request)) || {}
-    await store.updateCurrentSeason({ name, theme })
+    const { name } = (await readJson(request)) || {}
+    await store.updateCurrentSeason({ name })
     return json({ ok: true })
   } catch (err) { return sendErr(err) }
 }

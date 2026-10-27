@@ -1,5 +1,4 @@
 import { Users, Trash2, Handshake, Spade } from 'lucide-react'
-import { getTheme } from '../utils/themes'
 
 /**
  * The "More" tab: players, preferences, the current season and a small
@@ -12,10 +11,8 @@ export default function MorePage({
   darkMode,
   onToggleDark,
   seasonName,
-  seasonTheme,
   onResetGame,
 }) {
-  const ThemeIcon = getTheme(seasonTheme).Icon
 
   return (
     <div className="more-page">
@@ -36,10 +33,10 @@ export default function MorePage({
         <h2>მიმდინარე სეზონი</h2>
         <div className="more-season-row">
           <span className="more-season-chip">
-            <ThemeIcon size={15} /> {seasonName || 'უსახელო სეზონი'}
+            <Spade size={15} /> {seasonName || 'უსახელო სეზონი'}
           </span>
         </div>
-        <p className="more-hint">სეზონის სახელს, თემას და დასრულებას ადმინი ადგენს.</p>
+        <p className="more-hint">სეზონის სახელს და დასრულებას ადმინი ადგენს.</p>
       </div>
 
       <div className="card">
@@ -52,6 +49,7 @@ export default function MorePage({
           <button
             className={`toggle-switch ${soundEnabled ? 'on' : ''}`}
             role="switch"
+            aria-label="ხმები"
             aria-checked={soundEnabled}
             onClick={onToggleSound}
           >
@@ -66,6 +64,7 @@ export default function MorePage({
           <button
             className={`toggle-switch ${darkMode ? 'on' : ''}`}
             role="switch"
+            aria-label="მუქი რეჟიმი"
             aria-checked={darkMode}
             onClick={onToggleDark}
           >

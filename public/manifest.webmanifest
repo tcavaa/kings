@@ -3,8 +3,8 @@
   "short_name": "King",
   "start_url": "/score",
   "display": "standalone",
-  "background_color": "#efe6d6",
-  "theme_color": "#0f1e2e",
+  "background_color": "#171919",
+  "theme_color": "#171919",
   "icons": [
     {
       "src": "/12427687.png",

@@ -1,7 +1,6 @@
 import { GAME_TYPES } from '../constants/gameTypes'
 import TrophyIcon from './TrophyIcon'
 import { isChampionName } from '../utils/winners'
-import { MATRIX_CELL_DECOR } from '../utils/decorations'
 
 export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlayerIndex, onPreselect, playerColors = [], currentChampion }) {
   return (
@@ -35,7 +34,6 @@ export default function GameTypeMatrix({ players, usedTypesByPlayer, activePlaye
                   type="button"
                   disabled={used || idx !== activePlayerIndex}
                   onClick={() => onPreselect && onPreselect(t.code)}
-                  data-decor={MATRIX_CELL_DECOR[`${t.code}-${idx}`]}
                 >
                   {used ? '✕' : '•'}
                 </button>

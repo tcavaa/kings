@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { GAME_TYPES } from '../constants/gameTypes'
 import { computeScoresForRound } from '../utils/scoring'
 import { countsSum, normalizeCount, validateRound } from '../utils/rounds'
-import { TYPE_BTN_DECOR } from '../utils/decorations'
 
 // The chosen type lives in App, so a tap on the availability matrix and a
 // tap here pick the same thing.
@@ -79,7 +78,6 @@ export default function GameTypeSelector({
             className={selectedTypeCode === t.code ? 'type-btn selected' : 'type-btn'}
             onClick={() => onSelectType(t.code)}
             type="button"
-            data-decor={TYPE_BTN_DECOR[t.code]}
           >
             {t.label}
           </button>

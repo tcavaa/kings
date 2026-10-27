@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { DEFAULT_THEME } from '../utils/themes'
 import { seasonChampions } from '../utils/winners'
 
-// Seasons, read-only: they are named, themed and ended from King Online's
+// Seasons, read-only: they are named and ended from King Online's
 // /admin. Completed seasons have `ended_at` set; the CURRENT season is the
 // single row with `ended_at` NULL. Without such a row the current season
 // starts when the last one ended.
@@ -43,6 +42,5 @@ export function useSeasons() {
     currentChampion,
     currentSeasonStart,
     currentSeasonName: currentSeason?.name || null,
-    currentSeasonTheme: currentSeason?.theme || DEFAULT_THEME,
   }
 }
