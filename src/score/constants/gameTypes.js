@@ -1,4 +1,5 @@
 import { GAME_TYPE_RULES } from '../../../server/game/gameTypes.js'
+import { GAME_TYPES as ONLINE_TYPES } from '../../online/constants/gameTypes.js'
 
 // ჩაწერა's labels for the nine game types. How each one scores (kind,
 // totalUnits, pointsPerUnit) comes from the rules King Online's server plays
@@ -15,4 +16,7 @@ const LABELS = {
   P3: { label: '+ — პლიუსი 3', unitLabel: 'მინუსები' },
 }
 
-export const GAME_TYPES = GAME_TYPE_RULES.map(rule => ({ ...rule, ...LABELS[rule.code] }))
+// Colours match King Online's game picker, so a type looks the same in both.
+const COLORS = Object.fromEntries(ONLINE_TYPES.map(t => [t.code, t.color]))
+
+export const GAME_TYPES = GAME_TYPE_RULES.map(rule => ({ ...rule, ...LABELS[rule.code], color: COLORS[rule.code] }))

@@ -76,10 +76,12 @@ export default function GameTypeSelector({
           <button
             key={t.code}
             className={selectedTypeCode === t.code ? 'type-btn selected' : 'type-btn'}
+            style={{ '--type-color': t.color }}
             onClick={() => onSelectType(t.code)}
             type="button"
           >
-            {t.label}
+            <span className="type-code">{t.label.split(' — ')[0]}</span>
+            <span>{t.label.split(' — ')[1]}</span>
           </button>
         ))}
       </div>

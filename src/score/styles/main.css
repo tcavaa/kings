@@ -143,17 +143,28 @@ button, input, select { min-height: 44px; }
 .danger-link:hover { border-color: var(--accent-bad); color: var(--accent-bad); background: color-mix(in srgb, var(--accent-bad) 8%, transparent); }
 
 /* ════════════ Game type selector ════════════ */
-.type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 10px; }
+.type-grid { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 10px; }
 .type-btn {
   padding: 10px 12px; border-radius: 12px; background: var(--cell-bg); color: var(--text);
   border: 1px solid var(--line); cursor: pointer; text-align: left; font-size: 14px;
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 .type-btn:hover { border-color: var(--primary); }
+.game-type-selector .type-btn {
+  display: flex; align-items: center; gap: 12px;
+  border-left: 4px solid var(--type-color);
+  background: color-mix(in srgb, var(--type-color) 14%, var(--cell-bg));
+}
+.type-code {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 34px; height: 28px; padding: 0 6px; border-radius: 6px;
+  background: var(--type-color); color: #233d31; font-weight: 700; font-size: 13px;
+}
 .type-btn.selected {
   border-color: var(--primary); background: var(--primary-soft);
   outline: 1px solid var(--primary); font-weight: 600;
 }
+.game-type-selector .type-btn.selected { border-left-color: var(--type-color); }
 .game-type-selector .inputs { margin-top: 8px; }
 .game-type-selector .radio-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
 .radio-row {
@@ -625,6 +636,14 @@ h2 { font-weight: 600; line-height: 1.5; }
 .player-input .input-row span { font-size: 12px; color: var(--muted); }
 .player-input .input-row select { width: 100%; }
 input[type="text"], input[type="number"], select, .input-row select { font-size: 16px; }
+/* iOS draws a native select's Inter→Noto Georgian fallback text below its
+   box, clipping it; drawn by CSS instead, the text sits centred. */
+select {
+  -webkit-appearance: none; appearance: none;
+  height: 44px; padding: 0 36px 0 12px; line-height: 1.25;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237a8a7e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 9 5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; background-size: 14px;
+}
 .game-timer { border: 0; padding: 0; margin: 0 0 16px; font-size: 16px; background: transparent; color: var(--muted); }
 .game-timer svg { color: var(--muted); }
 .bottom-nav { box-shadow: none; }
@@ -644,8 +663,7 @@ input[type="text"], input[type="number"], select, .input-row select { font-size:
   .season-hero-champion > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
   .inputs-grid { grid-template-columns: 1fr; }
   .player-input .actions .primary { width: 100%; }
-  .type-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .type-btn { font-size: 12px; padding: 10px 8px; }
+  .type-btn { font-size: 14px; padding: 8px 10px; }
   .td, .th { padding: 8px 4px; font-size: 12px; }
   .row, .inline { flex-wrap: wrap; }
 }
