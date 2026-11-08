@@ -26,7 +26,7 @@ database.
   sits it out and the other three play it exactly as at a 3-player table;
   everyone still leads all 9 types, so a game is 36 rounds. Tournaments stay
   3-player.
-- After each round the result shows for 4 seconds and the next hand deals
+- After each round the result shows for 2 seconds and the next hand deals
   itself (no "next round" button).
 - One Supabase database (project `KINGS`, Frankfurt) for both, with **one
   player list** (`profiles`) and **one games table** (`finished_games`, each

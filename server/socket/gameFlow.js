@@ -11,7 +11,7 @@ const { LOBBY } = require('./lobby');
 
 // How long the round's result stays up before the next hand is dealt on its
 // own (there is no "next round" button any more).
-const NEXT_ROUND_DELAY_MS = Number(process.env.NEXT_ROUND_DELAY_MS) || 4000;   // env: tests only
+const NEXT_ROUND_DELAY_MS = Number(process.env.NEXT_ROUND_DELAY_MS) || 2000;   // env: tests only
 // A round played out to its last trick shows that trick (and flies it to its
 // winner) before the result opens — the client's TRICK_DISPLAY_MS +
 // TRICK_ANIMATION_MS — so the result still gets its full time on screen.

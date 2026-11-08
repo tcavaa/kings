@@ -7,10 +7,10 @@ import AvatarImg from "../AvatarImg";
 
 // The server deals the next hand on its own this long after the result opens
 // (see server/socket/gameFlow.js) — there is no "next round" button.
-const NEXT_ROUND_SECONDS = 4;
+const NEXT_ROUND_SECONDS = 2;
 // Still here well after that (a table restored after a server restart has no
 // timer): ask the server to deal. It ignores the ask while its own timer runs.
-const NUDGE_AFTER_MS = 7000;
+const NUDGE_AFTER_MS = 5000;
 
 export default function RoundResult() {
   const {
