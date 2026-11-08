@@ -13,7 +13,9 @@ export default function WaitingRoom() {
     startGame,
     roomMode,
     leaveRoom,
+    seatCount = 3,
   } = useGame();
+  const seats = Array.from({ length: seatCount }, (_, i) => i);
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef(null);
   useEffect(() => {
@@ -30,7 +32,7 @@ export default function WaitingRoom() {
   };
   const canStart =
     isCreator &&
-    players.length === 3 &&
+    players.length === seatCount &&
     players.every((p) => p.connected !== false);
   return (
     <div className="k-wait-page">
@@ -79,19 +81,22 @@ export default function WaitingRoom() {
             {canStart
               ? "დავიწყოთ თამაში"
               : isCreator
-                ? `ველოდებით მოთამაშეებს (${players.length}/3)`
+                ? `ველოდებით მოთამაშეებს (${players.length}/${seatCount})`
                 : "წამყვანი დაიწყებს თამაშს"}
             <ArrowRight size={20} />
           </button>
         </section>
-        <section className="k-wait-table" aria-label="მოთამაშეები">
+        <section
+          className={`k-wait-table ${seatCount === 4 ? "is-four" : ""}`}
+          aria-label="მოთამაშეები"
+        >
           <span className="k-table-edition">PRIVATE SESSION / {roomCode}</span>
           <div className="k-oval">
             <span>
               kıng<small>THE TABLE IS SET.</small>
             </span>
           </div>
-          {[0, 1, 2].map((seat) => {
+          {seats.map((seat) => {
             const p = players.find((p) => p.seat === seat);
             return (
               <div
@@ -119,10 +124,10 @@ export default function WaitingRoom() {
             );
           })}
           <div className="k-seat-progress">
-            {[0, 1, 2].map((i) => (
+            {seats.map((i) => (
               <i key={i} className={players.length > i ? "filled" : ""} />
             ))}
-            <span>{players.length} / 3 მოთამაშე</span>
+            <span>{players.length} / {seatCount} მოთამაშე</span>
           </div>
         </section>
       </main>

@@ -28,6 +28,8 @@ export function computeGameStats(playerList, details) {
   }
   for (const d of details || []) {
     for (const seat of Object.keys(tally).map(Number)) {
+      // The dealer who sat a 4-player round out didn't play it.
+      if (d.restingSeat === seat) continue
       const t = addRoundStats(tally[seat], d, seat)
       const score = d.scores?.[seat] ?? 0
       if (score > t.bestRound.score) t.bestRound = { score, round: d.round, type: d.gameType }

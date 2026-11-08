@@ -8,7 +8,7 @@ import { useTapLock } from "../hooks/useTapLock";
 import PlayingCard from "./ui/PlayingCard";
 
 export default function GameTypeSelector() {
-  const { selectGameType, usedTypes, leaderSeat, players, hand, round } =
+  const { selectGameType, usedTypes, leaderSeat, players, hand, round, totalRounds = 27 } =
     useGame();
   const [selected, setSelected] = useState(null);
   const [sent, once] = useTapLock();
@@ -29,7 +29,7 @@ export default function GameTypeSelector() {
       <div className="k-contract-heading">
         <div>
           <span className="k-eyebrow">
-            რაუნდი {round} / 27 · დარჩა {available.length} არჩევანი
+            რაუნდი {round} / {totalRounds} · დარჩა {available.length} არჩევანი
           </span>
           <h2>აირჩიე სტრატეგია.</h2>
         </div>

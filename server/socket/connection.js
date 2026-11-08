@@ -4,10 +4,8 @@
 // replies, which table or tournament it is in, and the reconnect and
 // quick-match start sequences.
 
-const { ownsSeat } = require('../game/GameManager');
-const {
-  playersView, championshipBlocked, CHAMPIONSHIP_LIMIT_MESSAGE, rateLimiter,
-} = require('./shared');
+const { ownsSeat, seatCountOf } = require('../game/GameManager');
+const { playersView, rateLimiter } = require('./shared');
 const { emitGameStart } = require('./gameFlow');
 const { LOBBY } = require('./lobby');
 
@@ -22,8 +20,6 @@ function createConnection(io, socket, ctx) {
     allow: rateLimiter(),
     emitError,
     fail: (err) => emitError(err.message, err.code),
-    championshipBlocked: (name) => championshipBlocked(gameManager, name),
-    emitChampionshipLimit: () => emitError(CHAMPIONSHIP_LIMIT_MESSAGE, 'CHAMPIONSHIP_LIMIT'),
   };
 
   // One table at a time per socket: a homepage seat and a tournament entry
@@ -110,6 +106,7 @@ function createConnection(io, socket, ctx) {
     if (room.status === 'playing') socket.leave(LOBBY);
     socket.emit('room-joined', {
       roomCode: rc, seat, reconnected: true, status: room.status, mode: room.mode || 'public',
+      seatCount: seatCountOf(room),
       startedAt: room.startedAt || null, tournament: tournamentTag,
     });
     const state = gameManager.getStateForPlayer(rc, seat);
@@ -119,9 +116,9 @@ function createConnection(io, socket, ctx) {
     lobby.refresh();
   };
 
-  /** A room just got its third player: homepage tables start on their own. */
+  /** A room just got its last player: homepage tables start on their own. */
   conn.maybeAutoStart = (room) => {
-    if (!room || !room.isPublic || room.status !== 'waiting' || room.players.length !== 3) return;
+    if (!room || !room.isPublic || room.status !== 'waiting' || room.players.length !== seatCountOf(room)) return;
     const gameState = gameManager.startGame(room.code);
     emitGameStart(ctx, room, gameState);
     // Free the homepage seats for the next trio. The trio has just left the

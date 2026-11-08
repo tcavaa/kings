@@ -362,9 +362,8 @@ class TournamentManager {
   _openTable(t, group, index, stage) {
     const gm = this.gameManager;
     const [host, ...rest] = group;
-    // Tournament games are championship-grade for the leaderboard, but entry
-    // is never gated on the daily quota — that check is skipped upstream for
-    // tournament rooms, and their results don't count against it either.
+    // Tournament games are championship-grade league games (3-seat tables),
+    // counted by the season like any other.
     const { roomCode } = gm.createRoom(host.id, host, 'championship');
     for (const p of rest) gm.joinRoom(roomCode, p.id, p);
 

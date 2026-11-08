@@ -50,6 +50,8 @@ export default function GameLayout() {
     mySeat,
     players,
     leaderSeat,
+    seatCount,
+    restingSeat,
     gamePhase,
     chosenGameType,
     trumpSuit,
@@ -146,6 +148,9 @@ export default function GameLayout() {
       mySeat,
       players,
       leaderSeat,
+      // 4-player tables: the seat across gets a place, and the dealer rests.
+      seatCount,
+      restingSeat,
       gamePhase,
       chosenGameType,
       trumpSuit,
@@ -170,6 +175,8 @@ export default function GameLayout() {
       mySeat,
       players,
       leaderSeat,
+      seatCount,
+      restingSeat,
       gamePhase,
       chosenGameType,
       trumpSuit,
@@ -198,6 +205,10 @@ export default function GameLayout() {
   const showRoundResult = gamePhase === "round_end";
   const showWaiting =
     gamePhase === "playing" && currentTurn !== mySeat && !trickAnimation;
+  // At a 4-player table the dealer sits each round out — no cards to play.
+  const iAmResting =
+    !spectating && restingSeat !== null && restingSeat !== undefined && mySeat === restingSeat
+    && ["type_selection", "trump_selection", "discard", "playing"].includes(gamePhase);
 
   const turnName = players.find((p) => p.seat === currentTurn)?.name ?? "…";
   const leaderName = players.find((p) => p.seat === leaderSeat)?.name ?? "…";
@@ -331,6 +342,12 @@ export default function GameLayout() {
       </div>
 
       <DisconnectBanner />
+
+      {iAmResting && (
+        <div className="k-resting-chip" role="status">
+          ამ ხელს ისვენებ — შენ ხარ დამრიგებელი.
+        </div>
+      )}
 
       {showTypeSelector && <GameTypeSelector />}
       {showTrumpSelector && <TrumpSelector />}

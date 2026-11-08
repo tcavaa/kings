@@ -1,6 +1,6 @@
 # Kings
 
-**King Online** (live three-player King card game) and **King Score** (the
+**King Online** (live King card game for three or four players) and **King Score** (the
 score keeper for games played at a real table) in one project, on one
 database.
 
@@ -13,6 +13,21 @@ database.
 - King Online's leaderboard has a **სეზონები** tab: the running season (facts,
   wins race, table) and every finished season's champion and table. Every
   King Online table is a league table (the casual კლასიკური mode is gone).
+- **Seasons count each player's first 40 King Online games** (from the season
+  that opened on 8 November 2026; older seasons are left as they were
+  crowned). There is no daily limit: past 40 a player keeps playing and the
+  games still count in their history, stats and the leaderboard, but their
+  season row (wins, games, points) stays as it was after game 40. The lobby
+  shows `played / 40`. Games recorded at a table in King Score aren't capped.
+  The rule lives once, in `seasonTable` (`server/games/results.js`).
+- **3- or 4-player tables.** The homepage has a 3-seat and a 4-seat
+  quick-match table, one under the other, and a private room can be created
+  for either. At 4 seats each round's dealer — the seat before the leader —
+  sits it out and the other three play it exactly as at a 3-player table;
+  everyone still leads all 9 types, so a game is 36 rounds. Tournaments stay
+  3-player.
+- After each round the result shows for 4 seconds and the next hand deals
+  itself (no "next round" button).
 - One Supabase database (project `KINGS`, Frankfurt) for both, with **one
   player list** (`profiles`) and **one games table** (`finished_games`, each
   game `type` = `online` or `live` — played in King Online, or at a table and
@@ -87,12 +102,11 @@ and look on top.
 | `NEXT_PUBLIC_SOCKET_URL` | yes | the Render URL, e.g. `https://kings-game-server.onrender.com` |
 | `ADMIN_PASSCODE` | yes | `/admin` passcode, 8+ characters; without it `/admin` stays locked |
 | `DB_POOL_MAX` | no | connections per function instance (default 5; 3 is plenty) |
-| `APP_TIMEZONE` | no | championship calendar day (default `Asia/Tbilisi`) |
 
 `NEXT_PUBLIC_*` values are baked in at build time — redeploy after changing them.
 
 **Render** (`server/.env` locally — see `server/.env.example`): `DATABASE_URL`,
-`CORS_ORIGIN` (the Vercel URL, or `*`), `APP_TIMEZONE`.
+`CORS_ORIGIN` (the Vercel URL, or `*`).
 
 ## Local development
 
@@ -125,7 +139,7 @@ shape; `type` tells them apart. A score-sheet game is converted by
 `server/games/scoreSheet.js` (round scores per seat, the round's own card
 counts as King Online's `*Taken` fields, plus the sheet's entry as typed),
 and `src/score/lib/gameShapes.js` turns any game back into King Score's old
-rows, so its screens work unchanged. The daily league limit counts online
+rows, so its screens work unchanged. The season's 40-game cap counts online
 games only.
 
 King Score's old tables (`players`, `game_results`, `game_details`) were

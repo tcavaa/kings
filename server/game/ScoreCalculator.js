@@ -2,13 +2,13 @@
 
 const { gameTypeRule, roundScores, unitCountsOf } = require('./gameTypes');
 
-const SEATS = [0, 1, 2];
-
 /**
- * Calculates scores for all 3 players after a round ends, by the scoring
+ * Calculates scores for every seat (3, or 4 with a resting dealer who took
+ * nothing and so scores 0) after a round ends, by the scoring
  * rules in gameTypes.js (the ones ჩაწერა's sheet uses too).
  *
  * @param {string} gameType - One of 'K','Q','J','H','L2','T','P1','P2','P3'
+ * @param {number[]} seats - every seat at the table
  * @param {object} roundData
  * @param {object} roundData.tricksTaken        - { 0: n, 1: n, 2: n }
  * @param {object} roundData.queensTaken        - { 0: n, 1: n, 2: n }
@@ -18,12 +18,13 @@ const SEATS = [0, 1, 2];
  * @param {number[]} roundData.trickWinners     - ordered list of trick-winner seats
  * @returns {{ 0: number, 1: number, 2: number }}
  */
-function calculate(gameType, roundData) {
+function calculate(gameType, seats, roundData) {
+  if (!Array.isArray(seats)) { roundData = seats; seats = [0, 1, 2]; }
   if (!gameTypeRule(gameType)) {
     console.warn(`[ScoreCalculator] Unknown game type: ${gameType}`);
-    return { 0: 0, 1: 0, 2: 0 };
+    return Object.fromEntries(seats.map((s) => [s, 0]));
   }
-  return roundScores(gameType, SEATS, {
+  return roundScores(gameType, seats, {
     // Only the units of the round's own type count (queens in Q, the last
     // two tricks in L2, …); K costs whoever took the King of Hearts.
     counts: unitCountsOf({ ...roundData, gameType }),

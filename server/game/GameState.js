@@ -3,7 +3,7 @@
 const { createDeck, shuffle, deal } = require('./Deck');
 const { resolveTrick } = require('./TrickResolver');
 const { calculate } = require('./ScoreCalculator');
-const { ALL_TYPE_CODES, TOTAL_ROUNDS, CARDS_PER_PLAYER } = require('./constants');
+const { ALL_TYPE_CODES, CARDS_PER_PLAYER, roundsFor, normalizeSeatCount } = require('./constants');
 const { TRUMP_TYPES, canDiscard, playError } = require('./rules');
 const { GAME_TYPE_RULES, gameTypeRule, isPenaltyCard } = require('./gameTypes');
 
@@ -26,12 +26,19 @@ function isCardShape(card) {
   return !!card && typeof card.rank === 'string' && typeof card.suit === 'string';
 }
 
+/** { 0: v, 1: v, … } for every seat at a table of `seatCount`. */
+function perSeat(seatCount, v) {
+  const out = {};
+  for (let s = 0; s < seatCount; s++) out[s] = typeof v === 'function' ? v(s) : v;
+  return out;
+}
+
 // Everything that starts over with each round. The constructor and
 // startNextRound both begin from this.
-function freshRoundState() {
+function freshRoundState(seatCount = 3) {
   return {
     phase: 'type_selection', // type_selection | trump_selection | discard | playing | round_end | game_over
-    hands: { 0: [], 1: [], 2: [] },
+    hands: perSeat(seatCount, () => []),
     centerCards: [],
     lastCenterCards: [], // the 2 cards added to the leader's hand this round
     chosenGameType: null,
@@ -40,10 +47,10 @@ function freshRoundState() {
     ledSuit: null,
     trickNumber: 0,
     currentTurn: null,
-    tricksTaken: { 0: 0, 1: 0, 2: 0 },
-    queensTaken: { 0: 0, 1: 0, 2: 0 },
-    jacksTaken: { 0: 0, 1: 0, 2: 0 },
-    heartsTaken: { 0: 0, 1: 0, 2: 0 },
+    tricksTaken: perSeat(seatCount, 0),
+    queensTaken: perSeat(seatCount, 0),
+    jacksTaken: perSeat(seatCount, 0),
+    heartsTaken: perSeat(seatCount, 0),
     kingOfHeartsTakenBy: null,
     trickWinners: [],
     lastTrick: null, // { winnerSeat, trick: [{seat, card}], trickNumber }
@@ -51,13 +58,20 @@ function freshRoundState() {
 }
 
 class GameState {
-  constructor() {
+  /**
+   * `seatCount` is 3 (everyone plays every round) or 4: then the dealer —
+   * the seat just before the round's leader — sits the round out and the
+   * other three play it exactly like a 3-player round. Every player still
+   * leads each of the 9 game types once, so a 4-player game is 36 rounds.
+   */
+  constructor(seatCount = 3) {
+    this.seatCount = normalizeSeatCount(seatCount);
     this.round = 1;
-    Object.assign(this, freshRoundState());
-    this.usedTypes = { 0: [], 1: [], 2: [] };
+    Object.assign(this, freshRoundState(this.seatCount));
+    this.usedTypes = perSeat(this.seatCount, () => []);
     this.roundScores = [];
     this.roundDetails = []; // detailed per-round stats for end-of-game review
-    this.cumulativeScores = { 0: 0, 1: 0, 2: 0 };
+    this.cumulativeScores = perSeat(this.seatCount, 0);
     // Bumped on every change. Every state the clients get carries it, so a
     // resync from a client that already holds this version can be answered
     // with "up to date" instead of the whole table.
@@ -66,14 +80,36 @@ class GameState {
     this.dealCards();
   }
 
-  get leaderSeat() { return (this.round - 1) % 3; }
+  get seats() { return Array.from({ length: this.seatCount }, (_, s) => s); }
+  get totalRounds() { return roundsFor(this.seatCount); }
+  get leaderSeat() { return (this.round - 1) % this.seatCount; }
+  /** The dealer, who sits this round out at a 4-player table (null at 3). */
+  get restingSeat() {
+    return this.seatCount === 4 ? (this.leaderSeat + this.seatCount - 1) % this.seatCount : null;
+  }
+  /** The three seats playing this round, in turn order from the leader. */
+  get activeSeats() {
+    const out = [];
+    for (let i = 0; i < this.seatCount; i++) {
+      const s = (this.leaderSeat + i) % this.seatCount;
+      if (s !== this.restingSeat) out.push(s);
+    }
+    return out;
+  }
   get isGameOver() { return this.phase === 'game_over'; }
 
   _changed() { this.version += 1; }
 
+  /** The playing seat after `seat` (clockwise, skipping the resting dealer). */
+  _nextSeat(seat) {
+    let next = (seat + 1) % this.seatCount;
+    if (next === this.restingSeat) next = (next + 1) % this.seatCount;
+    return next;
+  }
+
   /** How many cards each seat holds — what opponents' card fans are drawn from. */
   cardCounts() {
-    return { 0: this.hands[0].length, 1: this.hands[1].length, 2: this.hands[2].length };
+    return perSeat(this.seatCount, (s) => (this.hands[s] || []).length);
   }
 
   // ─── persistence ───────────────────────────────────────────────────────────
@@ -83,6 +119,7 @@ class GameState {
   serialize() {
     return {
       version: this.version,
+      seatCount: this.seatCount,
       round: this.round,
       phase: this.phase,
       hands: this.hands,
@@ -119,25 +156,31 @@ class GameState {
     // Skip the constructor (we don't want a fresh deal). Build the prototype
     // chain manually and copy all fields in.
     const gs = Object.create(GameState.prototype);
+    // Snapshots from before 4-player tables are all 3-seat games.
+    const seatCount = normalizeSeatCount(snapshot.seatCount);
     Object.assign(gs, {
       // sane defaults so callers can rely on every field existing even if
       // an older snapshot is missing one
-      ...freshRoundState(),
-      usedTypes: { 0: [], 1: [], 2: [] },
+      ...freshRoundState(seatCount),
+      usedTypes: perSeat(seatCount, () => []),
       roundScores: [],
       roundDetails: [],
-      cumulativeScores: { 0: 0, 1: 0, 2: 0 },
+      cumulativeScores: perSeat(seatCount, 0),
       round: 1,
       version: 1,
-    }, snapshot);
+    }, snapshot, { seatCount });
     delete gs.players;
     return gs;
   }
 
   dealCards() {
     const deck = shuffle(createDeck());
-    const { hands, center } = deal(deck);
-    this.hands = hands;
+    // The resting dealer gets no cards: the three players get 10 each, as at
+    // a 3-player table.
+    // Dealt in seat order (not turn order), so a 3-seat deal is exactly what
+    // it always was.
+    const { hands, center } = deal(deck, [...this.activeSeats].sort((a, b) => a - b));
+    this.hands = { ...perSeat(this.seatCount, () => []), ...hands };
     this.centerCards = center;
   }
 
@@ -300,7 +343,7 @@ class GameState {
 
     this.currentTrick.push({ seat, card: played });
 
-    this.currentTurn = (seat + 1) % 3;
+    this.currentTurn = this._nextSeat(seat);
     this._changed();
 
     if (this.currentTrick.length < 3) return outcome({ card: played });
@@ -330,7 +373,7 @@ class GameState {
       return outcome(trickDone);
     }
 
-    const scores = calculate(this.chosenGameType, {
+    const scores = calculate(this.chosenGameType, this.seats, {
       tricksTaken: { ...this.tricksTaken },
       queensTaken: { ...this.queensTaken },
       jacksTaken: { ...this.jacksTaken },
@@ -352,7 +395,7 @@ class GameState {
       roundEnds: true,
       scores,
       cumulativeScores: { ...this.cumulativeScores },
-      isGameOver: this.round >= TOTAL_ROUNDS,
+      isGameOver: this.round >= this.totalRounds,
     });
   }
 
@@ -361,8 +404,8 @@ class GameState {
    * round_end. `cards` is what was taken this round (see roundDetails).
    */
   _recordRound(scores, cards) {
-    for (let s = 0; s < 3; s++) {
-      this.cumulativeScores[s] += scores[s];
+    for (const s of this.seats) {
+      this.cumulativeScores[s] = (this.cumulativeScores[s] || 0) + (scores[s] || 0);
     }
 
     this.roundScores.push({
@@ -375,6 +418,8 @@ class GameState {
       round: this.round,
       gameType: this.chosenGameType,
       leaderSeat: this.leaderSeat,
+      // 4-player tables only: the dealer, who sat this round out.
+      ...(this.restingSeat !== null && { restingSeat: this.restingSeat }),
       trumpSuit: this.trumpSuit,
       scores: { ...scores },
       cumulativeScores: { ...this.cumulativeScores },
@@ -403,13 +448,16 @@ class GameState {
     }
 
     const total = QUIT_ROUND_TOTALS[this.chosenGameType] || 0;
-    const scores = { 0: 0, 1: 0, 2: 0 };
+    const scores = perSeat(this.seatCount, 0);
+    // The resting dealer is not in the round, so a quit costs or pays only
+    // the three players.
+    const playing = this.activeSeats;
     if (total < 0) {
-      scores[quitterSeat] = total;
+      if (playing.includes(quitterSeat)) scores[quitterSeat] = total;
+      else scores[this.leaderSeat] = total;
     } else {
-      for (let s = 0; s < 3; s++) {
-        if (s !== quitterSeat) scores[s] = total / 2;
-      }
+      const others = playing.filter((s) => s !== quitterSeat);
+      for (const s of others) scores[s] = total / others.length;
     }
 
     // The cards taken before the quit don't match the flat scores, so they
@@ -430,7 +478,7 @@ class GameState {
       scores,
       cumulativeScores: { ...this.cumulativeScores },
       round: this.round,
-      isGameOver: this.round >= TOTAL_ROUNDS,
+      isGameOver: this.round >= this.totalRounds,
       gameType: this.chosenGameType,
     };
   }
@@ -438,7 +486,7 @@ class GameState {
   _checkRoundEnd() {
     // K, Q, J and H end as soon as every unit of the type has been taken
     // (gameTypes.js says how many); the rest play all 10 tricks.
-    const all = (taken) => (taken[0] || 0) + (taken[1] || 0) + (taken[2] || 0)
+    const all = (taken) => this.seats.reduce((sum, s) => sum + (taken[s] || 0), 0)
       >= gameTypeRule(this.chosenGameType).totalUnits;
     switch (this.chosenGameType) {
       case 'K':
@@ -458,12 +506,12 @@ class GameState {
     if (this.phase !== 'round_end') {
       return { ok: false, error: 'Round is not over yet.' };
     }
-    if (this.round >= TOTAL_ROUNDS) {
+    if (this.round >= this.totalRounds) {
       return { ok: false, error: 'Game is already over.' };
     }
 
     this.round++;
-    Object.assign(this, freshRoundState());
+    Object.assign(this, freshRoundState(this.seatCount));
     this.dealCards();
     this._changed();
 
@@ -480,9 +528,12 @@ class GameState {
   _publicView() {
     return {
       version: this.version,
+      seatCount: this.seatCount,
+      totalRounds: this.totalRounds,
       round: this.round,
       phase: this.phase,
       leaderSeat: this.leaderSeat,
+      restingSeat: this.restingSeat,
       cardCounts: this.cardCounts(),
       chosenGameType: this.chosenGameType,
       trumpSuit: this.trumpSuit,

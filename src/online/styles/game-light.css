@@ -209,6 +209,13 @@ body.king-light-game .k-score-totals > div:nth-child(3) {
   background: #e9edfc;
   border-color: #7489d7;
 }
+body.king-light-game .k-score-totals > div:nth-child(4) {
+  background: #fbe7ec;
+  border-color: #c9667f;
+}
+body.king-light-game .k-data-table td.is-resting {
+  color: #8aa092;
+}
 body.king-light-game .k-score-totals strong {
   color: #176344;
 }
@@ -691,4 +698,24 @@ body.king-light-game .k-game-tools .k-bracket-trigger {
   .k-watch-chip > span {
     display: none;
   }
+}
+
+/* 4-player tables: the dealer sits the round out — no hand to show, so a
+   chip says why, where the hand would be. */
+.king-light-game .k-resting-chip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18%);
+  transform: translateX(-50%);
+  z-index: 15;
+  max-width: calc(100vw - 32px);
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: #163d31e6;
+  color: #f5f2e9;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  pointer-events: none;
+  box-shadow: 0 6px 18px #0b1f1833;
 }

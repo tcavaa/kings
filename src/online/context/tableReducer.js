@@ -20,11 +20,19 @@ export function sortHand(hand) {
 
 export const sameCard = (a, b) => a.rank === b.rank && a.suit === b.suit
 
-const perSeat = (v) => ({ 0: v(), 1: v(), 2: v() })
+const perSeat = (v, n = 3) => Object.fromEntries(Array.from({ length: n }, (_, s) => [s, v()]))
+
+/** 3, or 4 at a table where each round's dealer sits out. */
+const seatCountOf = (n) => (Number(n) === 4 ? 4 : 3)
 
 export const initialTable = {
   gamePhase: null,
   round: 1,
+  // Seats at the table: 3, or 4 — then `restingSeat` (the dealer) sits each
+  // round out. A full game is 9 rounds per seat.
+  seatCount: 3,
+  totalRounds: 27,
+  restingSeat: null,
   leaderSeat: 0,
   chosenGameType: null,
   trumpSuit: null,
@@ -71,6 +79,11 @@ function applySnapshot(state, snap) {
   if (snap.hand)                    next.hand = sortHand(snap.hand)
   if (snap.phase)                   next.gamePhase = snap.phase
   if (snap.round)                   next.round = snap.round
+  if (snap.seatCount) {
+    next.seatCount = seatCountOf(snap.seatCount)
+    next.totalRounds = next.seatCount * 9
+  }
+  if ('restingSeat' in snap)        next.restingSeat = snap.restingSeat ?? null
   if (snap.leaderSeat !== undefined) next.leaderSeat = snap.leaderSeat
   // By key, not truthiness: a null in the snapshot clears the old value.
   if ('chosenGameType' in snap)     next.chosenGameType = snap.chosenGameType ?? null
@@ -100,24 +113,36 @@ function applySnapshot(state, snap) {
 
 export function tableReducer(state, action) {
   switch (action.type) {
-    case 'game-started':
+    case 'game-started': {
+      const seatCount = seatCountOf(action.seatCount ?? state.seatCount)
       return {
         ...state,
         round: action.round,
+        seatCount,
+        totalRounds: seatCount * 9,
+        restingSeat: action.restingSeat ?? null,
         leaderSeat: action.leaderSeat,
         gamePhase: 'type_selection',
         // Fresh game — wipe the per-seat used-type ledger. Without this a
         // rematch (same browser session, new room) leaves the previous game's
         // fully-used matrix in place and the first leader sees every game
         // type greyed out until a page refresh.
-        usedTypes: perSeat(() => []),
+        usedTypes: perSeat(() => [], seatCount),
         roundScores: [],
         roundDetails: [],
-        cumulativeScores: perSeat(() => 0),
+        cumulativeScores: perSeat(() => 0, seatCount),
         lastTrickResult: null,
         trickAnimation: null,
         lastCenterCards: [],
       }
+    }
+
+    // The room we sit in (waiting room included) and how many seats it has.
+    case 'seat-count': {
+      const seatCount = seatCountOf(action.seatCount)
+      if (seatCount === state.seatCount) return state
+      return { ...state, seatCount, totalRounds: seatCount * 9 }
+    }
 
     case 'hand-dealt':
       return {
@@ -126,6 +151,7 @@ export function tableReducer(state, action) {
         hand: sortHand(action.hand || []),
         centerCards: action.centerCards || [],
         leaderSeat: action.leaderSeat,
+        ...('restingSeat' in action && { restingSeat: action.restingSeat ?? null }),
         round: action.round,
         cardCounts: action.cardCounts,
         chosenGameType: null,
@@ -140,6 +166,7 @@ export function tableReducer(state, action) {
         ...FRESH_HAND,
         round: action.round,
         leaderSeat: action.leaderSeat,
+        ...('restingSeat' in action && { restingSeat: action.restingSeat ?? null }),
         gamePhase: action.phase,
         usedTypes: action.usedTypes,
         // Watchers get no `hand-dealt`, so the new round's counts and reset
@@ -205,7 +232,7 @@ export function tableReducer(state, action) {
       const { winnerSeat, trick } = action
       return {
         ...state,
-        // Show the full 3-card trick on the table for a moment.
+        // Show the full trick (3 cards) on the table for a moment.
         currentTrick: trick,
         ledSuit: trick[0]?.card?.suit ?? null,
         lastTrickResult: { winnerSeat, trick },

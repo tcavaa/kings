@@ -1,23 +1,12 @@
 'use strict';
 
-// Finished games (King Online's and ჩაწერა's), lifetime stats and the daily
-// championship quota.
+// Finished games (King Online's and ჩაწერა's) and lifetime stats.
 
 const { db } = require('./connection');
 const { createMirror, iso } = require('./mirror');
 const { fromScoreSheet } = require('../games/scoreSheet');
 const { winnerNames, emptyRoundStats, addRoundStats } = require('../games/results');
 const { badRequest } = require('../lib/httpError');
-
-// Every DATETIME the MySQL build wrote was wall-clock time on the cPanel box
-// (Asia/Tbilisi), and the championship "calendar day" was that box's day.
-// Postgres stores real instants, so the day boundary is computed in this zone.
-const APP_TIMEZONE = process.env.APP_TIMEZONE || 'Asia/Tbilisi';
-
-// How many championship games a player may finish per calendar day (server
-// time). Enforced at room creation / join / quick-match sit; also exposed via
-// the quota endpoint so the lobby can grey the championship options out.
-const CHAMPIONSHIP_DAILY_LIMIT = 8;
 
 function matchesMode(isChampionship, mode) {
   if (mode === 'championship') return isChampionship === 1;
@@ -194,12 +183,13 @@ async function getGame(id) {
 }
 
 /**
- * A King Online game the game server just finished (its only writer).
- * `tournamentId` marks a bracket table: those count as league games but not
- * toward the daily quota.
+ * A King Online game the game server just finished (its only writer): 3
+ * players, or 4 at a table where each round's dealer sits out.
+ * `tournamentId` marks a bracket table.
  */
 async function saveFinishedGame(record) {
-  if (!record || !record.winner || !Array.isArray(record.players) || record.players.length !== 3
+  if (!record || !record.winner || !Array.isArray(record.players)
+      || record.players.length < 3 || record.players.length > 4
       || record.players.some((p) => !p || typeof p.name !== 'string' || !p.name || p.name.length > 64
         || !Number.isFinite(p.score))) {
     throw new Error('Invalid game record');
@@ -340,45 +330,9 @@ async function getLifetimeStats(name, mode = 'all', type = 'all') {
   return out;
 }
 
-/**
- * Daily championship quota for one player name (server-local calendar day,
- * APP_TIMEZONE). A "played" game is a finished King Online championship game
- * the player participated in — surrendered games count too, so abandoning a
- * match doesn't refund the slot. Games recorded in ჩაწერა and tournament
- * tables never count.
- */
-async function getChampionshipQuota(name) {
-  if (!name) throw badRequest('name is required');
-  // Only names are needed, so avatars are dropped before leaving the database.
-  const rows = await db()`
-    SELECT regexp_replace(payload, ${AVATAR_RE_SQL}, '"avatar":null', 'g') AS payload
-      FROM finished_games
-     WHERE is_championship = 1
-       AND type = 'online'
-       AND played_at >= (date_trunc('day', now() AT TIME ZONE ${APP_TIMEZONE}) AT TIME ZONE ${APP_TIMEZONE})`;
-  const lower = String(name).trim().toLowerCase();
-  let playedToday = 0;
-  for (const row of rows) {
-    let payload = {};
-    try { payload = JSON.parse(row.payload); } catch { continue; }
-    if (payload.tournamentId) continue;
-    const played = (payload.players || []).some(
-      (p) => String(p.name || '').toLowerCase() === lower
-    );
-    if (played) playedToday += 1;
-  }
-  return {
-    name: String(name).trim(),
-    limit: CHAMPIONSHIP_DAILY_LIMIT,
-    playedToday,
-    remaining: Math.max(0, CHAMPIONSHIP_DAILY_LIMIT - playedToday),
-  };
-}
-
 module.exports = {
-  CHAMPIONSHIP_DAILY_LIMIT,
   listGames, listGamesWithoutAvatars, getGame, getGameWithoutAvatars, saveFinishedGame, saveScoreSheetGame, rowToGame,
-  getLifetimeStats, getChampionshipQuota,
+  getLifetimeStats,
   // for seasons.js
   gameEntries, barePayload,
 };

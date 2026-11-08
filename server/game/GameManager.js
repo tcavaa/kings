@@ -2,7 +2,19 @@
 
 const { EventEmitter } = require('events');
 const GameState = require('./GameState');
+const { normalizeSeatCount } = require('./constants');
 const { generateCode, sameName, normalizeMode } = require('../lib/util');
+
+/**
+ * The homepage quick-match table a mode and size map to: 'championship' (3
+ * seats), 'championship4' (4 seats), and the same for 'public'.
+ */
+function quickMatchKey(mode, seatCount = 3) {
+  return `${normalizeMode(mode)}${normalizeSeatCount(seatCount) === 4 ? '4' : ''}`;
+}
+
+/** How many seats a room has: 3, or 4 at a table where the dealer rests. */
+const seatCountOf = (room) => normalizeSeatCount(room?.seatCount);
 
 // How long an entirely-empty (all players disconnected) room is kept alive
 // in memory before being garbage-collected. The persisted `live_games` row
@@ -68,7 +80,7 @@ class GameManager extends EventEmitter {
     // The homepage quick-match rooms currently collecting players — one per
     // game mode. Cleared the moment a table's game starts (or the room dies)
     // so the next sitter opens a fresh table. In-memory only.
-    this.quickMatchCodes = { public: null, championship: null };
+    this.quickMatchCodes = { public: null, championship: null, public4: null, championship4: null };
     this.spectators = new Map();   // socketId -> { roomCode, tournamentId, name, avatar }
     // Everyone currently on the site, table or not. socketId -> { name, since }
     this.presence = new Map();
@@ -129,7 +141,7 @@ class GameManager extends EventEmitter {
     return roomCode;
   }
 
-  createRoom(socketId, identity, mode = 'public') {
+  createRoom(socketId, identity, mode = 'public', seatCount = 3) {
     const roomCode = this._generateUniqueCode();
     this.detachSocket(socketId, roomCode);
     this.rooms.set(roomCode, {
@@ -137,9 +149,11 @@ class GameManager extends EventEmitter {
       players: [seatRow(socketId, identity, 0)],
       gameState: null,
       status: 'waiting',
-      // 'championship' games count toward the daily quota and feed the
-      // score app's seasons; 'public' games are casual.
+      // 'championship' games feed the seasons (each player's first 40 a
+      // season count); 'public' games are casual.
       mode: normalizeMode(mode),
+      // 3, or 4: then each round's dealer sits it out (see GameState).
+      seatCount: normalizeSeatCount(seatCount),
       // Rematch coordination — populated when a finished room transitions
       // into "waiting for players to click Play Again". Lives only in
       // memory; never persisted.
@@ -193,7 +207,7 @@ class GameManager extends EventEmitter {
       throw new Error('Game has already started.');
     }
 
-    if (room.players.length >= 3) throw new Error('Room is full.');
+    if (room.players.length >= seatCountOf(room)) throw new Error('Room is full.');
 
     this.detachSocket(socketId, roomCode);
     // Lowest free seat — players can leave a waiting room (or be swept out
@@ -271,9 +285,10 @@ class GameManager extends EventEmitter {
   startGame(roomCode) {
     const room = this.rooms.get(roomCode);
     if (!room) throw new Error(`Room ${roomCode} not found.`);
-    if (room.players.length !== 3) throw new Error('Need exactly 3 players to start.');
+    const seats = seatCountOf(room);
+    if (room.players.length !== seats) throw new Error(`Need exactly ${seats} players to start.`);
     if (room.status !== 'waiting') throw new Error('Game already started.');
-    room.gameState = new GameState();
+    room.gameState = new GameState(seats);
     room.status = 'playing';
     // Wall-clock start, so the in-game timer is the same for all three
     // players and survives both a refresh and a server restart. Deriving it
@@ -316,48 +331,10 @@ class GameManager extends EventEmitter {
     return this._mutateGame(roomCode, (gs) => gs.endRoundEarly(quitterSeat));
   }
 
-  handleNextRound(roomCode, socketId) {
-    const room = this.rooms.get(roomCode);
-    if (!room) throw new Error('Room not found.');
-    if (!room.gameState) throw new Error('Game not started.');
-    const mapping = this.socketRoomMap.get(socketId);
-    if (!mapping || mapping.seat !== this.roundStarterSeat(room)) {
-      throw new Error('Only the room creator can advance the round.');
-    }
-    const result = room.gameState.startNextRound();
-    if (!result.ok) throw new Error(result.error);
-    this._persist(roomCode);
-    return room.gameState;
-  }
-
-  /** Who starts the next round: seat 0, or the lowest connected seat while seat 0 is away. */
-  roundStarterSeat(room) {
-    const zero = room.players.find((p) => p.seat === 0);
-    if (zero?.connected) return 0;
-    const present = room.players.filter((p) => p.connected).map((p) => p.seat);
-    return present.length ? Math.min(...present) : 0;
-  }
-
   getStateForPlayer(roomCode, seat) {
     const room = this.rooms.get(roomCode);
     if (!room || !room.gameState) return null;
     return room.gameState.getStateForPlayer(seat);
-  }
-
-  /**
-   * League games this name is in the middle of, or has finished but whose
-   * save hasn't landed yet: the database quota can't see either, so a second
-   * tab or a quick Play Again would otherwise get past the daily limit.
-   * Bracket tables never count.
-   */
-  championshipGamesInFlight(name) {
-    let n = 0;
-    for (const room of this.rooms.values()) {
-      if (room.mode !== 'championship' || room.tournamentId) continue;
-      const counts = room.status === 'playing' || (room.status === 'finished' && !room.saved);
-      if (counts && room.players.some((p) => sameName(p.name, name))) n += 1;
-    }
-    return n;
   }
 
   markDisconnected(socketId) {
@@ -436,9 +413,9 @@ class GameManager extends EventEmitter {
   // the normal name-based joinRoom path, so a refreshed player can be
   // re-attached to their seat via `rejoin-public`.
 
-  /** The waiting quick-match room for a mode, or null if none/stale. */
-  quickMatchRoom(mode) {
-    const code = this.quickMatchCodes[normalizeMode(mode)];
+  /** The waiting quick-match room for a mode and size, or null if none/stale. */
+  quickMatchRoom(mode, seatCount = 3) {
+    const code = this.quickMatchCodes[quickMatchKey(mode, seatCount)];
     const room = code ? this.rooms.get(code) : null;
     if (!room || room.status !== 'waiting') return null;
     return room;
@@ -448,15 +425,17 @@ class GameManager extends EventEmitter {
    * Seat a socket at a quick-match table. Creates the room on first sit.
    * Same-name sitters are re-attached to their existing seat (refresh-safe).
    */
-  sitPublic(socketId, identity, emoji = null, mode = 'public') {
-    const key = normalizeMode(mode);
-    let room = this.quickMatchRoom(key);
+  sitPublic(socketId, identity, emoji = null, mode = 'public', seatCount = 3) {
+    const roomMode = normalizeMode(mode);
+    const seats = normalizeSeatCount(seatCount);
+    const key = quickMatchKey(roomMode, seats);
+    let room = this.quickMatchRoom(roomMode, seats);
     // A stale pointer (room started, died, or was GC'd) starts a fresh table.
     if (!room) this.quickMatchCodes[key] = null;
 
     let seat;
     if (!room) {
-      const created = this.createRoom(socketId, identity, key);
+      const created = this.createRoom(socketId, identity, roomMode, seats);
       seat = created.seat;
       room = this.rooms.get(created.roomCode);
       room.isPublic = true;
@@ -467,14 +446,16 @@ class GameManager extends EventEmitter {
 
     const player = room.players.find((p) => p.seat === seat);
     if (player && emoji !== undefined) player.emoji = emoji || player.emoji || null;
-    return { roomCode: room.code, seat, mode: key };
+    return { roomCode: room.code, seat, mode: roomMode, seatCount: seats, table: key };
   }
 
-  _quickMatchTableView(mode) {
-    const room = this.quickMatchRoom(mode);
-    if (!room) return { roomCode: null, seats: [] };
+  _quickMatchTableView(mode, seatCount = 3) {
+    const size = normalizeSeatCount(seatCount);
+    const room = this.quickMatchRoom(mode, size);
+    if (!room) return { roomCode: null, seatCount: size, seats: [] };
     return {
       roomCode: room.code,
+      seatCount: size,
       seats: room.players.map((p) => ({
         seat: p.seat,
         name: p.name,
@@ -485,11 +466,12 @@ class GameManager extends EventEmitter {
     };
   }
 
-  /** Homepage view of both quick-match tables (empty when not collecting). */
+  /** Homepage view of the quick-match tables (empty when not collecting). */
   publicRoomView() {
     return {
       public: this._quickMatchTableView('public'),
       championship: this._quickMatchTableView('championship'),
+      championship4: this._quickMatchTableView('championship', 4),
     };
   }
 
@@ -542,9 +524,8 @@ class GameManager extends EventEmitter {
 
     if (!newRoomCode) {
       // First click: create a fresh room with this socket as seat 0. The
-      // rematch inherits the finished game's mode (championship rematches
-      // are quota-checked in the socket handler before we get here).
-      const result = this.createRoom(socketId, identity, oldRoom.mode);
+      // rematch inherits the finished game's mode and table size.
+      const result = this.createRoom(socketId, identity, oldRoom.mode, seatCountOf(oldRoom));
       newRoomCode = result.roomCode;
       seat = result.seat;
       oldRoom.rematchRoomCode = newRoomCode;
@@ -577,3 +558,5 @@ Object.assign(GameManager.prototype, require('./presence'), require('./roomPersi
 
 module.exports = GameManager;
 module.exports.ownsSeat = ownsSeat;
+module.exports.seatCountOf = seatCountOf;
+module.exports.quickMatchKey = quickMatchKey;

@@ -108,3 +108,14 @@
   line-height: 1.8;
   margin-bottom: 24px;
 }
+
+/* Private table: pick 3 or 4 seats. */
+.k-create-sizes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.k-create-sizes .k-button {
+  width: 100%;
+  justify-content: center;
+}

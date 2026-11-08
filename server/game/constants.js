@@ -82,8 +82,17 @@ const GAME_TYPES = Object.fromEntries(GAME_TYPE_CODES.map((code) => [code, {
 // Ordered list of all type codes for tracking usage
 const ALL_TYPE_CODES = GAME_TYPE_CODES;
 
-// Total number of rounds in a full game (9 types × 3 players)
+// Total number of rounds in a full 3-player game (9 types × 3 players)
 const TOTAL_ROUNDS = 27;
+
+// A table seats 3 players, or 4 — then the dealer sits each round out.
+const SEAT_COUNTS = [3, 4];
+
+/** 3 or 4 from the wire (anything else is a 3-player table). */
+const normalizeSeatCount = (n) => (Number(n) === 4 ? 4 : 3);
+
+/** Rounds in a full game at a table of `seatCount`: every player leads all 9 types. */
+const roundsFor = (seatCount) => normalizeSeatCount(seatCount) * ALL_TYPE_CODES.length;
 
 // Cards dealt to each player
 const CARDS_PER_PLAYER = 10;
@@ -97,6 +106,9 @@ module.exports = {
   GAME_TYPES,
   ALL_TYPE_CODES,
   TOTAL_ROUNDS,
+  SEAT_COUNTS,
+  normalizeSeatCount,
+  roundsFor,
   CARDS_PER_PLAYER,
   CENTER_CARD_COUNT,
 };

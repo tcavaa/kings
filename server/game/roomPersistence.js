@@ -5,7 +5,7 @@
 
 const GameState = require('./GameState');
 const store     = require('../db/store');
-const { TOTAL_ROUNDS } = require('./constants');
+const { roundsFor } = require('./constants');
 
 // Retries for dropping a finished game's snapshot. If every one fails, the
 // next boot still skips the row (see _isOver).
@@ -21,7 +21,7 @@ const PERSIST_EVERY_MS = 1000;
 function _isOver(snap) {
   const phase = snap?.gameState?.phase;
   return snap?.status === 'finished' || phase === 'game_over'
-    || (phase === 'round_end' && (snap.gameState.round || 0) >= TOTAL_ROUNDS);
+    || (phase === 'round_end' && (snap.gameState.round || 0) >= roundsFor(snap.gameState.seatCount));
 }
 
 const persistenceMethods = {
@@ -35,6 +35,7 @@ const persistenceMethods = {
       code: room.code,
       status: room.status,
       mode: room.mode || 'public',
+      seatCount: room.seatCount === 4 ? 4 : 3,
       isPublic: !!room.isPublic,
       // Tournament tags travel with the snapshot so a restart mid-bracket
       // doesn't orphan the table from the tournament watching it.
@@ -59,8 +60,10 @@ const persistenceMethods = {
       status: snap.status || 'waiting',
       // Rows written before game modes existed have no `mode` — they were
       // all counted as championship games historically, but a *live* legacy
-      // room is safest treated as public so it can't eat a quota slot.
+      // room is safest treated as public so it can't count toward a season.
       mode: snap.mode === 'championship' ? 'championship' : 'public',
+      // Snapshots from before 4-player tables are all 3-seat rooms.
+      seatCount: snap.seatCount === 4 ? 4 : 3,
       isPublic: !!snap.isPublic,
       startedAt: snap.startedAt || null,
       tournamentId: snap.tournamentId || null,

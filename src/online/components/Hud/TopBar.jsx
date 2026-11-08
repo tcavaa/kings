@@ -32,6 +32,7 @@ function TopBar({
 }) {
   const {
     round,
+    totalRounds = 27,
     chosenGameType,
     trumpSuit,
     roomCode,
@@ -98,7 +99,7 @@ function TopBar({
         <div className="k-game-round">
           <span>რაუნდი</span>
           <strong>{String(round).padStart(2, "0")}</strong>
-          <small>/ 27</small>
+          <small>/ {totalRounds}</small>
           <i />
           {/* What's being played is always on screen, at every width: the
               contract, and for the plus games the trump suit (or none). */}
@@ -126,8 +127,8 @@ function TopBar({
           </div>
         </div>
       </div>
-      <div className="k-round-progress" aria-label={`რაუნდი ${round} / 27`}>
-        {Array.from({ length: 27 }, (_, i) => (
+      <div className="k-round-progress" aria-label={`რაუნდი ${round} / ${totalRounds}`}>
+        {Array.from({ length: totalRounds }, (_, i) => (
           <span
             key={i}
             className={
@@ -161,7 +162,7 @@ function TopBar({
         >
           <Layers size={16} />
           <span>
-            ხელები <b>{Math.max(0, 27 - round)}</b>
+            ხელები <b>{Math.max(0, totalRounds - round)}</b>
           </span>
         </button>
         <button

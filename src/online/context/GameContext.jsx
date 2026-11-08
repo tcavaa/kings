@@ -51,9 +51,10 @@ export function GameProvider({ children }) {
   // there (null = not sitting); while seated the user stays on the lobby
   // screen — the game only starts (and appPhase flips) when the server sees
   // the 3rd seat fill.
-  const [publicRoom, setPublicRoom] = useState({ public: EMPTY_TABLE, championship: EMPTY_TABLE })
+  const [publicRoom, setPublicRoom] = useState({ public: EMPTY_TABLE, championship: EMPTY_TABLE, championship4: EMPTY_TABLE })
   const [publicSeat, setPublicSeat] = useState(null)
-  // Which quick-match table the seat belongs to ('public' | 'championship').
+  // Which quick-match table the seat belongs to ('championship' — 3 seats —
+  // or 'championship4').
   const [publicSeatMode, setPublicSeatMode] = useState(null)
   // A seat we *could* go back to, read from localStorage on boot. Offered as
   // a button in the lobby — never applied on our own (see publicSeatStore).

@@ -128,6 +128,29 @@ run(async () => {
   check('back in the lobby, the watcher gets the lists again',
     await waitFor(() => lists(w).online.find((p) => p.name === 'მაყურებელი')?.status === 'lobby'));
 
-  [a, b, c, w, o].forEach((s) => s.close());
+  // ── the 4-seat homepage table ──
+  // Sitting fills the 4-seat quick-match table (the 3-seat one is left
+  // alone); the fourth sitter starts a 4-player game where the dealer rests.
+  const four = [await mk('ოთხი-1'), await mk('ოთხი-2'), await mk('ოთხი-3'), await mk('ოთხი-4')];
+  for (const s of four.slice(0, 3)) {
+    s.emit('sit-public', { playerName: s.playerName, mode: 'championship', seatCount: 4 });
+  }
+  check('three sitters wait at the 4-seat table',
+    await waitFor(() => o.last('public-room')?.championship4?.seats?.length === 3), JSON.stringify(o.last('public-room')));
+  check('the 3-seat table is untouched', (o.last('public-room')?.championship?.seats || []).length === 0);
+  check('the sitter is told which table', four[0].last('public-seated')?.table === 'championship4'
+    && four[0].last('public-seated')?.seatCount === 4, JSON.stringify(four[0].last('public-seated')));
+  four[3].emit('sit-public', { playerName: four[3].playerName, mode: 'championship', seatCount: 4 });
+  check('the fourth sitter starts the game', await waitFor(() => four.every((s) => s.last('game-started'))));
+  const gs4 = four[0].last('game-started');
+  check('a 4-player game: 36 rounds, the dealer rests',
+    gs4?.seatCount === 4 && gs4?.totalRounds === 36 && gs4?.restingSeat === 3 && gs4?.players?.length === 4,
+    JSON.stringify({ seatCount: gs4?.seatCount, totalRounds: gs4?.totalRounds, restingSeat: gs4?.restingSeat }));
+  check('the resting dealer is dealt no cards', await waitFor(() => four[3].last('hand-dealt'))
+    && four[3].last('hand-dealt').hand.length === 0 && four[0].last('hand-dealt').hand.length === 10);
+  check('the homepage 4-seat table is free again',
+    await waitFor(() => (o.last('public-room')?.championship4?.seats || []).length === 0));
+
+  [a, b, c, w, o, ...four].forEach((s) => s.close());
   summary();
 });

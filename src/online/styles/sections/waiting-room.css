@@ -166,6 +166,26 @@
   left: 77%;
   top: 17%;
 }
+/* 4-player table: you at the bottom, then left, across and right. */
+.is-four .k-wait-seat {
+  width: 112px;
+}
+.is-four .k-wait-seat.seat-0 {
+  left: 50%;
+  top: 62%;
+}
+.is-four .k-wait-seat.seat-1 {
+  left: 16%;
+  top: 34%;
+}
+.is-four .k-wait-seat.seat-2 {
+  left: 50%;
+  top: 5%;
+}
+.is-four .k-wait-seat.seat-3 {
+  left: 84%;
+  top: 34%;
+}
 .k-seat-progress {
   position: absolute;
   bottom: 23px;

@@ -2,13 +2,14 @@
 
 // A player who leaves for good mustn't freeze the table: once they've been
 // gone a while, the two still there can quit a round or end the game by
-// agreeing (highest score wins), and the lowest seat still at the table can
-// start the next round when seat 0 is the one who left.
+// agreeing (highest score wins), and the next round still deals itself when
+// seat 0 is the one who left.
 //
 // Needs a database for the final save, e.g.
 //   DATABASE_URL=postgres://postgres@localhost:55432/kings_test PORT=3407 node socket/abandon.smoke.js
 
 process.env.QUIT_GONE_MS = '1000';
+process.env.NEXT_ROUND_DELAY_MS = process.env.NEXT_ROUND_DELAY_MS || '600';
 const { startServer, connectClient, waitFor, sleep, check, summary, run } = require('../test/harness');
 
 const URL = startServer(3407);
@@ -55,10 +56,10 @@ run(async () => {
     && c.last('round-complete')?.roundDetail?.kingOfHeartsTakenBy === null);
 
   c.emit('next-round');
-  check('only the lowest seat still there may start the next round',
-    await waitFor(() => c.errors.some((e) => /advance the round/.test(e.message))), JSON.stringify(c.errors));
-  b.emit('next-round');
-  check('seat 1 starts the next round while seat 0 is away', await waitFor(() => c.last('round-started')));
+  await sleep(100);
+  check('a next-round ask while the deal timer runs is ignored', !c.last('round-started') && c.errors.length === 0,
+    JSON.stringify(c.errors));
+  check('the next round deals itself while seat 0 is away', await waitFor(() => c.last('round-started'), 3000));
   check('the next round carries fresh card counts for watchers',
     JSON.stringify(c.last('round-started')?.cardCounts) === '{"0":10,"1":10,"2":10}');
   b.emit('next-round');

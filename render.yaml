@@ -15,8 +15,6 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "22"
-      - key: APP_TIMEZONE
-        value: Asia/Tbilisi
       # Supabase → Connect → "Transaction pooler" URI (same value as on Vercel).
       - key: DATABASE_URL
         sync: false

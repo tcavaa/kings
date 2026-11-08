@@ -24,8 +24,10 @@ export class GameScene extends Phaser.Scene {
     // A restarted scene (HMR) starts empty, so the next snapshot must draw.
     this._lastRendered = null;
     const size = this.scale.gameSize;
-    // Watching is learnt from the first snapshot (state.spectator).
+    // Watching and the table size (3 or 4 seats) are learnt from the first
+    // snapshot (state.spectator, state.seatCount).
     this._watching = false;
+    this._seats = 3;
     this.L = layoutFor(size.height > size.width);
     this.cameras.main.setScroll(0, this.L.VIEW_TOP);
 
@@ -51,14 +53,15 @@ export class GameScene extends Phaser.Scene {
 
     // Switch to another layout. Resizing the game fires resize again, and
     // that repaints. Returns whether anything changed.
-    this._useLayout = (portrait, watching) => {
-      const next = layoutFor(portrait, watching);
+    this._useLayout = (portrait, watching, seats = this._seats) => {
+      const next = layoutFor(portrait, watching, seats);
       if (next.id === this.L.id) return false;
       this.L = next;
       const { width, height } = sceneSize(this.L);
       this.cameras.main.setScroll(0, this.L.VIEW_TOP);
       this.table.draw(this.L);
       this.scale.setGameSize(width, height);
+      this._emitGeometry();
       return true;
     };
 
@@ -70,7 +73,7 @@ export class GameScene extends Phaser.Scene {
       const parent = this.scale.parentSize;
       const portrait = isPortraitBox(parent.width, parent.height);
       if (parent.width > 0 && portrait !== this.L.portrait) {
-        this._useLayout(portrait, this._watching);
+        this._useLayout(portrait, this._watching, this._seats);
         return;
       }
       this._repaint();
@@ -162,8 +165,12 @@ export class GameScene extends Phaser.Scene {
     const rect = canvas.getBoundingClientRect();
     if (!rect.height) return;
     const sy = rect.height / this.scale.height;
+    // The seat across a wide 4-player table straddles the felt's top edge:
+    // the quote has to clear its photo too.
+    const across = this.L.seats === 4 && !this.L.portrait ? this.L.AVATAR_POS[2] : null;
+    const top = across ? Math.min(this.L.felt.top, across.y - 46) : this.L.felt.top;
     EventBus.emit("table-geometry", {
-      feltTop: rect.top + (this.L.felt.top - this.cameras.main.scrollY) * sy,
+      feltTop: rect.top + (top - this.cameras.main.scrollY) * sy,
     });
   }
 
@@ -207,9 +214,11 @@ export class GameScene extends Phaser.Scene {
     // Started or stopped watching (a finalist called away from a table they
     // were watching): the tall table swaps its hand rows in or out. The
     // resize that follows draws this state.
-    if (!!state.spectator !== this._watching) {
+    const seats = state.seatCount === 4 ? 4 : 3;
+    if (!!state.spectator !== this._watching || seats !== this._seats) {
       this._watching = !!state.spectator;
-      if (this._useLayout(this.L.portrait, this._watching)) return;
+      this._seats = seats;
+      if (this._useLayout(this.L.portrait, this._watching, seats)) return;
     }
     this._lastRendered = state;
     for (const view of this.views) view.render(state, this.L);

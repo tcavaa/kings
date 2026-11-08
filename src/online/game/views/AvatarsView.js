@@ -84,7 +84,7 @@ export class AvatarsView {
   constructor(scene, onPhotoReady) {
     this.scene = scene;
     this.photos = new AvatarTextureCache(scene.textures, onPhotoReady);
-    this.slots = [0, 1, 2].map(() => ({ key: null, container: null }));
+    this.slots = [0, 1, 2, 3].map(() => ({ key: null, container: null }));
   }
 
   render(state, L) {
@@ -95,6 +95,7 @@ export class AvatarsView {
       gamePhase,
       cardCounts = {},
       leaderSeat,
+      restingSeat = null,
       round,
       champions = [],
     } = state;
@@ -102,10 +103,11 @@ export class AvatarsView {
     // otherwise the seat-0 slot resolves to `seat: null`, matches no
     // player, and that player's avatar never appears for a watcher.
     const mySeat = state.mySeat ?? 0;
+    const seats = L.AVATAR_POS.length;
 
     this.slots.forEach((slot, rel) => {
-      const seat = (mySeat + rel) % 3;
-      const player = players.find((p) => p.seat === seat);
+      const seat = (mySeat + rel) % seats;
+      const player = rel < seats ? players.find((p) => p.seat === seat) : null;
       if (!player) {
         this._clear(slot);
         return;
@@ -122,6 +124,8 @@ export class AvatarsView {
         isOwn,
         isActive: gamePhase === "playing" && currentTurn === seat,
         isLeader,
+        // The dealer of a 4-player table, sitting this round out.
+        isResting: seat === restingSeat,
         isChampion: champions.includes(player.name),
         score: cumulativeScores[seat] ?? 0,
         cardCount: (cardCounts || {})[seat] ?? 0,
@@ -164,6 +168,8 @@ export class AvatarsView {
     // The tall table is shown smaller per scene unit; keep names readable.
     // (The photo is a pre-cut texture, not a mask, so it scales with the rest.)
     if (v.portrait) container.setScale(1.4);
+    // Sitting this round out: the plate fades back.
+    if (v.isResting) container.setAlpha(0.6);
 
     parts.plate = bakedImage(scene, 0, 0, plateTexture(scene, radius, v.isActive));
     container.add(parts.plate);
@@ -206,9 +212,12 @@ export class AvatarsView {
 
     // Name + score chip (mimics 'Frank / 1,860' style). The bottom seat
     // keeps them beside the photo — on its left, right-aligned, clear of the
-    // voice button on its right — so nothing hangs below it.
-    const beside = rel === 0;
-    const textX = beside ? -(radius + 14) : 0;
+    // voice button on its right — so nothing hangs below it. The seat across
+    // a wide 4-player table does the same on its right (`pos.beside`), so it
+    // doesn't hang down onto the trick.
+    const besideRight = rel !== 0 && !!pos.beside;
+    const beside = rel === 0 || besideRight;
+    const textX = besideRight ? radius + 14 : beside ? -(radius + 14) : 0;
     const nameOffY = beside ? -16 : v.isOwn ? radius + 16 : radius + 18;
     const nameLabel = v.isOwn ? "შენ" : v.name;
     container.add(
@@ -219,7 +228,7 @@ export class AvatarsView {
           fontFamily: georgianFont(),
           fontStyle: "bold",
         })
-        .setOrigin(beside ? 1 : 0.5, 0.5),
+        .setOrigin(besideRight ? 0 : beside ? 1 : 0.5, 0.5),
     );
 
     const { score } = v;
@@ -235,25 +244,25 @@ export class AvatarsView {
           ? "#ae3447"
           : "#4f6c5d";
     const scoreTxt = scene.add
-      .text(beside ? textX : -12, scoreOffY, scoreStr, {
+      .text(besideRight ? textX + 14 : beside ? textX : -12, scoreOffY, scoreStr, {
         fontSize: "13px",
         color: scoreCol,
         fontFamily: latinFont(),
         fontStyle: "bold",
       })
-      .setOrigin(beside ? 1 : 0, 0.5);
+      .setOrigin(besideRight ? 0 : beside ? 1 : 0, 0.5);
     // small coin icon, just before the score
-    const coinX = beside ? textX - scoreTxt.width - 10 : -22;
+    const coinX = besideRight ? textX + 4 : beside ? textX - scoreTxt.width - 10 : -22;
     container.add(bakedImage(scene, coinX, scoreOffY, coinTexture(scene)));
     container.add(scoreTxt);
 
-    if (v.isLeader) {
+    if (v.isLeader || v.isResting) {
       const pillY = scoreOffY + 18;
-      const pillX = beside ? textX - 32 : 0;
+      const pillX = besideRight ? textX + 32 : beside ? textX - 32 : 0;
       container.add(bakedImage(scene, pillX, pillY, pillTexture(scene)));
       container.add(
         scene.add
-          .text(pillX, pillY, "წამყვანი", {
+          .text(pillX, pillY, v.isLeader ? "წამყვანი" : "ისვენებს", {
             fontSize: "10px",
             color: "#f5f2e9",
             fontFamily: georgianFont(),

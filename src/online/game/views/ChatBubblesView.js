@@ -1,4 +1,4 @@
-import { relSeat } from "../layout.js";
+import { relSeat, seatsOf } from "../layout.js";
 import { EventBus } from "../EventBus.js";
 import { latinFont } from "../lib/fonts.js";
 
@@ -49,7 +49,7 @@ export class ChatBubblesView {
       const seat = Number(seatStr);
       // Watchers' messages (no seat) and empty seats have no avatar to sit on.
       if (!players.find((p) => p.seat === seat)) continue;
-      const rel = relSeat(seat, mySeat);
+      const rel = relSeat(seat, mySeat, seatsOf(L));
       wanted.set(seat, { rel, msg, key: `${L.id}|${rel}|${msg.message || ""}|${msg.at ?? ""}` });
     }
 
