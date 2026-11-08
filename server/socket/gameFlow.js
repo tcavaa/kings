@@ -9,6 +9,14 @@ const { normalizeMode } = require('../lib/util');
 const { playersView } = require('./shared');
 const { LOBBY } = require('./lobby');
 
+// How long the round's result stays up before the next hand is dealt on its
+// own (there is no "next round" button any more).
+const NEXT_ROUND_DELAY_MS = Number(process.env.NEXT_ROUND_DELAY_MS) || 2000;   // env: tests only
+// A round played out to its last trick shows that trick (and flies it to its
+// winner) before the result opens — the client's TRICK_DISPLAY_MS +
+// TRICK_ANIMATION_MS — so the result still gets its full time on screen.
+const LAST_TRICK_REVEAL_MS = process.env.NEXT_ROUND_DELAY_MS ? 0 : 1900;
+
 /**
  * A game just started at `room`: everyone gets the table and their hand, and
  * the players leave the lobby channel (they don't show its lists) while the
@@ -19,6 +27,9 @@ function emitGameStart(ctx, room, gameState) {
   io.to(room.code).emit('game-started', {
     round: gameState.round,
     leaderSeat: gameState.leaderSeat,
+    restingSeat: gameState.restingSeat,
+    seatCount: gameState.seatCount,
+    totalRounds: gameState.totalRounds,
     players: playersView(room.players),
     startedAt: room.startedAt || null,
     version: gameState.version,
@@ -38,9 +49,10 @@ function emitHandDealt(io, room, gameState) {
       // away, and non-leaders see the 2 prikup cards while the leader is
       // choosing. Only the leader is kept blind to the prikup until it's
       // merged into their hand.
-      hand: gameState.hands[player.seat],
+      hand: gameState.hands[player.seat] || [],
       centerCards: isLeader ? [] : gameState.centerCards,
       leaderSeat: gameState.leaderSeat,
+      restingSeat: gameState.restingSeat,
       round: gameState.round,
       cardCounts,
       version: gameState.version,
@@ -48,9 +60,62 @@ function emitHandDealt(io, room, gameState) {
   }
 }
 
-/** A round just ended (played out or quit): tell the table, and finish the game after round 27. */
+/**
+ * Deal the next round at `room` and tell the table. Run by the timer
+ * emitRoundComplete arms, and by a `next-round` a client sends when it has
+ * waited too long (a table restored after a restart has no timer).
+ * Returns false when the room isn't between rounds.
+ */
+function advanceRound(ctx, room) {
+  const { io, gameManager } = ctx;
+  clearNextRoundTimer(room);
+  const gs = room?.gameState;
+  if (!gs || room.status !== 'playing' || gs.phase !== 'round_end') return false;
+  const result = gs.startNextRound();
+  if (!result.ok) return false;
+  gameManager._persist(room.code);
+  // A quit/surrender vote from the last round is moot now.
+  if (room.quitProposal) {
+    if (room.quitProposal.timer) clearTimeout(room.quitProposal.timer);
+    room.quitProposal = null;
+  }
+  io.to(room.code).emit('round-started', {
+    round: gs.round,
+    leaderSeat: gs.leaderSeat,
+    restingSeat: gs.restingSeat,
+    phase: gs.phase,
+    usedTypes: { ...gs.usedTypes },
+    // Watchers get no `hand-dealt`, so the fresh card counts come here.
+    cardCounts: gs.cardCounts(),
+    version: gs.version,
+  });
+  emitHandDealt(io, room, gs);
+  return true;
+}
+
+function clearNextRoundTimer(room) {
+  if (room?.nextRoundTimer) {
+    clearTimeout(room.nextRoundTimer);
+    room.nextRoundTimer = null;
+  }
+}
+
+/** Deal the next round `delayMs` from now (the result modal's countdown). */
+function scheduleNextRound(ctx, room, delayMs = NEXT_ROUND_DELAY_MS) {
+  clearNextRoundTimer(room);
+  room.nextRoundTimer = setTimeout(() => {
+    room.nextRoundTimer = null;
+    // The room may have been dropped or finished meanwhile.
+    if (ctx.gameManager.getRoom(room.code) !== room) return;
+    advanceRound(ctx, room);
+  }, delayMs);
+  if (typeof room.nextRoundTimer.unref === 'function') room.nextRoundTimer.unref();
+}
+
+/** A round just ended (played out or quit): tell the table, and finish the game after the last round. */
 function emitRoundComplete(ctx, room, result, extra) {
   const gs = room.gameState;
+  const delayMs = NEXT_ROUND_DELAY_MS + (extra && extra.trick ? LAST_TRICK_REVEAL_MS : 0);
   ctx.io.to(room.code).emit('round-complete', {
     ...extra,
     roundEnds: true,
@@ -61,9 +126,12 @@ function emitRoundComplete(ctx, room, result, extra) {
     isGameOver: result.isGameOver,
     cardCounts: gs.cardCounts(),
     roundDetail: gs.roundDetails[gs.roundDetails.length - 1],
+    // When the next hand is dealt on its own (the modal counts down to it).
+    nextRoundInMs: result.isGameOver ? null : delayMs,
     version: gs.version,
   });
   if (result.isGameOver) finishGame(ctx, room, room.code);
+  else scheduleNextRound(ctx, room, delayMs);
 }
 
 /**
@@ -76,17 +144,19 @@ function emitRoundComplete(ctx, room, result, extra) {
 function finishGame(ctx, room, roomCode, extra = {}) {
   const { io, gameManager, tournamentManager } = ctx;
   const gs = room.gameState;
+  clearNextRoundTimer(room);
+  const seats = gs.seats;
 
   const finalScores = { ...gs.cumulativeScores };
   let bestScore = null;
-  for (let s = 0; s < 3; s++) {
+  for (const s of seats) {
     if (bestScore === null || finalScores[s] > bestScore) {
       bestScore = finalScores[s];
     }
   }
   // Everyone on the top score is a winner — a tie crowns them all. `winner`
   // (the lowest-seat one) is kept alongside `winners` for older consumers.
-  const winners = [0, 1, 2]
+  const winners = seats
     .filter((s) => finalScores[s] === bestScore)
     .map((s) => ({
       seat: s,
@@ -99,9 +169,7 @@ function finishGame(ctx, room, roomCode, extra = {}) {
 
   // The game server is the only writer of King Online results. The id is
   // derived from the room and the final scores, so a retry can't double-save.
-  // Until the save lands, the daily quota counts the game from memory (see
-  // GameManager.championshipGamesInFlight).
-  const scorePart = [0, 1, 2]
+  const scorePart = seats
     .map((s) => finalScores[s] ?? 0)
     .join('.')
     .replace(/-/g, 'n');
@@ -116,7 +184,6 @@ function finishGame(ctx, room, roomCode, extra = {}) {
     winner,
     winners,
     isChampionship: mode === 'championship',
-    // Bracket tables are league games that don't use up the daily quota.
     tournamentId: room.tournamentId || null,
     tournamentStage: room.tournamentStage || null,
     roundDetails: gs.roundDetails || [],
@@ -183,4 +250,7 @@ function saveWithRetry(gameId, record, attempt = 0) {
   });
 }
 
-module.exports = { emitGameStart, emitHandDealt, emitRoundComplete, finishGame };
+module.exports = {
+  emitGameStart, emitHandDealt, emitRoundComplete, finishGame, advanceRound, scheduleNextRound,
+  NEXT_ROUND_DELAY_MS,
+};

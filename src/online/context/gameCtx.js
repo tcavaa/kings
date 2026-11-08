@@ -72,6 +72,8 @@ export function createGameCtx({ refs, dispatch, chat, unlockAudio, playClip, set
     setTournamentSeat: set.tournamentSeat,
     setQuitProposal: set.quitProposal,
     setRematch: set.rematch,
+    // How many seats the room we're in has (3, or 4 with a resting dealer).
+    setSeatCount: (seatCount) => dispatch({ type: 'seat-count', seatCount }),
 
     // State the listeners also read: the ref moves with it.
     setRoom: (code) => { refs.roomCode.current = code; set.roomCode(code) },

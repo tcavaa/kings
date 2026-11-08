@@ -41,7 +41,7 @@ export default function SeasonHero({ profiles }) {
     () => withCurrentAvatars(gamesSince(games || [], start), profiles || []),
     [games, start, profiles],
   );
-  const top = useMemo(() => standingsOf(seasonGames).slice(0, TOP), [seasonGames]);
+  const top = useMemo(() => standingsOf(seasonGames, start).slice(0, TOP), [seasonGames, start]);
   const loading = seasons === null || games === null;
 
   return (

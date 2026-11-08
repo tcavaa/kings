@@ -10,6 +10,7 @@ const TOURNAMENT_STAGE = {
   done: "დასრულდა",
 };
 
+// A 3-player game; 4-player tables send their own total (36).
 const TOTAL_ROUNDS = 27;
 
 function tableLabel(game) {
@@ -59,7 +60,8 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
     !!active &&
     game.players.some((p) => p.name.toLowerCase() === active.name.toLowerCase());
   const players = [...game.players].sort((a, b) => b.score - a.score);
-  const left = Math.max(0, TOTAL_ROUNDS - game.round);
+  const total = game.totalRounds || TOTAL_ROUNDS;
+  const left = Math.max(0, total - game.round);
   return (
     <article
       className="k-live-table"
@@ -84,12 +86,12 @@ function LiveTableCard({ game, active, connected, waitingAtTable, onWatch, onNee
       </ol>
       <div className="k-live-progress">
         <span>
-          რაუნდი {game.round}/{TOTAL_ROUNDS}
+          რაუნდი {game.round}/{total}
         </span>
         <span>დარჩა {left}</span>
       </div>
       <div className="k-live-bar" aria-hidden="true">
-        <i style={{ width: `${(game.round / TOTAL_ROUNDS) * 100}%` }} />
+        <i style={{ width: `${(game.round / total) * 100}%` }} />
       </div>
       {/* Three different dead ends, and each needs its own words: your own
           table, no profile yet (which opens the picker rather than refusing),

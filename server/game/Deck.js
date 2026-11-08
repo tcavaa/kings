@@ -32,20 +32,23 @@ function shuffle(deck) {
 
 /**
  * Deals cards from a shuffled deck.
- * 3 players × 10 cards + 2 center cards.
+ * 3 players × 10 cards + 2 center cards. `seats` are the three seats dealt
+ * to (at a 4-player table the resting dealer is left out).
  * @param {Array} deck - A shuffled 32-card deck
- * @returns {{ hands: {0: Card[], 1: Card[], 2: Card[]}, center: Card[] }}
+ * @param {number[]} [seats]
+ * @returns {{ hands: {[seat]: Card[]}, center: Card[] }}
  */
-function deal(deck) {
-  const hands = { 0: [], 1: [], 2: [] };
+function deal(deck, seats = [0, 1, 2]) {
+  const hands = {};
   const center = [];
 
   // Deal 10 cards to each player
-  for (let seat = 0; seat < 3; seat++) {
+  seats.forEach((seat, n) => {
+    hands[seat] = [];
     for (let i = 0; i < CARDS_PER_PLAYER; i++) {
-      hands[seat].push(deck[seat * CARDS_PER_PLAYER + i]);
+      hands[seat].push(deck[n * CARDS_PER_PLAYER + i]);
     }
-  }
+  });
 
   // Last 2 cards go to center
   const offset = 3 * CARDS_PER_PLAYER;

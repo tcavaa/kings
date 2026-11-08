@@ -2,8 +2,9 @@ import { useMemo } from "react";
 import { useGame } from "../context/GameContext";
 import { winProbabilities } from "../../../shared/winProbability.js";
 
-// Same duqani tri-color used by ScoreChart, indexed by sorted seat order.
-const COLORS = ["#d7fa52", "#afbf9b", "#6e8672"];
+// Same duqani tri-color used by ScoreChart, indexed by sorted seat order
+// (plus a fourth for 4-player tables).
+const COLORS = ["#d7fa52", "#afbf9b", "#6e8672", "#c9a45c"];
 
 /**
  * Live win-probability bars for the current game. The model (how far the

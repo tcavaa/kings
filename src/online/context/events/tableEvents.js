@@ -13,14 +13,14 @@ export function registerTableEvents(socket, ctx) {
   const { refs, dispatch } = ctx
   const later = (fn, ms) => { refs.trickTimers.current.push(setTimeout(fn, ms)) }
 
-  socket.on('game-started', ({ round, leaderSeat, players: p, startedAt }) => {
+  socket.on('game-started', ({ round, leaderSeat, restingSeat, seatCount, players: p, startedAt }) => {
     ctx.clearGameOverTimer()
     ctx.forgetResults()
     refs.snapshotAfterRejoin.current = false
     // Everyone is at the table, whatever the banner said before.
     ctx.clearDisconnected()
     ctx.setGameStartedAt(startedAt || Date.now())
-    dispatch({ type: 'game-started', round, leaderSeat })
+    dispatch({ type: 'game-started', round, leaderSeat, restingSeat, seatCount: seatCount || (p || []).length })
     ctx.setPlayers(p)
     ctx.setAppPhase('game')
     // Wipe rematch state from any previous game; the new game-over for
@@ -29,15 +29,15 @@ export function registerTableEvents(socket, ctx) {
     ctx.setQuitProposal(null)
   })
 
-  socket.on('hand-dealt', ({ hand, centerCards, leaderSeat, round, cardCounts }) => {
+  socket.on('hand-dealt', ({ hand, centerCards, leaderSeat, restingSeat, round, cardCounts }) => {
     ctx.clearTrickTimers()
-    dispatch({ type: 'hand-dealt', hand, centerCards, leaderSeat, round, cardCounts })
+    dispatch({ type: 'hand-dealt', hand, centerCards, leaderSeat, restingSeat, round, cardCounts })
     ctx.clearGameOverTimer()
   })
 
-  socket.on('round-started', ({ round, leaderSeat, phase, usedTypes, cardCounts }) => {
+  socket.on('round-started', ({ round, leaderSeat, restingSeat, phase, usedTypes, cardCounts }) => {
     ctx.clearTrickTimers()
-    dispatch({ type: 'round-started', round, leaderSeat, phase, usedTypes, cardCounts })
+    dispatch({ type: 'round-started', round, leaderSeat, restingSeat, phase, usedTypes, cardCounts })
     ctx.setQuitProposal(null)
   })
 
@@ -201,8 +201,9 @@ export function registerTableEvents(socket, ctx) {
 /** Results for the game-over screen, rebuilt from a finished snapshot. */
 function resultsFromSnapshot(state, roomCode) {
   const fs = state.cumulativeScores || {}
-  const best = Math.max(...[0, 1, 2].map(s => fs[s] ?? -Infinity))
-  const winnersList = [0, 1, 2]
+  const seats = Object.keys(fs).map(Number)
+  const best = Math.max(...seats.map(s => fs[s] ?? -Infinity))
+  const winnersList = seats
     .filter(s => (fs[s] ?? -Infinity) === best)
     .map(s => ({
       seat: s,

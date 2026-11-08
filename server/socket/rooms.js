@@ -5,6 +5,8 @@
 // behind.
 
 const { normalizeMode } = require('../lib/util');
+const { normalizeSeatCount } = require('../game/constants');
+const { seatCountOf } = require('../game/GameManager');
 const { playersView, identify, sanitizeEmoji } = require('./shared');
 const { emitGameStart } = require('./gameFlow');
 
@@ -14,7 +16,7 @@ const PUBLIC_SEAT_GRACE_MS = 30 * 1000;
 
 function register(io, socket, ctx, conn) {
   const { gameManager, tournamentManager, lobby } = ctx;
-  const { socketId, allow, emitError, fail, championshipBlocked, emitChampionshipLimit } = conn;
+  const { socketId, allow, emitError, fail } = conn;
 
   // ─── create-room ─────────────────────────────────────────────────────────
   socket.on('create-room', async (payload = {}) => {
@@ -23,17 +25,18 @@ function register(io, socket, ctx, conn) {
       const me = await identify(socket, payload);
       conn.assertNoTournament();
       const roomMode = normalizeMode(payload.mode);
-      if (roomMode === 'championship' && await championshipBlocked(me.name)) {
-        return emitChampionshipLimit();
-      }
-      const { roomCode, seat } = gameManager.createRoom(socketId, me, roomMode);
+      // There is no daily limit any more: a player past the season's league
+      // games can keep playing, the season just stops counting their games.
+      const seatCount = normalizeSeatCount(payload.seatCount);
+      const { roomCode, seat } = gameManager.createRoom(socketId, me, roomMode, seatCount);
       socket.join(roomCode);
       const room = gameManager.getRoom(roomCode);
-      socket.emit('room-created', { roomCode, seat, mode: roomMode });
+      socket.emit('room-created', { roomCode, seat, mode: roomMode, seatCount });
       io.to(roomCode).emit('player-joined', {
         players: playersView(room.players),
         roomCode,
         mode: room.mode,
+        seatCount,
       });
     } catch (err) {
       fail(err);
@@ -57,19 +60,6 @@ function register(io, socket, ctx, conn) {
       }
       conn.assertNoTournament(rc);
 
-      // Championship rooms enforce the daily quota on genuinely NEW sit-downs
-      // only — a reconnect (same name already seated) must never be blocked,
-      // or a mid-game wifi blip would lock a player out of their own table.
-      const targetRoom = gameManager.getRoom(rc);
-      // Tournament tables are championship-grade for the leaderboard but are
-      // explicitly exempt from the daily allowance — entering a bracket must
-      // never be refused because of, or count against, the 8-a-day cap.
-      if (targetRoom && targetRoom.mode === 'championship' && !targetRoom.tournamentId) {
-        if (!gameManager.isSeated(targetRoom, me) && await championshipBlocked(me.name)) {
-          return emitChampionshipLimit();
-        }
-      }
-
       const { seat, reconnected, status } = gameManager.joinRoom(rc, socketId, me);
       socket.join(rc);
       const room = gameManager.getRoom(rc);
@@ -81,12 +71,13 @@ function register(io, socket, ctx, conn) {
       }
 
       socket.emit('room-joined', {
-        roomCode: rc, seat, status, mode: roomMode,
+        roomCode: rc, seat, status, mode: roomMode, seatCount: seatCountOf(room),
       });
       io.to(rc).emit('player-joined', {
         players: playersView(room.players),
         roomCode: rc,
         mode: roomMode,
+        seatCount: seatCountOf(room),
       });
       // A homepage table joined by its code fills up like one sat at.
       if (room.isPublic) {
@@ -101,28 +92,20 @@ function register(io, socket, ctx, conn) {
   // ─── public quick-match room ──────────────────────────────────────────────
 
   // Sit at one of the homepage quick-match tables ('public' by default,
-  // 'championship' when requested). The sitter stays on the homepage — no
-  // waiting-room redirect — until the 3rd seat fills, at which point the
-  // game starts automatically for all three and the table's slot resets.
+  // 'championship' when requested; `seatCount` 3 or 4). The sitter stays on
+  // the homepage — no waiting-room redirect — until the last seat fills, at
+  // which point the game starts automatically and the table's slot resets.
   socket.on('sit-public', async (payload = {}) => {
     try {
       if (!allow('join')) return;
       const me = await identify(socket, payload);
       conn.assertNoTournament();
       const tableMode = normalizeMode(payload.mode);
-      // Quota applies to fresh sit-downs only; re-taking your own seat after
-      // a refresh must always work.
-      if (tableMode === 'championship') {
-        const waitingRoom = gameManager.quickMatchRoom(tableMode);
-        if (!gameManager.isSeated(waitingRoom, me) && await championshipBlocked(me.name)) {
-          return emitChampionshipLimit();
-        }
-      }
-      const { roomCode, seat } = gameManager.sitPublic(
-        socketId, me, sanitizeEmoji(payload.emoji), tableMode
+      const { roomCode, seat, seatCount, table } = gameManager.sitPublic(
+        socketId, me, sanitizeEmoji(payload.emoji), tableMode, normalizeSeatCount(payload.seatCount)
       );
       socket.join(roomCode);
-      socket.emit('public-seated', { roomCode, seat, mode: tableMode });
+      socket.emit('public-seated', { roomCode, seat, mode: tableMode, seatCount, table });
       lobby.publicRoom();
       conn.maybeAutoStart(gameManager.getRoom(roomCode));
     } catch (err) {
@@ -174,7 +157,11 @@ function register(io, socket, ctx, conn) {
       const { seat, status } = gameManager.joinRoom(rc, socketId, me);
       socket.join(rc);
       if (status === 'waiting') {
-        socket.emit('public-seated', { roomCode: rc, seat, mode: room.mode || 'public' });
+        const seatCount = seatCountOf(room);
+        socket.emit('public-seated', {
+          roomCode: rc, seat, mode: room.mode || 'public', seatCount,
+          table: `${room.mode === 'championship' ? 'championship' : 'public'}${seatCount === 4 ? '4' : ''}`,
+        });
         lobby.publicRoom();
       } else {
         conn.emitReconnected(rc, seat, me);
@@ -217,23 +204,13 @@ function register(io, socket, ctx, conn) {
       };
 
       // A repeated tap lands in the rematch room it already created or
-      // joined: answer it again, without a second quota check.
+      // joined: answer it again.
       const repeat = oldRoom.status === 'waiting' && oldRoom.rematchOf;
-      if (!repeat) {
-        // A tournament seat is not rematchable — the bracket decides what
-        // comes next, and spawning a stray room here would strand the player
-        // outside it while their real table waits.
-        if (oldRoom.tournamentId) {
-          return emitError('Tournament games cannot be replayed.');
-        }
-        // A championship rematch is a brand-new championship game — the one
-        // that just finished already counts (saved or not), so after a
-        // player's last game of the day this correctly refuses (they can
-        // still rematch publicly by creating a room from the lobby).
-        if (oldRoom.mode === 'championship' && oldRoom.status === 'finished'
-            && await championshipBlocked(me.name)) {
-          return emitChampionshipLimit();
-        }
+      // A tournament seat is not rematchable — the bracket decides what
+      // comes next, and spawning a stray room here would strand the player
+      // outside it while their real table waits.
+      if (!repeat && oldRoom.tournamentId) {
+        return emitError('Tournament games cannot be replayed.');
       }
 
       const result = gameManager.requestRematch(socketId, me);
@@ -248,18 +225,19 @@ function register(io, socket, ctx, conn) {
       // Tell the requester their new seat — same shape as `room-joined`
       // so the client uses the existing handler to transition into the
       // waiting room UI without a new code path.
+      const newRoom = gameManager.getRoom(newRoomCode);
       socket.emit('room-joined', {
-        roomCode: newRoomCode, seat, status: 'waiting',
+        roomCode: newRoomCode, seat, status: 'waiting', seatCount: seatCountOf(newRoom),
       });
 
       // Send the new lobby's player list to the requester so the waiting
       // room is populated immediately (otherwise the first joiner sits
       // there alone with no UI cue until the next player joins).
-      const newRoom = gameManager.getRoom(newRoomCode);
       if (newRoom) {
         io.to(newRoomCode).emit('player-joined', {
           players: playersView(newRoom.players),
           roomCode: newRoomCode,
+          seatCount: seatCountOf(newRoom),
         });
       }
 

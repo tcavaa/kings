@@ -8,7 +8,9 @@
 const { db } = require('./connection');
 const { iso } = require('./mirror');
 const { gameEntries, barePayload } = require('./games');
-const { winnerNames, inSeason, seasonTable, championOf, championsOf } = require('../games/results');
+const {
+  winnerNames, inSeason, seasonTable, championOf, championsOf, SEASON_GAME_LIMIT, seasonGameLimitApplies,
+} = require('../games/results');
 const { badRequest } = require('../lib/httpError');
 
 async function listSeasons() {
@@ -42,12 +44,43 @@ async function seasonStandings(start) {
     games.push({
       playedAt: e.playedAtMs,
       type: e.type,
+      // Names only: the season's per-player game cap needs to know who played.
+      players: parsed.ok ? (parsed.value.players || []).map((p) => ({ name: p && p.name, score: p && p.score })) : [],
       winners: winnerNames({ winners: parsed.ok ? parsed.value.winners : null, winner_name: e.winner_name }),
     });
   }
   // Only the winners are listed: /admin shows who is ahead.
   const table = seasonTable(games, start).map(({ name, wins }) => ({ name, wins }));
   return { table, champion: championOf(table), champions: championsOf(table), firstGameAt: firstGameMs === null ? null : new Date(firstGameMs) };
+}
+
+/**
+ * One player's King Online league games in the running season, against the
+ * season's cap (SEASON_GAME_LIMIT). Past the cap they can still play; the
+ * season just stops counting their games. `limit` is null for a season
+ * from before the cap. Tournament tables count like any league game.
+ */
+async function getSeasonQuota(name) {
+  const clean = String(name ?? '').trim();
+  if (!clean) throw badRequest('name is required');
+  const { start } = await currentSeason();
+  const lower = clean.toLowerCase();
+  let played = 0;
+  for (const e of await gameEntries('championship', 'online')) {
+    if (!inSeason(e.playedAtMs, start)) continue;
+    const parsed = barePayload(e);
+    if (!parsed.ok) continue;
+    if ((parsed.value.players || []).some((p) => String(p?.name || '').trim().toLowerCase() === lower)) played += 1;
+  }
+  const limit = seasonGameLimitApplies(start) ? SEASON_GAME_LIMIT : null;
+  return {
+    name: clean,
+    limit,
+    played,
+    counted: limit === null ? played : Math.min(played, limit),
+    remaining: limit === null ? null : Math.max(0, limit - played),
+    seasonStartedAt: start.getTime() > 0 ? start.toISOString() : null,
+  };
 }
 
 /** /admin: what ending the season now would record. */
@@ -101,4 +134,4 @@ async function updateCurrentSeason({ name }) {
   }
 }
 
-module.exports = { listSeasons, previewSeasonEnd, endSeason, updateCurrentSeason };
+module.exports = { listSeasons, previewSeasonEnd, endSeason, updateCurrentSeason, getSeasonQuota };

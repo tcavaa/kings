@@ -1,6 +1,6 @@
 import Phaser from "../phaser.js";
 import { createFaceUpCard } from "../objects/Card.js";
-import { relSeat } from "../layout.js";
+import { relSeat, seatsOf } from "../layout.js";
 import { isPenaltyCard } from "../../../../server/game/gameTypes.js";
 
 const cardId = ({ seat, card }) => `${seat}:${card.rank}${card.suit}`;
@@ -43,7 +43,7 @@ export class TrickView {
 
     trick.slice(keep).forEach(({ seat, card }, j) => {
       const i = keep + j;
-      const rel = relSeat(seat, mySeat);
+      const rel = relSeat(seat, mySeat, seatsOf(L));
       const pos = L.TRICK_POS[rel];
       const container = createFaceUpCard(this.scene, pos.x, pos.y, card, false);
       container.setAngle(pos.angle);
@@ -80,7 +80,7 @@ export class TrickView {
    */
   flyTo(winnerSeat, state, L, release) {
     if (!this.cards.length) return false;
-    const target = L.AVATAR_POS[relSeat(winnerSeat, state.mySeat)];
+    const target = L.AVATAR_POS[relSeat(winnerSeat, state.mySeat, seatsOf(L))];
     const cards = this.cards;
     // The flying cards are no longer the drawn trick; they remove themselves.
     this.cards = [];
@@ -152,7 +152,7 @@ export class TrickView {
   }
 
   _pulse(seat, colour, state, L) {
-    const pos = L.AVATAR_POS[relSeat(seat, state.mySeat)];
+    const pos = L.AVATAR_POS[relSeat(seat, state.mySeat, seatsOf(L))];
     if (!pos) return;
     // Drawn round its own origin so it grows from the avatar's centre; the
     // tall table shows avatars at 1.4x, so the ring starts at that size too.

@@ -15,7 +15,12 @@
 // cards under the felt would be an empty gap: the watch layout drops them,
 // seats the bottom player right under the felt, and spends part of the room
 // saved on moving everything clear of the top bar.
-export function layoutFor(portrait, watching = false) {
+//
+// A 4-player table (`seats` 4) adds a seat across the table: relative seats
+// are then 0 = self, 1 = left, 2 = across (top), 3 = right — the order play
+// goes round. Its ids end in "-4".
+export function layoutFor(portrait, watching = false, seats = 3) {
+  if (seats === 4) return fourSeats(layoutFor(portrait, watching));
   if (!portrait) {
     const W = 1100, H = 700, TABLE_CX = W / 2, TABLE_CY = H / 2 - 20;
     return {
@@ -81,6 +86,55 @@ function watchLayout(L) {
     AVATAR_POS: [own, down(L.AVATAR_POS[1]), down(L.AVATAR_POS[2])],
     OPP_FAN_POS: L.OPP_FAN_POS.map(down),
     TRICK_POS: L.TRICK_POS.map(down),
+  };
+}
+
+/**
+ * The same table with a fourth seat across from the viewer. The side seats
+ * keep their places; the trick in the middle gets a fourth spot on top.
+ */
+function fourSeats(L) {
+  const { W, TABLE_CX, TABLE_CY, felt } = L;
+  if (!L.portrait) {
+    // The seat across straddles the felt's top edge — low enough to stay
+    // clear of the top bar, high enough to leave the trick room. Its name
+    // and score sit beside the photo (see AvatarsView), so nothing hangs
+    // down onto the felt, and its card fan sits to its left.
+    const top = { x: TABLE_CX, y: felt.top + 34, beside: true };
+    return {
+      ...L,
+      id: `${L.id}-4`,
+      seats: 4,
+      AVATAR_POS: [L.AVATAR_POS[0], L.AVATAR_POS[1], top, L.AVATAR_POS[2]],
+      OPP_FAN_POS: [null, L.OPP_FAN_POS[1], { baseX: TABLE_CX - 150, y: top.y, dir: 1 }, L.OPP_FAN_POS[2]],
+      TRICK_POS: [
+        { x: TABLE_CX, y: TABLE_CY + 60, angle: -4 },
+        { x: TABLE_CX - 78, y: TABLE_CY + 6, angle: -10 },
+        { x: TABLE_CX, y: TABLE_CY - 38, angle: 4 },
+        { x: TABLE_CX + 78, y: TABLE_CY + 6, angle: 10 },
+      ],
+    };
+  }
+  // Tall table: the three opponents share the band above the felt.
+  const y = L.AVATAR_POS[1].y;
+  const fanY = L.OPP_FAN_POS[1].y;
+  return {
+    ...L,
+    id: `${L.id}-4`,
+    seats: 4,
+    AVATAR_POS: [L.AVATAR_POS[0], { x: 112, y }, { x: TABLE_CX, y }, { x: W - 112, y }],
+    OPP_FAN_POS: [
+      null,
+      { baseX: 150, y: fanY, dir: 1 },
+      { baseX: TABLE_CX, y: fanY, dir: 0 },
+      { baseX: W - 150, y: fanY, dir: -1 },
+    ],
+    TRICK_POS: [
+      { x: TABLE_CX, y: TABLE_CY + 80, angle: -4 },
+      { x: TABLE_CX - 88, y: TABLE_CY, angle: -10 },
+      { x: TABLE_CX, y: TABLE_CY - 78, angle: 4 },
+      { x: TABLE_CX + 88, y: TABLE_CY, angle: 10 },
+    ],
   };
 }
 
@@ -150,5 +204,11 @@ export function handSlots(L, total, k, narrow) {
   return slots;
 }
 
-/** A seat's place around this table: 0 = the viewer's seat, 1 = left, 2 = right. */
-export const relSeat = (seat, mySeat) => (seat - (mySeat ?? 0) + 3) % 3;
+/**
+ * A seat's place around this table: 0 = the viewer's seat, 1 = left, then
+ * round the table (2 = right at 3 seats; 2 = across, 3 = right at 4).
+ */
+export const relSeat = (seat, mySeat, seats = 3) => (seat - (mySeat ?? 0) + seats) % seats;
+
+/** How many seats a layout has places for. */
+export const seatsOf = (L) => L.AVATAR_POS.length;

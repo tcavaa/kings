@@ -20,17 +20,18 @@ export function registerRoomEvents(socket, ctx) {
     })
   })
 
-  socket.on('room-created', ({ roomCode: code, seat, mode }) => {
+  socket.on('room-created', ({ roomCode: code, seat, mode, seatCount }) => {
     ctx.resetRoomScopedState()
     ctx.forgetResults()
     ctx.setRoom(code)
     ctx.setSeat(seat)
     ctx.setIsCreator(true)
     ctx.setRoomMode(mode === 'championship' ? 'championship' : 'public')
+    ctx.setSeatCount(seatCount === 4 ? 4 : 3)
     ctx.setAppPhase('waiting')
   })
 
-  socket.on('room-joined', ({ roomCode: code, seat, reconnected, status, mode, tournament: tournamentTag, startedAt }) => {
+  socket.on('room-joined', ({ roomCode: code, seat, reconnected, status, mode, seatCount, tournament: tournamentTag, startedAt }) => {
     ctx.clearGameOverTimer()
     // A different table (not our own seat coming back): start clean.
     if (!reconnected || code !== refs.roomCode.current) {
@@ -41,6 +42,7 @@ export function registerRoomEvents(socket, ctx) {
     ctx.setSeat(seat)
     ctx.setIsCreator(seat === 0)
     if (mode) ctx.setRoomMode(mode === 'championship' ? 'championship' : 'public')
+    if (seatCount) ctx.setSeatCount(seatCount === 4 ? 4 : 3)
     if (startedAt) ctx.setGameStartedAt(startedAt)
     // Set when the server seats us at a bracket table; drives the HUD's
     // tournament button and blocks the quit/rematch affordances.
@@ -64,8 +66,10 @@ export function registerRoomEvents(socket, ctx) {
   // last events can still arrive) must not overwrite this table's players.
   const otherRoom = (code) => !!code && code !== refs.roomCode.current
 
-  socket.on('player-joined', ({ players: p, roomCode }) => {
-    if (!otherRoom(roomCode)) ctx.setPlayers(p)
+  socket.on('player-joined', ({ players: p, roomCode, seatCount }) => {
+    if (otherRoom(roomCode)) return
+    ctx.setPlayers(p)
+    if (seatCount) ctx.setSeatCount(seatCount === 4 ? 4 : 3)
   })
   // player-left's roster carries no photos or connection flags; keep the
   // ones we already have for players who are still there.
@@ -107,17 +111,19 @@ export function registerRoomEvents(socket, ctx) {
   }
 
   socket.on('public-room', (view = {}) => {
-    const norm = (t) => ({
+    const norm = (t, seatCount = 3) => ({
       roomCode: t?.roomCode || null,
+      seatCount: t?.seatCount === 4 ? 4 : seatCount,
       seats: Array.isArray(t?.seats) ? t.seats : [],
     })
     // Legacy single-table payloads (server mid-deploy) land as the casual table.
     const v = view.public || view.championship
-      ? { public: norm(view.public), championship: norm(view.championship) }
-      : { public: norm(view), championship: { roomCode: null, seats: [] } }
+      ? { public: norm(view.public), championship: norm(view.championship), championship4: norm(view.championship4, 4) }
+      : { public: norm(view), championship: norm(null), championship4: norm(null, 4) }
     ctx.setPublicRoom(v)
     if (refs.publicSeat.current === null) return
-    const myTable = [v.public, v.championship].find(t => t.roomCode && t.roomCode === refs.roomCode.current)
+    const myTable = [v.public, v.championship, v.championship4]
+      .find(t => t.roomCode && t.roomCode === refs.roomCode.current)
     if (myTable) {
       // Still the same table — but if our seat is gone the server swept
       // us out (disconnect grace expired). Stand down locally.
@@ -132,7 +138,7 @@ export function registerRoomEvents(socket, ctx) {
     }
   })
 
-  socket.on('public-seated', ({ roomCode: code, seat, mode }) => {
+  socket.on('public-seated', ({ roomCode: code, seat, mode, seatCount, table }) => {
     // Also the answer to rejoin-public after a blip.
     if (refs.hadDisconnect.current) ctx.endReconnect({ flushChat: false })
     ctx.setRoom(code)
@@ -140,8 +146,10 @@ export function registerRoomEvents(socket, ctx) {
     ctx.setIsCreator(seat === 0)
     ctx.setPublicSeat(seat)
     const tableMode = mode === 'championship' ? 'championship' : 'public'
-    ctx.setPublicSeatMode(tableMode)
+    // Which homepage table: 'championship' (3 seats) or 'championship4'.
+    ctx.setPublicSeatMode(table || `${tableMode}${seatCount === 4 ? '4' : ''}`)
     ctx.setRoomMode(tableMode)
+    ctx.setSeatCount(seatCount === 4 ? 4 : 3)
     // Remember the seat so the lobby can offer it back after a refresh.
     writeSeatMarker(code, refs.myName.current)
     ctx.setResumableSeat(null)
@@ -225,7 +233,7 @@ export function registerRoomEvents(socket, ctx) {
       proposerName,
       acceptedSeats: Array.isArray(acceptedSeats) ? acceptedSeats : [proposerSeat],
       // Seats that must agree — a player who left for good doesn't vote.
-      voters: Array.isArray(voters) ? voters : [0, 1, 2],
+      voters: Array.isArray(voters) ? voters : (refs.players.current || []).map(p => p.seat),
     })
   })
 
@@ -240,7 +248,7 @@ export function registerRoomEvents(socket, ctx) {
     }
   })
 
-  socket.on('error', ({ message, code, limit }) => {
+  socket.on('error', ({ message, code }) => {
     // If a play was in flight and got rejected, the client may have
     // optimistically removed a card — re-sync hand state from the server
     // so the player sees the correct deck again. Always release the lock.
@@ -267,12 +275,6 @@ export function registerRoomEvents(socket, ctx) {
       // lobby asks us to pick the profile again.
       dropProfileSession()
       ctx.addToast('აირჩიე პროფილი თავიდან.', 'error')
-      return
-    }
-    if (code === 'CHAMPIONSHIP_LIMIT') {
-      // The server's number, from the payload or its message.
-      const max = Number(limit) || Number(/\((\d+)/.exec(message || '')?.[1]) || 8
-      ctx.addToast(`დღის ლიმიტი ამოიწურა — ${max} ლიგის თამაში დღეში. აირჩიე კლასიკური თამაში.`, 'error')
       return
     }
     ctx.addToast(message, 'error')

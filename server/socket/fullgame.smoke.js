@@ -1,14 +1,15 @@
 'use strict';
 
-// A complete 27-round King game over real sockets: three bots create a
-// championship room, play every round to the end (type selection, trump,
-// discards, all tricks, next-round), and the finished game must land in
-// finished_games. Math.random is seeded, and the bots always pick the first
+// A complete King game over real sockets: three bots (SEATS=4: four, where
+// each round's dealer sits out) create a championship room, play every round
+// to the end (type selection, trump, discards, all tricks; the next round
+// deals itself), and the finished game must land in finished_games. Math.random is seeded, and the bots always pick the first
 // legal move, so a given SEED produces exactly the same game every run — on
 // this server or on any other build of it (SERVER_DIR), which makes the
 // printed digest a cross-version equivalence check.
 //
 // Run: PORT=3530 SEED=7 node socket/fullgame.smoke.js
+//      PORT=3532 SEATS=4 node socket/fullgame.smoke.js
 //      SERVER_DIR=/path/to/other/server PORT=3531 SEED=7 node socket/fullgame.smoke.js
 
 const path = require('path');
@@ -37,6 +38,10 @@ Math.random = function random() {
 };
 
 process.env.PORT = process.env.PORT || '3530';
+// The next hand deals itself a few seconds after a round; no need to wait here.
+process.env.NEXT_ROUND_DELAY_MS = process.env.NEXT_ROUND_DELAY_MS || '20';
+const SEATS = Number(process.env.SEATS) === 4 ? 4 : 3;
+const ROUNDS = SEATS * 9;
 const SERVER_DIR = path.resolve(process.env.SERVER_DIR || path.join(__dirname, '..'));
 require('../test/harness').useTestDatabase();
 try { require(path.join(SERVER_DIR, 'lib', 'util.js')).setRandomSource(seeded); } catch { /* an older build */ }
@@ -119,35 +124,44 @@ function act(b, st) {
     };
     const card = hand.find((c) => GameState.prototype.validatePlay.call(view, me, c).valid);
     b.s.emit('play-card', { card });
-  } else if (st.phase === 'round_end' && me === 0) {
-    b.lastKey = key;
-    b.s.emit('next-round');
   }
+  // round_end: nothing to do, the server deals the next round by itself.
 }
 
 (async () => {
   await sleep(300);
-  const [a, c2, c3] = [await bot('Bot-A'), await bot('Bot-B'), await bot('Bot-C')];
-  a.s.emit('create-room', { playerName: a.name, mode: 'championship' });
+  const names = ['Bot-A', 'Bot-B', 'Bot-C', 'Bot-D'].slice(0, SEATS);
+  const bots = [];
+  for (const n of names) bots.push(await bot(n));
+  const [a, ...others] = bots;
+  a.s.emit('create-room', { playerName: a.name, mode: 'championship', seatCount: SEATS });
   await sleep(300);
   check('room created', !!a.room, JSON.stringify(a.errors));
-  for (const b of [c2, c3]) { b.s.emit('join-room', { roomCode: a.room, playerName: b.name }); await sleep(200); }
-  check('everyone seated', c2.seat === 1 && c3.seat === 2, `${c2.seat} ${c3.seat}`);
+  for (const b of others) { b.s.emit('join-room', { roomCode: a.room, playerName: b.name }); await sleep(200); }
+  check('everyone seated', others.every((b, i) => b.seat === i + 1), others.map((b) => b.seat).join(' '));
   a.s.emit('start-game');
 
   const started = Date.now();
-  while (!(a.over && c2.over && c3.over) && Date.now() - started < 120000) await sleep(50);
-  check('game reached game-over for all three', !!(a.over && c2.over && c3.over));
-  check('27 rounds completed', a.rounds === 27, `${a.rounds}`);
-  check('the leader never saw the prikup while picking trump', [a, c2, c3].every((b) => !b.sawPrikup));
-  check('no bot move was rejected', [a, c2, c3].every((b) => b.errors.length === 0),
-    JSON.stringify([a.errors, c2.errors, c3.errors]));
+  while (!bots.every((b) => b.over) && Date.now() - started < 180000) await sleep(50);
+  check(`game reached game-over for all ${SEATS}`, bots.every((b) => b.over));
+  check(`${ROUNDS} rounds completed`, a.rounds === ROUNDS, `${a.rounds}`);
+  check('the leader never saw the prikup while picking trump', bots.every((b) => !b.sawPrikup));
+  check('no bot move was rejected', bots.every((b) => b.errors.length === 0),
+    JSON.stringify(bots.map((b) => b.errors)));
   const over = a.over || {};
   check('championship mode carried to game-over', over.mode === 'championship', over.mode);
-  check('27 round details', (over.roundDetails || []).length === 27);
+  check(`${ROUNDS} round details`, (over.roundDetails || []).length === ROUNDS);
+  if (SEATS === 4) {
+    const details = over.roundDetails || [];
+    check('each round the dealer (the seat before the leader) rests',
+      details.every((d) => d.restingSeat === (d.leaderSeat + 3) % 4), JSON.stringify(details.slice(0, 4).map((d) => [d.leaderSeat, d.restingSeat])));
+    check('the resting dealer scores nothing that round', details.every((d) => (d.scores?.[d.restingSeat] ?? 0) === 0));
+    check('every seat rested 9 rounds', [0, 1, 2, 3].every((s) => details.filter((d) => d.restingSeat === s).length === 9));
+    check('every seat led all 9 types', [0, 1, 2, 3].every((s) => new Set(details.filter((d) => d.leaderSeat === s).map((d) => d.gameType)).size === 9));
+  }
 
   // The server's own save is fire-and-forget; give it a moment.
-  const scorePart = [0, 1, 2].map((s) => over.finalScores?.[s] ?? 0).join('.').replace(/-/g, 'n');
+  const scorePart = names.map((_, s) => s).map((s) => over.finalScores?.[s] ?? 0).join('.').replace(/-/g, 'n');
   const id = `g_${a.room}_${over.winner?.seat}_${scorePart}`;
   let saved = null;
   for (let i = 0; i < 40 && !saved; i++) { saved = await store.getGame(id); if (!saved) await sleep(100); }
@@ -155,8 +169,9 @@ function act(b, st) {
   check('saved as championship', saved?.isChampionship === true);
   check('saved round details match game-over', JSON.stringify(saved?.roundDetails) === JSON.stringify(over.roundDetails));
   check('saved winners match game-over', JSON.stringify(saved?.winners) === JSON.stringify(over.winners));
-  const quota = await store.getChampionshipQuota('Bot-A');
-  check('the game counts toward the daily championship quota', quota.playedToday >= 1, JSON.stringify(quota));
+  check(`saved with ${SEATS} players`, saved?.players?.length === SEATS, `${saved?.players?.length}`);
+  const quota = await store.getSeasonQuota('Bot-A');
+  check('the game counts toward the season\'s league games', quota.played >= 1, JSON.stringify(quota));
   // The seeded game always gets the same id: remove it so the next run saves it afresh.
   await require(path.join(SERVER_DIR, 'db', 'connection.js')).getSql()`DELETE FROM finished_games WHERE id = ${id}`;
 

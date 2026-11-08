@@ -18,7 +18,7 @@ export default function QuitModal({ confirmKind, onCloseConfirm }) {
 
   // ── 2/3: a proposal is live ──────────────────────────────────────────────
   if (quitProposal) {
-    const { kind, proposerSeat, proposerName, acceptedSeats = [], voters = [0, 1, 2] } = quitProposal
+    const { kind, proposerSeat, proposerName, acceptedSeats = [], voters = players.map(p => p.seat) } = quitProposal
     // Spectators don't vote.
     if (mySeat === null || mySeat === undefined) return null
     const isMine    = proposerSeat === mySeat

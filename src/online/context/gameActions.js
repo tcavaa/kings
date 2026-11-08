@@ -24,10 +24,10 @@ export function createActions(ctx) {
     addToast: ctx.addToast,
 
     // ── rooms ───────────────────────────────────────────────────────────
-    createRoom(name, mode = 'public') {
+    createRoom(name, mode = 'public', seatCount = 3) {
       ctx.unlockAudio()
       setMe(name)
-      emit('create-room', { ...ctx.identity(name), mode })
+      emit('create-room', { ...ctx.identity(name), mode, seatCount })
     },
 
     joinRoom(code, name) {
@@ -135,10 +135,10 @@ export function createActions(ctx) {
     },
 
     // ── public quick-match ──────────────────────────────────────────────
-    sitPublic(name, emoji = null, mode = 'public') {
+    sitPublic(name, emoji = null, mode = 'public', seatCount = 3) {
       ctx.unlockAudio()
       setMe(name)
-      emit('sit-public', { ...ctx.identity(name), emoji, mode })
+      emit('sit-public', { ...ctx.identity(name), emoji, mode, seatCount })
     },
     standPublic() { emit('stand-public') },
     setPublicEmoji(emoji) { emit('set-public-emoji', { emoji }) },

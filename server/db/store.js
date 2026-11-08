@@ -5,8 +5,8 @@
 // `require('../db/store')`. Each domain lives in its own module:
 //
 //   profiles.js    profiles, photos, PINs, sessions, and ჩაწერა's player list
-//   games.js       finished games, lifetime stats, the daily league quota
-//   seasons.js     King Score's seasons
+//   games.js       finished games and lifetime stats
+//   seasons.js     King Score's seasons and each player's season game count
 //   live.js        rooms and tournaments in progress (restart recovery)
 //   sheets.js      ჩაწერა score sheets being played right now
 //   sounds.js      the reaction-clip catalogue

@@ -5,7 +5,7 @@ export default function GameTypeMatrix() {
   const { players, usedTypes, chosenGameType } = useGame();
   const sorted = [...players].sort((a, b) => a.seat - b.seat);
   return (
-    <section className="k-matrix-content">
+    <section className={`k-matrix-content ${sorted.length > 3 ? "is-four" : ""}`}>
       <p className="k-data-caption">
         ✓ ნათამაშებია · ცარიელი — დარჩენილია · ოქროსფერი — მიმდინარე.
       </p>

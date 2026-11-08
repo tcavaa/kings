@@ -360,3 +360,59 @@ test("penalty cards are K♥ in King, queens, jacks and hearts — none in the t
   assert.equal(isPenaltyCard("H", c("7", "S")), false);
   for (const code of ["T", "L2", "P1", "P2", "P3"]) assert.equal(isPenaltyCard(code, c("Q", "H")), false);
 });
+
+test("seasons from 8 Nov 2026 count only each player's first 40 online games", () => {
+  const { SEASON_GAME_LIMIT, seasonGameLimitApplies, capSeasonGames, seasonOnlineGamesOf } = require("../server/games/results.js");
+  assert.equal(SEASON_GAME_LIMIT, 40);
+  assert.equal(seasonGameLimitApplies("2026-11-08T15:59:00Z"), true);
+  assert.equal(seasonGameLimitApplies("2026-10-18T21:39:24Z"), false);
+  assert.equal(seasonGameLimitApplies(null), false);
+
+  const start = "2026-11-08T15:59:00Z";
+  const at = (n) => new Date(Date.parse(start) + (n + 1) * 60000).toISOString();
+  // Ana plays 45 online games and wins them all; Beka joins only the last 5
+  // (Ana's 41st–45th) and Gio plays the first 40 with Ana.
+  const games = [];
+  for (let n = 0; n < 45; n++) {
+    const other = n < 40 ? "Gio" : "Beka";
+    games.push({ playedAt: at(n), type: "online", winners: ["Ana"],
+      players: [{ name: "Ana", score: 10 }, { name: other, score: -10 }] });
+  }
+  // A live (ჩაწერა) game after the cap still counts for Ana.
+  games.push({ playedAt: at(50), type: "live", winners: ["Ana"], players: [{ name: "Ana", score: 5 }, { name: "Gio", score: -5 }] });
+
+  const table = seasonTable(games, start);
+  const row = (n) => table.find((r) => r.name === n);
+  assert.deepEqual([row("Ana").wins, row("Ana").onlineWins, row("Ana").liveWins, row("Ana").games, row("Ana").totalScore], [41, 40, 1, 41, 405]);
+  // The other player of a game past Ana's cap still has it counted.
+  assert.deepEqual([row("Beka").games, row("Beka").totalScore], [5, -50]);
+  assert.deepEqual([row("Gio").games, row("Gio").totalScore], [41, -405]);
+  // Past seasons are left as they were crowned: no cap.
+  assert.equal(seasonTable(games, "2026-10-18T21:39:24Z").find((r) => r.name === "Ana").wins, 46);
+  // Order doesn't matter: games are counted by when they were played.
+  assert.deepEqual(seasonTable([...games].reverse(), start).find((r) => r.name === "Ana").wins, 41);
+  assert.equal(capSeasonGames(games).length, games.length);
+  assert.equal(seasonOnlineGamesOf(games, " ana "), 45);
+});
+
+test("a 4-player game rests each round's dealer and lasts 36 rounds", () => {
+  const GameState = require("../server/game/GameState.js");
+  const g = new GameState(4);
+  assert.equal(g.totalRounds, 36);
+  assert.deepEqual([g.leaderSeat, g.restingSeat, g.activeSeats], [0, 3, [0, 1, 2]]);
+  assert.equal(g.hands[3].length, 0);
+  assert.deepEqual([0, 1, 2].map((s) => g.hands[s].length), [10, 10, 10]);
+  g.round = 2;
+  assert.deepEqual([g.leaderSeat, g.restingSeat, g.activeSeats], [1, 0, [1, 2, 3]]);
+  // Play skips the resting dealer.
+  assert.equal(g._nextSeat(3), 1);
+  // A 3-player game is unchanged.
+  const three = new GameState();
+  assert.deepEqual([three.totalRounds, three.restingSeat, three.activeSeats], [27, null, [0, 1, 2]]);
+  // Old snapshots (no seatCount) restore as 3-player games.
+  const restored = GameState.fromSnapshot({ ...three.serialize(), seatCount: undefined });
+  assert.equal(restored.seatCount, 3);
+  assert.equal(GameState.fromSnapshot(g.serialize()).seatCount, 4);
+  // calculate() scores every seat; the dealer took nothing and scores 0.
+  assert.deepEqual(calculate("T", [0, 1, 2, 3], { tricksTaken: { 0: 4, 1: 3, 2: 3, 3: 0 } }), { 0: -16, 1: -12, 2: -12, 3: 0 });
+});

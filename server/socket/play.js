@@ -5,7 +5,7 @@
 // behind.
 
 const { playersView } = require('./shared');
-const { emitHandDealt, emitRoundComplete, finishGame } = require('./gameFlow');
+const { emitRoundComplete, finishGame, advanceRound } = require('./gameFlow');
 
 // How long a quit/surrender proposal waits for votes before auto-expiring.
 const QUIT_VOTE_MS = 30 * 1000;
@@ -176,20 +176,13 @@ function register(io, socket, ctx, conn) {
   }));
 
   // ─── next-round ───────────────────────────────────────────────────────────
-  socket.on('next-round', withSeat(({ roomCode, room, gs }) => {
-    if (gs.phase !== 'round_end') return;
-    const gameState = gameManager.handleNextRound(roomCode, socketId);
-    clearQuitProposal(room);
-    io.to(roomCode).emit('round-started', {
-      round: gameState.round,
-      leaderSeat: gameState.leaderSeat,
-      phase: gameState.phase,
-      usedTypes: { ...gameState.usedTypes },
-      // Watchers get no `hand-dealt`, so the fresh card counts come here.
-      cardCounts: gameState.cardCounts(),
-      version: gameState.version,
-    });
-    emitHandDealt(io, room, gameState);
+  // The next hand is dealt on its own a few seconds after a round ends (see
+  // gameFlow.scheduleNextRound). A client only sends this when that didn't
+  // happen in time — a table restored after a server restart has no timer —
+  // so any seated player may, and a round already moving on ignores it.
+  socket.on('next-round', withSeat(({ room, gs }) => {
+    if (gs.phase !== 'round_end' || room.nextRoundTimer) return;
+    advanceRound(ctx, room);
   }));
 
   // ─── propose-quit ─────────────────────────────────────────────────────────
@@ -204,6 +197,10 @@ function register(io, socket, ctx, conn) {
       if (room.status !== 'playing') return emitError('Game is not in progress.');
       if (kind === 'round' && !(gs.chosenGameType && (gs.phase === 'discard' || gs.phase === 'playing'))) {
         return emitError('The round cannot be quit right now.');
+      }
+      // The resting dealer of a 4-player table isn't playing this round.
+      if (kind === 'round' && seat === gs.restingSeat) {
+        return emitError('You are sitting this round out.');
       }
       if (room.quitProposal) return emitError('Another proposal is already waiting on votes.');
 

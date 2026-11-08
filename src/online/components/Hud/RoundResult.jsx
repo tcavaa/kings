@@ -1,10 +1,17 @@
-import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useGame } from "../../context/GameContext";
 import { getGameType } from "../../constants/gameTypes";
 import { quoteForRound } from "../../constants/quotes";
 import ModalShell from "../ModalShell";
 import AvatarImg from "../AvatarImg";
-import { useTapLock } from "../../hooks/useTapLock";
+
+// The server deals the next hand on its own this long after the result opens
+// (see server/socket/gameFlow.js) — there is no "next round" button.
+const NEXT_ROUND_SECONDS = 2;
+// Still here well after that (a table restored after a server restart has no
+// timer): ask the server to deal. It ignores the ask while its own timer runs.
+const NUDGE_AFTER_MS = 5000;
+
 export default function RoundResult() {
   const {
     round,
@@ -15,14 +22,28 @@ export default function RoundResult() {
     mySeat,
     nextRound,
     roomCode,
+    spectating,
+    roundDetails,
   } = useGame();
-  // Seat 0 starts the next round; while it is away, the lowest seat still at
-  // the table does (the server applies the same rule).
-  const seatZero = players.find((p) => p.seat === 0);
-  const present = players.filter((p) => p.connected !== false).map((p) => p.seat);
-  const starter = seatZero?.connected !== false ? 0 : Math.min(...present);
-  const starterName = players.find((p) => p.seat === starter)?.name;
-  const [sent, once] = useTapLock();
+  // The dealer who sat this round out at a 4-player table.
+  const resting = (roundDetails || []).find((d) => d.round === round)?.restingSeat;
+  const [left, setLeft] = useState(NEXT_ROUND_SECONDS);
+  useEffect(() => {
+    setLeft(NEXT_ROUND_SECONDS);
+    const started = Date.now();
+    const tick = setInterval(() => {
+      setLeft(Math.max(0, NEXT_ROUND_SECONDS - Math.floor((Date.now() - started) / 1000)));
+    }, 250);
+    const nudge = !spectating && mySeat !== null && mySeat !== undefined
+      ? setTimeout(() => nextRound(), NUDGE_AFTER_MS)
+      : null;
+    return () => {
+      clearInterval(tick);
+      if (nudge) clearTimeout(nudge);
+    };
+    // A new round number is a new result.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round]);
   const last = roundScores[roundScores.length - 1],
     type = getGameType(chosenGameType),
     quote = quoteForRound(roomCode, round);
@@ -58,10 +79,14 @@ export default function RoundResult() {
                   <AvatarImg avatar={p.avatar} name={p.name} size={32} />
                   {p.name}
                 </span>
-                <b className={delta < 0 ? "negative" : "positive"}>
-                  {delta > 0 ? "+" : ""}
-                  {delta}
-                </b>
+                {p.seat === resting ? (
+                  <b className="resting" title="ისვენებდა">—</b>
+                ) : (
+                  <b className={delta < 0 ? "negative" : "positive"}>
+                    {delta > 0 ? "+" : ""}
+                    {delta}
+                  </b>
+                )}
                 <strong>{cumulativeScores[p.seat] ?? 0}</strong>
               </div>
             );
@@ -71,21 +96,12 @@ export default function RoundResult() {
         „{quote.text}“<small>— {quote.author}</small>
       </blockquote>
       <div className="k-round-action">
-        {mySeat === starter ? (
-          <button
-            className="k-button"
-            disabled={sent}
-            onClick={() => once(nextRound)}
-          >
-            შემდეგი ხელი <ArrowRight size={18} />
-          </button>
-        ) : (
-          <p role="status">
-            {starterName
-              ? `შემდეგ ხელს ${starterName} დაიწყებს…`
-              : "ველოდებით შემდეგ ხელს…"}
-          </p>
-        )}
+        <p role="status" aria-live="polite">
+          {left > 0 ? `შემდეგი ხელი ${left} წამში…` : "ახალი ხელი რიგდება…"}
+        </p>
+        <div className="k-round-countdown" aria-hidden="true">
+          <i style={{ animationDuration: `${NEXT_ROUND_SECONDS}s` }} key={round} />
+        </div>
       </div>
     </ModalShell>
   );

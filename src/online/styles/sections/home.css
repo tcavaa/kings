@@ -335,7 +335,7 @@
 }
 .k-seat-line {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--k-seats, 3), minmax(0, 1fr));
   padding: 25px 0;
   position: relative;
   gap: 12px;
@@ -393,6 +393,29 @@
 }
 .k-match-action .k-button {
   width: 100%;
+}
+/* The 3-seat and 4-seat quick-match tables, one under the other. */
+.k-match-tables {
+  display: grid;
+  gap: 28px;
+  min-width: 0;
+}
+.k-match-tables > .k-match-seating + .k-match-seating {
+  padding-top: 28px;
+  border-top: 1px solid #ffffff1c;
+}
+.k-match-seating.is-four .k-seat-line {
+  gap: 8px;
+}
+.k-match-seating.is-four .k-seat-line::before {
+  left: 12%;
+  right: 12%;
+}
+.k-season-full {
+  margin-top: 14px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #e6c46f;
 }
 .k-match-action > small {
   display: block;

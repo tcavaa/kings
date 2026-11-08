@@ -287,7 +287,7 @@ function ResultsContent({ onOpenLeaderboard, game }) {
             <div className="k-result-details">
               {details.length > 0 && (
                 <ResultsCard title="მოთამაშეების სტატისტიკა">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4">
+                  <div className={`grid grid-cols-1 gap-3 p-4 ${playerList.length > 3 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
                     {playerList.map((p) => {
                       const s = stats[p.seat] || {};
                       const best = s.bestRound?.round

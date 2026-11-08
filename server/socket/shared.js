@@ -1,7 +1,7 @@
 'use strict';
 
 // Helpers every socket module uses: the roster view, who a socket plays as,
-// the daily league quota, and the per-socket rate limits.
+// and the per-socket rate limits.
 
 const store = require('../db/store');
 
@@ -51,27 +51,6 @@ async function identify(socket, { profileToken, playerName } = {}) {
   return { name: profile?.name || name, avatar: profile?.avatar || null, profileId: null, ownerKey };
 }
 
-// ─── the daily league quota ─────────────────────────────────────────────────
-
-const CHAMPIONSHIP_LIMIT_MESSAGE =
-  `Daily championship limit reached (${store.CHAMPIONSHIP_DAILY_LIMIT} games per day). Play a public game instead.`;
-
-/**
- * True when `playerName` has exhausted today's championship quota, counting
- * league games still being played or not yet saved (the database can't see
- * those). Fails open (returns false) if the DB is unreachable — a broken
- * database should degrade to "can't record games", not "can't play at all".
- */
-async function championshipBlocked(gameManager, playerName) {
-  try {
-    const quota = await store.getChampionshipQuota(playerName);
-    return quota.remaining - gameManager.championshipGamesInFlight(playerName) <= 0;
-  } catch (err) {
-    console.warn(`[handlers] championship quota check failed for ${playerName}: ${err.message}`);
-    return false;
-  }
-}
-
 // ─── rate limits ────────────────────────────────────────────────────────────
 // [events, per milliseconds] for each kind of event a socket may send. Every
 // one of these fans out to a whole table or to every connected socket, so a
@@ -115,5 +94,5 @@ function sanitizeEmoji(emoji) {
 }
 
 module.exports = {
-  playersView, identify, championshipBlocked, CHAMPIONSHIP_LIMIT_MESSAGE, rateLimiter, sanitizeEmoji,
+  playersView, identify, rateLimiter, sanitizeEmoji,
 };

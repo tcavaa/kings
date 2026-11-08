@@ -66,7 +66,7 @@ export default function Lobby({ onOpenLeaderboard }) {
     }
   });
 
-  // Today's championship quota for the locked-in profile — null while
+  // This season's league games for the locked-in profile — null while
   // loading/unknown. Refetched whenever the active profile changes.
   const [quota, setQuota] = useState(null);
 
@@ -88,33 +88,33 @@ export default function Lobby({ onOpenLeaderboard }) {
     if (active?.name) announcePresence(active.name);
   }, [connected, active?.name, active?.avatar, announcePresence, refreshLobby]);
 
-  // Championship quota for the active profile. Refetched on profile switch;
-  // a failed fetch just hides the counter (server still enforces the limit).
+  // Season games for the active profile ("12 / 40"). Refetched on profile
+  // switch; a failed fetch just hides the counter. Nothing is blocked past
+  // the cap — the season just stops counting the player's games.
   useEffect(() => {
     let cancelled = false;
     setQuota(null);
     if (!active?.name) return undefined;
     api
-      .getChampionshipQuota(active.name)
+      .getSeasonQuota(active.name)
       .then((q) => {
         if (!cancelled) setQuota(q);
       })
       .catch(() => {
-        /* counter hidden; server-side check still applies */
+        /* counter hidden */
       });
     return () => {
       cancelled = true;
     };
   }, [active?.name]);
 
-  const quotaSpent = quota != null && quota.remaining <= 0;
-
   // Action buttons need no PIN prompt of their own — an active profile is
   // already verified on this device, so we just fire the socket call.
-  const handleCreate = () => {
+  const handleCreate = (seatCount = 3) => {
     if (!active) return;
     // Every table is a league table (the casual "classic" mode is gone).
-    createRoom(active.name, "championship");
+    // A 4-player table rests each round's dealer.
+    createRoom(active.name, "championship", seatCount);
   };
 
   const handleJoin = () => {
@@ -213,7 +213,7 @@ export default function Lobby({ onOpenLeaderboard }) {
           <Users size={14} />
           {onlinePlayers?.length || 0} მოთამაშე ონლაინ
         </span>
-        <span>3 მოთამაშე. 27 რაუნდი. ერთი გამარჯვება.</span>
+        <span>3 ან 4 მოთამაშე. ერთი გამარჯვება.</span>
       </div>
       {resumableSeat && publicSeat === null && (
         <div className="k-resume">
@@ -351,14 +351,23 @@ export default function Lobby({ onOpenLeaderboard }) {
               </button>
             )}
             <span className="k-eyebrow">CREATE A LEAGUE TABLE</span>
-            <button
-              className="k-button"
-              disabled={!canPlay || quotaSpent}
-              onClick={handleCreate}
-            >
-              შექმენი მაგიდა <Plus size={18} />
-            </button>
-            {quotaSpent && <small>ლიგის დღიური ლიმიტი ამოიწურა.</small>}
+            <div className="k-create-sizes">
+              <button
+                className="k-button"
+                disabled={!canPlay}
+                onClick={() => handleCreate(3)}
+              >
+                3 მოთამაშე <Plus size={18} />
+              </button>
+              <button
+                className="k-button k-button-outline"
+                disabled={!canPlay}
+                onClick={() => handleCreate(4)}
+              >
+                4 მოთამაშე <Plus size={18} />
+              </button>
+            </div>
+            <small>4 მოთამაშისას ყოველ ხელში დამრიგებელი ისვენებს.</small>
             <span className="k-eyebrow">HAVE AN INVITE?</span>
             <form
               onSubmit={(e) => {

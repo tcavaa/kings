@@ -142,6 +142,9 @@ const presenceMethods = {
           }
           : null,
         round: gs.round,
+        // 27 rounds at 3 seats, 36 at 4 (where the dealer rests each round).
+        totalRounds: gs.totalRounds,
+        seatCount: gs.seatCount,
         phase: gs.phase,
         startedAt: room.startedAt || null,
         watchers: this.spectatorCount(room.code),

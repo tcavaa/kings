@@ -13,7 +13,7 @@ import {
 import { api } from "../../lib/api";
 import { isWinnerName } from "../../lib/leaderboard";
 import { inSeason } from "../../../../server/games/results.js";
-import { currentSeasonOf, gamesSince, leagueGames, standingsOf } from "../../lib/seasons";
+import { countedGames, currentSeasonOf, gamesSince, leagueGames, standingsOf } from "../../lib/seasons";
 import AvatarImg from "../AvatarImg";
 import FormGuide from "./FormGuide";
 import { recentForm } from "../../lib/playerStats";
@@ -152,12 +152,17 @@ export default function SeasonsPanel({ games, onPlayerSelect, onSelectGame }) {
   const { season: current, start: currentStart } = currentSeasonOf(seasons);
   const past = useMemo(() => (seasons || []).filter((s) => s.ended_at), [seasons]);
   const currentGames = useMemo(() => gamesSince(games, currentStart), [games, currentStart]);
-  const currentPlayers = useMemo(() => standingsOf(currentGames), [currentGames]);
+  const currentPlayers = useMemo(
+    () => standingsOf(currentGames, currentStart),
+    [currentGames, currentStart],
+  );
+  // Wins as the season counts them (each player's first 40 online games).
+  const raceGames = useMemo(() => countedGames(currentGames, currentStart), [currentGames, currentStart]);
   const pastRows = useMemo(
     () =>
       past.map((s) => {
         const sGames = league.filter((g) => inSeason(g.playedAt, s.started_at, s.ended_at));
-        return { season: s, games: sGames, players: standingsOf(sGames) };
+        return { season: s, games: sGames, players: standingsOf(sGames, s.started_at, s.ended_at) };
       }),
     [past, league],
   );
@@ -201,7 +206,7 @@ export default function SeasonsPanel({ games, onPlayerSelect, onSelectGame }) {
             {leader && <small>{leader.wins} მოგება</small>}
           </div>
         </div>
-        <SeasonRace games={currentGames} players={currentPlayers} />
+        <SeasonRace games={raceGames} players={currentPlayers} />
         <Standings
           players={currentPlayers}
           games={currentGames}

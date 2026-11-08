@@ -143,8 +143,10 @@ export const api = {
   getLifetimeStats: (name, type = 'all') =>
     request(`/api/stats/${encodeURIComponent(name)}?type=${encodeURIComponent(type)}`),
 
-  // championship daily quota — { name, limit, playedToday, remaining }.
-  getChampionshipQuota: (name) => request(`/api/quota/${encodeURIComponent(name)}`),
+  // this season's King Online league games — { name, limit, played, counted,
+  // remaining }. `limit` is the season's cap (40); past it nothing is
+  // blocked, the season just stops counting the player's games.
+  getSeasonQuota: (name) => request(`/api/quota/${encodeURIComponent(name)}`),
 
   // reaction-sound catalogue — [{ id, label, glyph, color, url }]. Public
   // read; the write side lives in `adminApi` below.
